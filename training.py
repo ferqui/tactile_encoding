@@ -40,8 +40,9 @@ def main():
     ###########################################
     ##                Dataset                ##
     ###########################################
+    upsample_fac = 5
     file_name = "data/data_braille_letters_digits.pkl"
-    ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(file_name)
+    ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(file_name, upsample_fac)
     params['nb_channels'] = nb_channels
     params['labels'] = labels
     params['data_steps'] = data_steps
@@ -50,7 +51,7 @@ def main():
     nb_input_copies = params['nb_input_copies']
     nb_inputs = params['nb_channels'] * nb_input_copies
     nb_hidden = 450
-    nb_outputs = len(np.unique(params['labels'])) + 1
+    nb_outputs = len(np.unique(params['labels']))
 
     # Learning parameters
     nb_steps = params['data_steps']
