@@ -58,8 +58,8 @@ nb_epochs = 300
 # Neuron parameters
 tau_mem = params['tau_mem']  # ms
 tau_syn = tau_mem / params['tau_ratio']
-alpha = float(np.exp(-params['time_bin_size']*0.001 / tau_syn))
-beta = float(np.exp(-params['time_bin_size']*0.001 / tau_mem))
+alpha = float(np.exp(-params['data_steps']*0.001 / tau_syn))
+beta = float(np.exp(-params['data_steps']*0.001 / tau_mem))
 
 encoder_weight_scale = 1.0
 fwd_weight_scale = params['fwd_weight_scale']
