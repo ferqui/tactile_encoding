@@ -1,18 +1,14 @@
 import torch
 import pandas as pd
 import numpy as np
+import random
+import matplotlib.pyplot as plt
 
 # helper functions
+from scipy import signal
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
-
-
-def upsample(data, n=2):
-    shp = data.shape
-    tmp = data.reshape(shp + (1,))
-    tmp = data.tile((1, 1, 1, n))
-    return tmp.reshape((shp[0], n * shp[1], shp[2]))
 
 
 def load_analog_data(file_name):
@@ -23,7 +19,7 @@ def load_analog_data(file_name):
                       'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
     # Extract data
     nb_repetitions = 200
-    data = data_dict['taxel_data']/255
+    data = data_dict['taxel_data']
     labels = data_dict['letter']
     # find a way to use letters as labels
     le = LabelEncoder()
@@ -32,29 +28,24 @@ def load_analog_data(file_name):
     labels = le.transform(labels) # labels as int numbers
 
     data_steps = len(data[0])
-    data = torch.as_tensor(data, dtype=torch.float)
+
+    # Upsample
+    upsample_fac = 10
+    data_upsampled = []
+    for _, trial in enumerate(data):
+        data_upsampled.append(signal.resample(trial, data_steps*upsample_fac))
+    data_steps = len(data_upsampled[0]) # update data steps
+
+    # convert into tensors
+    data = torch.as_tensor(data_upsampled, dtype=torch.float)
     labels = torch.as_tensor(labels, dtype=torch.long)
 
     # # Select nonzero inputs
-    # nzid = [1,2,6,10]
-    # data = data[:,:,nzid]
-    # selected_chans = len(nzid)
     selected_chans = len(data[0][0])  # read out from data
 
     # Standardize data
     rshp = data.reshape((-1, data.shape[2]))
     data = (data-rshp.mean(0))/(rshp.std(0)+1e-3)
-
-    # Upsample
-    def upsample(data, n=2):
-        shp = data.shape
-        tmp = data.reshape(shp+(1,))
-        tmp = data.tile((1, 1, 1, n))
-        return tmp.reshape((shp[0], n*shp[1], shp[2]))
-
-    global nb_upsample
-    nb_upsample = 2
-    data = upsample(data, n=nb_upsample)
 
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=0.2, shuffle=True, stratify=labels)
