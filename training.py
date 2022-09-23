@@ -72,15 +72,15 @@ def main():
     ###########################################
 
     a = torch.empty((nb_inputs,))
-    torch.nn.init.normal_(
+    nn.init.normal_(
         a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     A1 = torch.empty((nb_inputs,))
-    torch.nn.init.normal_(
+    nn.init.normal_(
         A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     A2 = torch.empty((nb_inputs,))
-    torch.nn.init.normal_(
+    nn.init.normal_(
         A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     network = nn.Sequential(Encoder(nb_inputs, encoder_weight_scale, nb_input_copies),
