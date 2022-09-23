@@ -31,7 +31,7 @@ def load_analog_data(file_name):
     # labels['categorical_label'] = le.transform(labels)
     labels = le.transform(labels) # labels as int numbers
 
-    data_steps = len(data[0])  # check that this returns 51
+    data_steps = len(data[0])
     data = torch.as_tensor(data, dtype=torch.float)
     labels = torch.as_tensor(labels, dtype=torch.long)
 
@@ -39,7 +39,7 @@ def load_analog_data(file_name):
     # nzid = [1,2,6,10]
     # data = data[:,:,nzid]
     # selected_chans = len(nzid)
-    selected_chans = 12  # read out from data
+    selected_chans = len(data[0][0])  # read out from data
 
     # Standardize data
     rshp = data.reshape((-1, data.shape[2]))

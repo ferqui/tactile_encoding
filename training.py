@@ -14,7 +14,8 @@ from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron
 from auxiliary import compute_classification_accuracy, plot_spikes
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = torch.device(
+    'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 ###########################################
 ##              Parameters               ##
@@ -38,12 +39,13 @@ with open(file_name_parameters) as file:
 ###########################################
 ##                Dataset                ##
 ###########################################
-ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(params)
+file_name = "data/data_braille_letters_digits.pkl"
+ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(file_name)
 params['nb_channels'] = nb_channels
 params['labels'] = labels
 params['data_steps'] = data_steps
 
-## Network parameters
+# Network parameters
 nb_input_copies = params['nb_input_copies']
 nb_inputs = params['nb_channels'] * nb_input_copies
 nb_hidden = 450
@@ -53,7 +55,7 @@ nb_outputs = len(np.unique(params['labels'])) + 1
 nb_steps = params['data_steps']
 nb_epochs = 300
 
-## Neuron parameters
+# Neuron parameters
 tau_mem = params['tau_mem']  # ms
 tau_syn = tau_mem / params['tau_ratio']
 alpha = float(np.exp(-params['time_bin_size']*0.001 / tau_syn))
@@ -68,17 +70,21 @@ rec_weight_scale = params['weight_scale_factor'] * fwd_weight_scale
 ###########################################
 
 a = torch.empty((nb_inputs,))
-torch.nn.init.normal_(a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
+torch.nn.init.normal_(
+    a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
 A1 = torch.empty((nb_inputs,))
-torch.nn.init.normal_(A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
+torch.nn.init.normal_(
+    A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
 A2 = torch.empty((nb_inputs,))
-torch.nn.init.normal_(A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
+torch.nn.init.normal_(
+    A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
 network = nn.Sequential(Encoder(nb_inputs, encoder_weight_scale, nb_input_copies),
                         MN_neuron(nb_inputs, a, A1, A2, train=True),
-                        LIF_neuron(nb_inputs, nb_hidden, alpha, beta, is_recurrent=True, fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale),
+                        LIF_neuron(nb_inputs, nb_hidden, alpha, beta, is_recurrent=True,
+                                   fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale),
                         LIF_neuron(nb_hidden, nb_outputs, alpha, beta, is_recurrent=False, fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale)).to(device)
 print(network)
 
@@ -86,27 +92,29 @@ print(network)
 ##               Training                ##
 ###########################################
 
-optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
+optimizer = torch.optim.Adamax(
+    network.parameters(), lr=0.005, betas=(0.9, 0.995))
 
-log_softmax_fn = nn.LogSoftmax(dim=1)  # The log softmax function across output units
+# The log softmax function across output units
+log_softmax_fn = nn.LogSoftmax(dim=1)
 loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
 ttc_hist = []
 loss_hist = []
 accs_hist = [[], []]
 
-writer = SummaryWriter() # For logging purpose
+writer = SummaryWriter()  # For logging purpose
 
 dl_train = DataLoader(ds_train, batch_size=128, shuffle=True, num_workers=8)
 dl_test = DataLoader(ds_test, batch_size=128, shuffle=False, num_workers=8)
 pbar = trange(nb_epochs)
 for e in pbar:
     local_loss = []
-    accs = [] # accs: mean training accuracies for each batch
+    accs = []  # accs: mean training accuracies for each batch
     for x_local, y_local in dl_train:
         x_local, y_local = x_local.to(device), y_local.to(device)
 
-        ## Reset all the layers in the network
+        # Reset all the layers in the network
         for layer in network:
             if hasattr(layer.__class__, 'reset'):
                 layer.reset()
@@ -119,16 +127,18 @@ for e in pbar:
         out_rec = []
         s_out_rec = []
         for t in range(nb_steps):
-            out = network(x_local[:,t])
+            out = network(x_local[:, t])
 
-            spk_rec.append(network[-2].state.S)   # Get the spikes of the hidden layer
-            out_rec.append(network[-1].state.mem) # Get the voltage of the last layer
+            # Get the spikes of the hidden layer
+            spk_rec.append(network[-2].state.S)
+            # Get the voltage of the last layer
+            out_rec.append(network[-1].state.mem)
             s_out_rec.append(out)
         spk_rec = torch.stack(spk_rec, dim=1)
         out_rec = torch.stack(out_rec, dim=1)
         s_out_rec = torch.stack(s_out_rec, dim=1)
 
-        m = torch.sum(s_out_rec, 1) # sum over time
+        m = torch.sum(s_out_rec, 1)  # sum over time
         log_p_y = log_softmax_fn(m)
 
         # Here we can set up our regularizer loss
@@ -158,7 +168,8 @@ for e in pbar:
     accs_hist[0].append(mean_accs)
 
     # Calculate test accuracy in each epoch on the testing dataset
-    test_acc, test_ttc, spk_hidden, spk_output = compute_classification_accuracy(params, dl_test, network, True, device)
+    test_acc, test_ttc, spk_hidden, spk_output = compute_classification_accuracy(
+        params, dl_test, network, True, device)
     accs_hist[1].append(test_acc)  # only safe best test
     ttc_hist.append(test_ttc)
 
@@ -179,4 +190,5 @@ for e in pbar:
     writer.add_figure('Hidden spikes', fig1, global_step=e)
     writer.add_figure('Output spikes', fig2, global_step=e)
 
-    pbar.set_postfix_str("Train accuracy: " + str(np.round(accs_hist[0][-1] * 100,2)) +'%. Test accuracy: ' + str(np.round(accs_hist[1][-1] * 100,2)) + '%, Loss: ' + str(np.round(mean_loss,2)))
+    pbar.set_postfix_str("Train accuracy: " + str(np.round(accs_hist[0][-1] * 100, 2)) + '%. Test accuracy: ' + str(
+        np.round(accs_hist[1][-1] * 100, 2)) + '%, Loss: ' + str(np.round(mean_loss, 2)))
