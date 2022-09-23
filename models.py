@@ -69,7 +69,7 @@ class MN_neuron(nn.Module):
         super(MN_neuron, self).__init__()
 
         # One-to-one synapse
-        self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=True)
+        self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=train)
 
         self.C = 1
 
