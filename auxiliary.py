@@ -15,7 +15,7 @@ def compute_classification_accuracy(params, dataset, network, early, device):
     multi_accs = []
     ttc = None
     for x_local, y_local in dataset:
-        x_local, y_local = x_local.to(device), y_local.to(device)
+        x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
 
         for layer in network:
             if hasattr(layer.__class__, 'reset'):
