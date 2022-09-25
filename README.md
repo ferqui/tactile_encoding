@@ -23,7 +23,7 @@ Scanning | Sample-based | Event-based
 ```
 conda create -n encoding
 conda activate encoding
-conda install matplotlib tqdm pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
+conda install matplotlib seaborn tqdm pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 ```
 ### Virtual environment installation
 ```

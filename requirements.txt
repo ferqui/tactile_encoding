@@ -5,3 +5,4 @@ torchaudio==0.12.1
 torchvision==0.13.1
 tqdm==4.64.0
 tensorboard==2.9.0
+seaborn==0.12.0
