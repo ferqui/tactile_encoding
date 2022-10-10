@@ -65,7 +65,7 @@ class Encoder(nn.Module):
 class MN_neuron(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
-    def __init__(self, nb_inputs, a, A1, A2, b=10, G=50, train=True):
+    def __init__(self, nb_inputs, a, A1, A2, b=10, G=50, k1=200, k2=20, R1=0, R2= 1, train=True):
         super(MN_neuron, self).__init__()
 
         # One-to-one synapse
@@ -77,15 +77,15 @@ class MN_neuron(nn.Module):
 
         self.EL = -0.07
         self.Vr = -0.07
-        self.R1 = 0
-        self.R2 = 1
+        self.R1 = R1
+        self.R2 = R2
         self.Tr = -0.06
         self.Tinf = -0.05
 
         self.b = b  # units of 1/s
         self.G = G * self.C  # units of 1/s
-        self.k1 = 200  # units of 1/s
-        self.k2 = 20  # units of 1/s
+        self.k1 = k1  # units of 1/s
+        self.k2 = k2  # units of 1/s
 
         self.dt = 1 / 1000
 
