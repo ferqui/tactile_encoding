@@ -109,7 +109,7 @@ def main():
     # The log softmax function across output units
     dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
     dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-    pbar = trange(nb_epochs)
+    # pbar = trange(nb_epochs)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
     for e in range(epochs):
@@ -178,11 +178,12 @@ def main():
         print('output len', len(outputs))
         print('label len',len(label))
         output_vs_label = [torch.round(outputs.type(torch.float)).clone().detach(),torch.round(label.type(torch.float)).clone().detach()]
-        plt.imshow(torch.concat(output_vs_label,dim = 1),aspect = 'auto',cmap = 'seismic')
+        plt.imshow(torch.concat(output_vs_label,dim = 1),aspect = 'auto',cmap = 'seismic', interpolation='nearest')
         plt.colorbar()
         plt.title('OUTPUT vs LABEL')
-        plt.xlabel('Output|Label')
+        # plt.xlabel('Output|Label')
         plt.ylabel('TrialxVariable')
+        plt.xticks([0,1],['Output','Label'])
         plt.show()
         for x_local, y_local in dl_test:
             x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
