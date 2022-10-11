@@ -11,13 +11,20 @@ from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
 
 
-def load_analog_data(file_name, upsample_fac):
+def load_analog_data(file_name, upsample_fac, specify_letters = []):
 
     data_dict = pd.read_pickle(file_name)
-
+    # print(data_dict)
     # Extract data
-    data = data_dict['taxel_data']
-    labels = data_dict['letter']
+    if len(specify_letters) != 0:
+        letter_list = []
+        for letter in specify_letters:
+            letter_list.append(np.where(data_dict['letter'] == letter)[0])
+            labels = data_dict['letter'][np.array(letter_list).flatten()]
+            data = data_dict['taxel_data'][np.array(letter_list).flatten()]
+    else:
+        data = data_dict['taxel_data']
+        labels = data_dict['letter']
     # find a way to use letters as labels
     le = LabelEncoder()
     le.fit(labels)

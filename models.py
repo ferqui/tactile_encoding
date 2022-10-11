@@ -45,7 +45,7 @@ activation = SurrGradSpike.apply
 
 ## Encoder
 class Encoder(nn.Module):
-    def __init__(self, nb_inputs, encoder_weight_scale, nb_input_copies):
+    def __init__(self, nb_inputs, encoder_weight_scale, nb_input_copies,ds_min,ds_max):
         super(Encoder, self).__init__()
 
         enc_gain = torch.empty((nb_inputs,), requires_grad=False)
@@ -56,9 +56,11 @@ class Encoder(nn.Module):
         self.nb_input_copies = nb_input_copies
         self.register_buffer('enc_gain', enc_gain)
         self.register_buffer('enc_bias', enc_bias)
+        self.ds_min = ds_min
+        self.ds_max = ds_max
 
     def forward(self, inputs):
-        encoder_currents = self.enc_gain * (inputs.tile((self.nb_input_copies,)) + self.enc_bias) 
+        encoder_currents = self.enc_gain * (inputs.tile((self.nb_input_copies,)) + self.enc_bias)
         return encoder_currents
 
 ## MN neuron
