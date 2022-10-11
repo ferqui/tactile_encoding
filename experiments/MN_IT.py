@@ -112,7 +112,7 @@ def main():
     pbar = trange(nb_epochs)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
-    for e in range(300):
+    for e in range(epochs):
         local_loss = []
         H_train = []
         H_test = []
@@ -128,7 +128,6 @@ def main():
             for t in range(nb_steps):
                 out = neuron(x_local[:, t,None,None])
                 s_out_rec.append(out)
-
 
             s_out_rec_train = torch.stack(s_out_rec, dim=1)
             ### s_out_rec_train shape: trial x time x fanout x variable x channels
@@ -148,20 +147,43 @@ def main():
 
                 net = NMF(V_matrix.shape, rank=rank_NMF)
                 net.fit(V_matrix)
-                H_train[neuron_id] = net.H
 
+                H_train[neuron_id] = net.H
+                # plt.show()
                 optimizer.zero_grad()
                 outputs = model(H_train[neuron_id])
                 loss = criterion(torch.round(outputs.type(torch.float)), torch.round(label.type(torch.float)))
+
                 # print(torch.round(outputs.type(torch.float)))
                 # print(torch.round(label.type(torch.float)))
-                print(loss)
+                # print('loss',loss)
                 # get gradients w.r.t to parameters
                 loss.backward()
 
                 # update parameters
                 optimizer.step()
 
+        ## Some useful plots
+        plt.imshow(V_matrix, aspect='auto')
+        plt.title('INPUT NMF')
+        plt.xlabel('Time')
+        plt.ylabel('TrialxVariable')
+        # plt.show()
+        plt.figure()
+        plt.title('H MNF')
+        plt.xlabel('Rank')
+        plt.ylabel('TrialxVariable')
+        plt.imshow(net.H.clone().detach(), aspect='auto')
+        plt.figure()
+        print('output len', len(outputs))
+        print('label len',len(label))
+        output_vs_label = [torch.round(outputs.type(torch.float)).clone().detach(),torch.round(label.type(torch.float)).clone().detach()]
+        plt.imshow(torch.concat(output_vs_label,dim = 1),aspect = 'auto',cmap = 'seismic')
+        plt.colorbar()
+        plt.title('OUTPUT vs LABEL')
+        plt.xlabel('Output|Label')
+        plt.ylabel('TrialxVariable')
+        plt.show()
         for x_local, y_local in dl_test:
             x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
 
@@ -189,6 +211,7 @@ def main():
 
             for neuron_id in range(1):
                 V_matrix = s_out_rec_test[:, 0, neuron_id, :]
+
                 net = NMF(V_matrix.shape, rank=rank_NMF)
                 net.fit(V_matrix)
                 H_test[neuron_id] = net.H
@@ -239,6 +262,12 @@ def main():
                     pred_pos = torch.where(label_unique == pred)
                     pdf_x1x2[lab_pos,pred_pos] += 1
             pdf_x1x2 = pdf_x1x2/torch.sum(pdf_x1x2)
-
+            pdf_x1 = torch.sum(pdf_x1x2,dim = 0)
+            pdf_x2 = torch.sum(pdf_x1x2, dim=1)
+            mi = torch.zeros(1)
+            for el1_idx,pdf_x1_el in enumerate(pdf_x1):
+                for el2_idx,pdf_x2_el in enumerate(pdf_x2):
+                    mi += pdf_x1x2[el1_idx,el2_idx]*torch.log(pdf_x1x2[el1_idx,el2_idx]/(pdf_x1_el*pdf_x2_el))
+            print('mutual information',mi)
 if __name__ == "__main__":
     main()
