@@ -93,7 +93,7 @@ class MN_neuron_IT(nn.Module):
         self.dt = 1 / 1000
 
         # self.a = nn.Parameter(torch.tensor(a), requires_grad=True)
-        one2N_matrix = torch.ones(1,self.fanout,self.channels, 1)
+        one2N_matrix = torch.ones(1,self.fanout,self.channels, 1) # shape: 1 (single neuron) x fanout x channels x 1)
         #self.register_buffer('one2N_matrix', torch.ones(1, nb_inputs))
 
         print('shape ones',one2N_matrix.shape)

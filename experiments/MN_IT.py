@@ -28,12 +28,12 @@ class linearRegression(torch.nn.Module):
         out = self.linear(x)
         return out
 
-def sim_a_batch(dataset,device,neuron,varying_element,rank_NMF,model,training = []):
+def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}):
     #training has optimizer,criterion
     for x_local, y_local in dataset:
         # print('aaaa')
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
-        # x_local = x_local[0, :] * torch.ones_like(x_local)
+        x_local = x_local[0, :] * torch.ones_like(x_local)
         # Reset all the layers in the network
         neuron.reset()
         s_out_rec = []
@@ -43,6 +43,11 @@ def sim_a_batch(dataset,device,neuron,varying_element,rank_NMF,model,training = 
             s_out_rec.append(out)
 
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
+        s_out_rec_train = torch.zeros_like(s_out_rec_train)
+        step_t = 15
+        for i in range(10):
+            s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
+            # print(i*step_t)
         ### s_out_rec_train shape: trial x time x fanout x variable x channels
         s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
 
@@ -51,37 +56,62 @@ def sim_a_batch(dataset,device,neuron,varying_element,rank_NMF,model,training = 
         s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
         label = label.T.flatten()[:, None]
         # plt.imshow(s_out_rec_train[:,0,4,:], aspect='auto')
-        # plt.ylim([0, 128*2])
+        # # plt.ylim([0, 128*2])
         # plt.title('INPUT NMF')
         # plt.xlabel('Time')
         # plt.ylabel('TrialxVariable')
+        # ## s_out_rec_train shape:  (trial x variable) x fanout x channels x time
+        # # print('s_out_train shape',s_out_rec_train.shape)
         # plt.show()
-        ### s_out_rec_train shape:  (trial x variable) x fanout x channels x time
-        # print('s_out_train shape',s_out_rec_train.shape)
-
         H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
         for neuron_id in [4]:
             V_matrix = s_out_rec_train[:, 0, neuron_id, :]
-            print('total spikes for neuron', neuron_id, ':', V_matrix.sum())
 
             net = NMF(V_matrix.shape, rank=rank_NMF)
             net.fit(V_matrix)
 
             H[neuron_id] = net.H
+            # plt.figure()
+            # plt.imshow(net().clone().detach(), aspect='auto')
+            # # plt.ylim([0, 128*2])
+            # plt.title('OUT NMF')
+            # plt.xlabel('Time')
+            # plt.ylabel('TrialxVariable')
+            # plt.figure()
+            import scipy.spatial as sp
+            cdist = 1 - sp.distance.cdist(net().clone().detach(), V_matrix.clone().detach(), 'cosine')
+            diagonal_cdist = cdist.diagonal()
+            diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
+
+            # print('gigi diag',np.mean(diag_cdist_nonan))
+            # plt.imshow(cdist,aspect = 'auto')
+            # plt.colorbar()
             # plt.show()
+            # plt.show()
+
             if len(training):
+                # print('training total spikes for neuron', neuron_id, ':', V_matrix.sum())
+
                 training['optimizer'].zero_grad()
                 outputs = model(H[neuron_id])
-                loss = training['criterion'](torch.round(outputs.type(torch.float)), torch.round(label.type(torch.float)))
+                loss = training['criterion'](outputs, label)
                 # if torch.isnan(loss):
+                print('loss',float(loss))
                 # get gradients w.r.t to parameters
                 loss.backward()
                 # update parameters
                 training['optimizer'].step()
+                acc = ((outputs - label) ** 2).sum()/x_local.shape[0]
+                print('acc', acc)
+                coeff = [p for p in model.parameters()][0][0]
+                coeff = coeff.clone().detach()
+                plt.plot(coeff)
             else:
+                # print('testing xlocal mean',x_local.mean())
+                # print('test total spikes for neuron', neuron_id, ':', V_matrix.sum())
                 predicted = model(H[neuron_id])
-                tmp = np.mean((predicted.type(torch.int32) == label.type(torch.int32)).detach().cpu().numpy())
-                print('acc', tmp)
+                acc = ((predicted - label) ** 2).sum()/x_local.shape[0]
+                print('acc', acc)
 def main():
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -142,7 +172,7 @@ def main():
 
     # a = torch.empty((nb_inputs,))
     n_param_values = 10
-    a = torch.Tensor(np.linspace(0, 10, n_param_values))
+    a = torch.Tensor(np.linspace(0, 20, n_param_values))
     # nn.init.normal_(
     #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
@@ -155,13 +185,13 @@ def main():
     fanout = 1  # number of output neurons from the linear expansion
     neuron = models.MN_neuron_IT(params['nb_channels'], fanout, n_param_values, a, A1, A2, train=False)
 
-    batch_size = 128
+    batch_size = 20
 
     inputDim = 1  # takes variable 'x'
     outputDim = 1  # takes variable 'y'
     learningRate = 0.01
     epochs = 100
-    rank_NMF = 1000
+    rank_NMF = 100
     model = linearRegression(rank_NMF, 1)
 
     # The log softmax function across output units
@@ -176,137 +206,12 @@ def main():
         H_test = []
         accs = []  # accs: mean training accuracies for each batch
         counter = 0
-        for x_local, y_local in dl_train:
-            # print('aaaa')
-            x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
-            # x_local = x_local[0, :] * torch.ones_like(x_local)
-            # Reset all the layers in the network
-            neuron.reset()
-            counter += 1
-            s_out_rec = []
-            for t in range(nb_steps):
-                out = neuron(
-                    x_local[:, t, None, None])  # shape: n_batches x 1 ( time bin) x n_param_values x n_channels
-                s_out_rec.append(out)
+        plt.figure()
+        sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model, {'optimizer':optimizer, 'criterion':criterion})
+        sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model)
 
-            s_out_rec_train = torch.stack(s_out_rec, dim=1)
-            ### s_out_rec_train shape: trial x time x fanout x variable x channels
-            s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
-
-            ### s_out_rec_train shape:  trial x variable x fanout x channels x time
-            label = torch.ones([s_out_rec_train.shape[1], varying_element.shape[0]]) * varying_element
-            s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
-            label = label.T.flatten()[:, None]
-            # plt.imshow(s_out_rec_train[:,0,4,:], aspect='auto')
-            # plt.ylim([0, 128*2])
-            # plt.title('INPUT NMF')
-            # plt.xlabel('Time')
-            # plt.ylabel('TrialxVariable')
-            # plt.show()
-            ### s_out_rec_train shape:  (trial x variable) x fanout x channels x time
-            # print('s_out_train shape',s_out_rec_train.shape)
-
-            H_train = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
-            for neuron_id in [4]:
-                V_matrix = s_out_rec_train[:, 0, neuron_id, :]
-                plt.figure()
-                plt.imshow(V_matrix,aspect= 'auto')
-                plt.title('V_matrix')
-                print('total spikes for neuron', neuron_id, ':', V_matrix.sum())
-                if counter == 2:
-                    plt.show()
-                    print('ciao')
-                net = NMF(V_matrix.shape, rank=rank_NMF)
-                net.fit(V_matrix)
-
-                H_train[neuron_id] = net.H
-                # plt.show()
-                optimizer.zero_grad()
-                outputs = model(H_train[neuron_id])
-                loss = criterion(torch.round(outputs.type(torch.float)), torch.round(label.type(torch.float)))
-                # if torch.isnan(loss):
-
-
-                # print(torch.round(outputs.type(torch.float)))
-                # print(torch.round(label.type(torch.float)))
-                # print('loss',loss)
-                # get gradients w.r.t to parameters
-                loss.backward()
-
-                # update parameters
-                optimizer.step()
-
-                # Some useful plots
-                # plt.imshow(V_matrix, aspect='auto')
-                # # plt.ylim([0,20])
-                # plt.title('INPUT NMF')
-                # plt.xlabel('Time')
-                # plt.ylabel('TrialxVariable')
-                # # plt.show()
-                # plt.figure()
-                # plt.title('H MNF')
-                # plt.xlabel('Rank')
-                # plt.ylabel('TrialxVariable')
-                # plt.imshow(net.H.clone().detach(), aspect='auto')
-                # plt.figure()
-                # print('output len', len(outputs))
-                # print('label len',len(label))
-                # output_vs_label = [torch.round(outputs.type(torch.float)).clone().detach(),torch.round(label.type(torch.float)).clone().detach()]
-                # plt.imshow(torch.concat(output_vs_label,dim = 1),aspect = 'auto',cmap = 'seismic', interpolation='nearest')
-                # plt.colorbar()
-                # plt.title('OUTPUT vs LABEL')
-                # # plt.xlabel('Output|Label')
-                # plt.ylabel('TrialxVariable')
-                # plt.xticks([0,1],['Output','Label'])
-                #
-                # WH = torch.matmul(net.W, net.H.T)
-                # plt.figure()
-                # plt.title('WH')
-                # plt.imshow(WH.T.detach(), aspect='auto')
-                # plt.xlabel('Time')
-                # plt.ylabel('TrialxVariable')
-                # plt.show()
-                print('Hi')
-
-        for x_local, y_local in dl_test:
-            x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
-
-            # Reset all the layers in the network
-            neuron.reset()
-            s_out_rec = []
-            for t in range(nb_steps):
-                out = neuron(x_local[:, t, None, None])
-                s_out_rec.append(out)
-            s_out_rec_test = torch.stack(s_out_rec, dim=1)
-            # print('s_out_rec_test shape',s_out_rec_test.shape)
-            ### shape: trial x time x fanout x variable x channels
-            s_out_rec_test = torch.permute(s_out_rec_test, (0, 3, 2, 4, 1))
-            ### shape:  trial x fanout x channels x time x variable
-            label = label.T.flatten()[:, None]
-            # print('label shape',label.shape)
-
-            s_out_rec_test = torch.flatten(s_out_rec_test, start_dim=0, end_dim=1)
-            ### shape:  trial x fanout x channels x (time x variable)
-
-            label = torch.ones([s_out_rec_test.shape[0], varying_element.shape[0]]) * varying_element
-
-            H_test = torch.zeros([s_out_rec_test.shape[2], s_out_rec_test.shape[0], rank_NMF])
-            # print('H_test shape',H_test.shape)
-
-            for neuron_id in [4]:
-                V_matrix = s_out_rec_test[:, 0, neuron_id, :]
-
-                net = NMF(V_matrix.shape, rank=rank_NMF)
-                net.fit(V_matrix)
-                H_test[neuron_id] = net.H
-                predicted = model(H_test[neuron_id])
-                # print('predicted shape', predicted.shape)
-                # print(predicted.type(torch.int32))
-                # print(label.type(torch.int32))
-                tmp = np.mean((predicted.type(torch.int32) == label.type(torch.int32)).detach().cpu().numpy())
-                print('acc', tmp)
-
-            print('loss {}, ac'.format(loss.item(), tmp.item()))
+        plt.show()
+        print('Hiiiiiiiiiiii')
     ## last test
     for x_local, y_local in dl_test:
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
