@@ -260,7 +260,6 @@ def main():
 
     A2 = torch.Tensor(np.linspace(0, 0, n_param_values))
 
-    varying_element = a
 
     fanout = 1  # number of output neurons from the linear expansion
     neuron = models.MN_neuron_IT(params['nb_channels'], fanout, n_param_values, a, A1, A2, train=False)
