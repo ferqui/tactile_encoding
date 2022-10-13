@@ -19,6 +19,8 @@ from auxiliary import compute_classification_accuracy, plot_spikes
 from torch.autograd import Variable
 torch.manual_seed(0)
 
+
+
 class linearRegression(torch.nn.Module):
     def __init__(self, inputSize, outputSize):
         super(linearRegression, self).__init__()
@@ -30,23 +32,27 @@ class linearRegression(torch.nn.Module):
 
 def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}):
     #training has optimizer,criterion
+    counter = 0
     for x_local, y_local in dataset:
         # print('aaaa')
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
-        x_local = x_local[0, :] * torch.ones_like(x_local)
+        # x_local = x_local[0, :] * torch.ones_like(x_local)
         # Reset all the layers in the network
         neuron.reset()
         s_out_rec = []
+        vmem_neuron = torch.zeros(x_local.shape[0], x_local.shape[1], 1, varying_element.shape[0], x_local.shape[2])
+        thr_neuron = torch.zeros_like(vmem_neuron)
         for t in range(x_local.shape[1]):
-            out = neuron(
-                x_local[:, t, None, None])  # shape: n_batches x 1 ( time bin) x n_param_values x n_channels
+            out = neuron(x_local[:, t, None, None]*1000000)  # shape: n_batches x 1 fanout x n_param_values x n_channels
             s_out_rec.append(out)
+            vmem_neuron[:,t] = neuron.state.V # shape: n_batches x 1 fanout x n_param_values x n_channels
+            thr_neuron[:,t] = neuron.state.Thr
 
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
         s_out_rec_train = torch.zeros_like(s_out_rec_train)
         step_t = 15
-        for i in range(10):
-            s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
+        # for i in range(10):
+        #     s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
             # print(i*step_t)
         ### s_out_rec_train shape: trial x time x fanout x variable x channels
         s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
@@ -55,29 +61,24 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         label = torch.ones([s_out_rec_train.shape[1], varying_element.shape[0]]) * varying_element
         s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
         label = label.T.flatten()[:, None]
-        # plt.imshow(s_out_rec_train[:,0,4,:], aspect='auto')
-        # # plt.ylim([0, 128*2])
-        # plt.title('INPUT NMF')
-        # plt.xlabel('Time')
-        # plt.ylabel('TrialxVariable')
-        # ## s_out_rec_train shape:  (trial x variable) x fanout x channels x time
-        # # print('s_out_train shape',s_out_rec_train.shape)
+        label_min = label.min()
+        label_diff = label.max()-label.min()
+        label_norm = (label - label_min)/(label_diff)
+        print('label_norm min max',label_norm.min(),label_norm.max())
+
         # plt.show()
+
         H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
-        for neuron_id in [4]:
+        selected_neuron_id = 4
+        for neuron_id in [selected_neuron_id]:
             V_matrix = s_out_rec_train[:, 0, neuron_id, :]
 
             net = NMF(V_matrix.shape, rank=rank_NMF)
             net.fit(V_matrix)
 
             H[neuron_id] = net.H
-            # plt.figure()
-            # plt.imshow(net().clone().detach(), aspect='auto')
-            # # plt.ylim([0, 128*2])
-            # plt.title('OUT NMF')
-            # plt.xlabel('Time')
-            # plt.ylabel('TrialxVariable')
-            # plt.figure()
+
+
             import scipy.spatial as sp
             cdist = 1 - sp.distance.cdist(net().clone().detach(), V_matrix.clone().detach(), 'cosine')
             diagonal_cdist = cdist.diagonal()
@@ -91,9 +92,66 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
             if len(training):
                 # print('training total spikes for neuron', neuron_id, ':', V_matrix.sum())
-
+                counter += 1
                 training['optimizer'].zero_grad()
                 outputs = model(H[neuron_id])
+                outputs_norm = (outputs - label_min) / (label_diff)
+                output_vs_label = [outputs.clone().detach(),
+                                   label.clone().detach()]
+                if counter == 10:
+
+                    idx_param_value = 0
+                    idx_fanout = 0
+                    for trial in range(3):#range(vmem_neuron.shape[0]):
+
+                        p = plt.plot(thr_neuron[trial,:,idx_fanout,idx_param_value,selected_neuron_id])
+                        idx_out_spikes_in_trial = s_out_rec_train[idx_param_value*x_local.shape[0]+trial,idx_fanout, neuron_id,:]==1
+                        v = vmem_neuron[trial,:,idx_fanout,idx_param_value,selected_neuron_id]
+
+                        plt.vlines(s_out_rec_train[idx_param_value*x_local.shape[0]+trial,idx_fanout, neuron_id, idx_out_spikes_in_trial], float(v.min()), float(v.max()), color=p[0].get_color(), linestyle='dashed')
+
+                        plt.plot(v, label=str(len(np.where(idx_out_spikes_in_trial==True)[0])), linestyle='dotted', color=p[0].get_color())
+
+                        plt.legend()
+
+                    plt.title('V neuron across trials')
+                    plt.xlabel('Time')
+                    plt.ylabel('vmem')
+
+                    plt.figure()
+                    plt.imshow(x_local[:,4,:],aspect = 'auto')
+                    plt.title('XLOCAL')
+
+                    plt.figure()
+                    plt.imshow(s_out_rec_train[:, 0, selected_neuron_id, :], aspect='auto')
+                    # plt.ylim([0, 128*2])
+                    plt.title('INPUT NMF')
+                    plt.xlabel('Time')
+                    plt.ylabel('TrialxVariable')
+
+                    # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
+                    print('s_out_train shape', s_out_rec_train.shape)
+                    plt.figure()
+                    plt.imshow(net.H.clone().detach(), aspect='auto')
+                    # plt.ylim([0, 128*2])
+                    plt.title('H NMF')
+                    plt.xlabel('Time')
+                    plt.ylabel('TrialxVariable')
+                    plt.figure()
+                    plt.imshow(net().clone().detach(), aspect='auto')
+                    # plt.ylim([0, 128*2])
+                    plt.title('OUT NMF')
+                    plt.xlabel('Time')
+                    plt.ylabel('TrialxVariable')
+                    plt.figure()
+                    plt.imshow(torch.concat(output_vs_label, dim=1), aspect='auto', cmap='seismic', interpolation='nearest')
+                    plt.colorbar()
+                    plt.title('OUTPUT vs LABEL')
+                    # plt.xlabel('Output|Label')
+                    plt.ylabel('TrialxVariable')
+                    plt.xticks([0, 1], ['Output', 'Label'])
+                    plt.show()
+                    print('eee macarena')
                 loss = training['criterion'](outputs, label)
                 # if torch.isnan(loss):
                 print('loss',float(loss))
@@ -101,7 +159,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 loss.backward()
                 # update parameters
                 training['optimizer'].step()
-                acc = ((outputs - label) ** 2).sum()/x_local.shape[0]
+                acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
                 coeff = [p for p in model.parameters()][0][0]
                 coeff = coeff.clone().detach()
@@ -110,7 +168,9 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 # print('testing xlocal mean',x_local.mean())
                 # print('test total spikes for neuron', neuron_id, ':', V_matrix.sum())
                 predicted = model(H[neuron_id])
-                acc = ((predicted - label) ** 2).sum()/x_local.shape[0]
+                outputs_norm = (predicted - label_min) / (label_diff)
+
+                acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
 def main():
     device = torch.device(
@@ -141,7 +201,7 @@ def main():
     upsample_fac = 5
     file_name = "../data/data_braille_letters_digits.pkl"
     ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(file_name, upsample_fac,
-                                                                          specify_letters=['A'])
+                                                                          specify_letters=[])
     params['nb_channels'] = nb_channels
     params['labels'] = labels
     params['data_steps'] = data_steps
@@ -172,7 +232,7 @@ def main():
 
     # a = torch.empty((nb_inputs,))
     n_param_values = 10
-    a = torch.Tensor(np.linspace(0, 20, n_param_values))
+    a = torch.Tensor(np.linspace(0, 0, n_param_values))
     # nn.init.normal_(
     #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
