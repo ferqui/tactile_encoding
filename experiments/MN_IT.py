@@ -42,10 +42,10 @@ class NlinearRegression(torch.nn.Module):
         out = self.NLregression(x)
         return out
 
-def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}, list_loss=[]):
+def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}, list_loss=[], list_mi=[], final = False):
     #training has optimizer,criterion
     counter = 0
-
+    print('sim_batch')
     for x_local, y_local in dataset:
         # print('aaaa')
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
@@ -55,6 +55,9 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         s_out_rec = []
         vmem_neuron = torch.zeros(x_local.shape[0], x_local.shape[1], 1, varying_element.shape[0], x_local.shape[2])
         thr_neuron = torch.zeros_like(vmem_neuron)
+
+        print('Hello')
+
         for t in range(x_local.shape[1]):
             out = neuron(x_local[:, t, None, None]*1000)  # shape: n_batches x 1 fanout x n_param_values x n_channels
             s_out_rec.append(out)
@@ -180,7 +183,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 training['optimizer'].step()
                 acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
-
+                return list_loss
             else:
                 # print('testing xlocal mean',x_local.mean())
                 # print('test total spikes for neuron', neuron_id, ':', V_matrix.sum())
@@ -190,12 +193,49 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
 
-    return list_loss
+                label_unique = torch.unique(label)
+                predicted_int = predicted.type(torch.int)
+                predicted_range = torch.unique(predicted_int)
+                pdf_x1x2 = torch.zeros([len(label_unique), len(predicted_range)])
+                for pred in predicted_int:
+                    for lab in label:
+                        lab_pos = torch.where(label_unique == lab)[0]
+                        pred_pos = torch.where(predicted_range == pred)[0]
+                        pdf_x1x2[lab_pos, pred_pos] += 1
+
+                num_occ = torch.sum(pdf_x1x2)
+                pdf_x1 = torch.sum(pdf_x1x2, dim=1)/num_occ # to check
+                pdf_x2 = torch.sum(pdf_x1x2, dim=0)/num_occ
+                pdf_x1x2 = pdf_x1x2 / num_occ
+                if final == True:
+                    plt.figure()
+                    plt.imshow(pdf_x1x2)
+                    plt.xticks([i for i in range(len(predicted_range))],np.array(predicted_range))
+                    plt.yticks([i for i in range(len(label_unique))],np.array(label_unique))
+                    plt.xlabel('Predicted')
+                    plt.ylabel('Label')
+                    plt.title('Prob matrix')
+                    plt.colorbar()
+                    plt.show()
+                mi = torch.zeros(1)
+                for el1_idx, pdf_x1_el in enumerate(pdf_x1):
+                    for el2_idx, pdf_x2_el in enumerate(pdf_x2):
+                        mi += pdf_x1x2[el1_idx, el2_idx] * torch.log(
+                            pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el))
+                print('mutual information', mi)
+                list_mi.append(mi)
+                return list_mi
+
+
 
 def main():
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(0)
+
+    cuda = torch.cuda.is_available()
+    if cuda:
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
     ###########################################
     ##              Parameters               ##
@@ -230,11 +270,11 @@ def main():
     nb_input_copies = params['nb_input_copies']
     nb_inputs = params['nb_channels'] * nb_input_copies
     nb_hidden = 450
-    nb_outputs = len(np.unique(params['labels']))
+    nb_outputs = len(torch.unique(params['labels']))
 
     # Learning parameters
     nb_steps = params['data_steps']
-    nb_epochs = 300
+    nb_epochs = 100
 
     # Neuron parameters
     tau_mem = params['tau_mem']  # ms
@@ -252,13 +292,13 @@ def main():
 
     # a = torch.empty((nb_inputs,))
     n_param_values = 10
-    a = torch.Tensor(np.linspace(-10, 10, n_param_values))
+    a = torch.Tensor(np.linspace(-10, 10, n_param_values)).to(device)
     # nn.init.normal_(
     #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A1 = torch.Tensor(np.linspace(0, 0, n_param_values))
+    A1 = torch.Tensor(np.linspace(0, 0, n_param_values)).to(device)
 
-    A2 = torch.Tensor(np.linspace(0, 0, n_param_values))
+    A2 = torch.Tensor(np.linspace(0, 0, n_param_values)).to(device)
 
     varying_element = a
 
@@ -269,11 +309,12 @@ def main():
 
     inputDim = 1  # takes variable 'x'
     outputDim = 1  # takes variable 'y'
-    learningRate = 0.1#10#0.01
-    epochs = 100
+    learningRate = 10#10#0.01
+
     rank_NMF = 10
-    #model = linearRegression(rank_NMF, 1)
-    model = linearRegression(rank_NMF,1)
+    range_weight_init = 10
+    model = linearRegression(rank_NMF, 1)
+    model.linear.weight = torch.nn.Parameter(model.linear.weight*range_weight_init)
 
     coeff = [p for p in model.parameters()][0][0]
     coeff = coeff.clone().detach()
@@ -281,75 +322,45 @@ def main():
     # plt.hist(coeff)
     # plt.show()
 
+    #TODO: Check this
+    if torch.cuda.is_available():
+        pin_memory=False
+    else:
+        pin_memory=True
+
     # The log softmax function across output units
-    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
-    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
+    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
     # pbar = trange(nb_epochs)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
     list_loss = []
-    for e in range(100):
+    list_mi = []
+    for e in range(nb_epochs):
         local_loss = []
         H_train = []
         H_test = []
         accs = []  # accs: mean training accuracies for each batch
         counter = 0
-        list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model, {'optimizer':optimizer, 'criterion':criterion}, list_loss)
-        _ = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model)
+        print('Epoch', e)
+        list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model, {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss)
+        list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi)
 
         print('Hiiiiiiiiiiii')
+    list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, final = True)
+    fig = plt.figure()
     plt.plot(list_loss)
+    plt.xlabel('Epochs x Trials')
+    plt.ylabel('Loss')
+    fig.savefig('./figures/Loss_linear_.pdf', format='pdf')
+
+    fig = plt.figure()
+    plt.plot(list_mi)
+    plt.xlabel('Epochs x Trials')
+    plt.ylabel('MI')
+    fig.savefig('./figures/MI_linear.pdf', format='pdf')
+
     plt.show()
-
-    ## last test
-    try:
-        for x_local, y_local in dl_test:
-            x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
-
-            # Reset all the layers in the network
-            neuron.reset()
-            s_out_rec = []
-            for t in range(nb_steps):
-                out = neuron(x_local[:, t, None, None])
-                s_out_rec.append(out)
-            s_out_rec_test = torch.stack(s_out_rec, dim=1)
-            # print('s_out_rec_test shape',s_out_rec_test.shape)
-            ### shape: trial x time x fanout x variable x channels
-            s_out_rec_test = torch.permute(s_out_rec_test, (0, 3, 2, 4, 1))
-            ### shape:  trial x fanout x channels x time x variable
-            label = label.T.flatten()[:, None]
-            # print('label shape',label.shape)
-
-            s_out_rec_test = torch.flatten(s_out_rec_test, start_dim=0, end_dim=1)
-            ### shape:  trial x fanout x channels x (time x variable)
-
-            label = torch.ones([s_out_rec_test.shape[0], varying_element.shape[0]]) * varying_element
-
-            H_test = torch.zeros([s_out_rec_test.shape[2], s_out_rec_test.shape[0], rank_NMF])
-            # print('H_test shape',H_test.shape)
-            label_unique = torch.unique(label)
-            pdf_x1x2 = torch.zeros([len(label_unique), len(label_unique)])
-            for neuron_id in range(1):
-                V_matrix = s_out_rec_test[:, 0, neuron_id, :]
-                net = NMF(V_matrix.shape, rank=rank_NMF)
-                net.fit(V_matrix)
-                H_test[neuron_id] = net.H
-                predicted = model(H_test[neuron_id])
-                for pred in predicted:
-                    for lab in labels:
-                        lab_pos = torch.where(label_unique == lab)
-                        pred_pos = torch.where(label_unique == pred)
-                        pdf_x1x2[lab_pos, pred_pos] += 1
-                pdf_x1x2 = pdf_x1x2 / torch.sum(pdf_x1x2)
-                pdf_x1 = torch.sum(pdf_x1x2, dim=0)
-                pdf_x2 = torch.sum(pdf_x1x2, dim=1)
-                mi = torch.zeros(1)
-                for el1_idx, pdf_x1_el in enumerate(pdf_x1):
-                    for el2_idx, pdf_x2_el in enumerate(pdf_x2):
-                        mi += pdf_x1x2[el1_idx, el2_idx] * torch.log(pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el))
-                print('mutual information', mi)
-    except:
-        print('Hello')
 
 if __name__ == "__main__":
     main()

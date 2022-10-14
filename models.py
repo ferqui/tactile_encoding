@@ -107,6 +107,7 @@ class MN_neuron_IT(nn.Module):
         self.A1 = torch.permute(nn.Parameter(one2N_matrix*A1 * self.C, requires_grad=train),(0,1,3,2))
         self.A2 = torch.permute(nn.Parameter(one2N_matrix*A2 * self.C, requires_grad=train),(0,1,3,2))
 
+        print('device A1', self.A1.device)
         self.state = None
 
     def forward(self, x):
@@ -126,7 +127,7 @@ class MN_neuron_IT(nn.Module):
         i1 += -self.k1 * i1 * self.dt
         i2 += -self.k2 * i2 * self.dt
 
-        V += self.dt * (self.linear * x + i1 + i2 - self.G * (V - self.EL)) / self.C
+        V += self.dt * (self.linear.to(x.device, non_blocking=True) * x + i1 + i2 - self.G * (V - self.EL)) / self.C
 
         Thr += self.dt * (self.a * (V - self.EL) - self.b * (Thr - self.Tinf))
 
