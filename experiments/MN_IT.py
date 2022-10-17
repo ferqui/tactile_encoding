@@ -70,10 +70,10 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
 
-        s_out_rec_train = torch.zeros_like(s_out_rec_train)
-        step_t = 15
-        for i in range(10):
-            s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
+        # s_out_rec_train = torch.zeros_like(s_out_rec_train)
+        # step_t = 15
+        # for i in range(10):
+        #     s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
             #print(i*step_t)
         ## s_out_rec_train shape: trial x time x fanout x variable x channels
 
@@ -86,7 +86,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         label_min = label.min()
         label_diff = label.max()-label.min()
         label_norm = (label - label_min)/(label_diff)
-        print('label_norm min max',label_norm.min(),label_norm.max())
+        # print('label_norm min max',label_norm.min(),label_norm.max())
 
         # plt.show()
 
@@ -97,16 +97,19 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
             net = NMF(V_matrix.shape, rank=rank_NMF)
             net.fit(V_matrix.to_sparse())
+            batch_size = 20
+            # H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
 
             H[neuron_id] = net.H
-
+            # for i in range(rank_NMF):
+            #     H[neuron_id, i * batch_size:(i + 1) * (batch_size),i] = 1
 
             import scipy.spatial as sp
             cdist = 1 - sp.distance.cdist(net().clone().detach(), V_matrix.clone().detach(), 'cosine')
             diagonal_cdist = cdist.diagonal()
             diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
 
-            print('gigi diag',np.mean(diag_cdist_nonan))
+            # print('gigi diag',np.mean(diag_cdist_nonan))
             # plt.imshow(cdist,aspect = 'auto')
             # plt.colorbar()
             # plt.show()
@@ -123,7 +126,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 coeff = [p for p in model.parameters()][0][0]
                 coeff = coeff.clone().detach()
                 #plt.plot(coeff)
-                if counter == 100000:
+                if counter == -1:
 
                     idx_param_value = 0
                     idx_fanout = 0
@@ -157,9 +160,15 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
                     print('s_out_train shape', s_out_rec_train.shape)
                     plt.figure()
-                    plt.imshow(net.H.clone().detach(), aspect='auto')
+                    plt.imshow(H[neuron_id].clone().detach(), aspect='auto',interpolation='nearest')
                     # plt.ylim([0, 128*2])
                     plt.title('H NMF')
+                    plt.xlabel('Rank')
+                    plt.ylabel('TrialxVariable')
+                    plt.figure()
+                    plt.imshow(coeff[:,None].clone().detach(), aspect='auto',interpolation='nearest')
+                    # plt.ylim([0, 128*2])
+                    plt.title('w classifier')
                     plt.xlabel('Rank')
                     plt.ylabel('TrialxVariable')
                     plt.figure()
@@ -181,7 +190,8 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     # plt.xlabel('Output|Label')
                     plt.ylabel('TrialxVariable')
                     plt.xticks([0, 1], ['Output', 'Label'])
-                    plt.show()
+                    # plt.show()
+                    print('eee macarena')
 
                 loss = training['criterion'](outputs, label)
                 # if torch.isnan(loss):
@@ -193,12 +203,23 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 training['optimizer'].step()
                 acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
-                return list_loss
+
+                # print('counter end train', counter)
+
             else:
                 # print('testing xlocal mean',x_local.mean())
                 # print('test total spikes for neuron', neuron_id, ':', V_matrix.sum())
                 predicted = model(H[neuron_id])
-
+                # plt.figure()
+                # plt.imshow(H[neuron_id].clone().detach(),aspect = 'auto',interpolation='nearest')
+                # plt.title('H[4]')
+                # plt.figure()
+                # plt.imshow(net.H.clone().detach(), aspect='auto',interpolation='nearest')
+                # plt.title('net.H')
+                # plt.figure()
+                # plt.imshow(predicted.clone().detach(), aspect='auto',interpolation='nearest')
+                # # print(model.parameters())
+                # plt.show()
                 output_vs_label = [predicted.clone().detach(),
                                    label.clone().detach()]
 
@@ -207,21 +228,26 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
 
+
+
                 label_unique = torch.unique(label)
                 predicted_int = predicted.type(torch.int)
                 predicted_range = torch.unique(predicted_int)
+
+
+
                 pdf_x1x2 = torch.zeros([len(label_unique), len(predicted_range)])
-                for pred in predicted_int:
-                    for lab in label:
-                        lab_pos = torch.where(label_unique == lab)[0]
-                        pred_pos = torch.where(predicted_range == pred)[0]
-                        pdf_x1x2[lab_pos, pred_pos] += 1
+                for trial_idx in range(len(predicted_int)):
+
+                    lab_pos = torch.where(label_unique == label[trial_idx])[0]
+                    pred_pos = torch.where(predicted_range == predicted_int[trial_idx])[0]
+                    pdf_x1x2[lab_pos, pred_pos] += 1
 
                 num_occ = torch.sum(pdf_x1x2)
                 pdf_x1 = torch.sum(pdf_x1x2, dim=1)/num_occ # to check
                 pdf_x2 = torch.sum(pdf_x1x2, dim=0)/num_occ
                 pdf_x1x2 = pdf_x1x2 / num_occ
-                if final == True:
+                if final == -1:
                     f = plt.figure()
                     plt.imshow(pdf_x1x2)
                     plt.xticks([i for i in range(len(predicted_range))],np.array(predicted_range))
@@ -280,17 +306,25 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.xticks([0, 1], ['Output', 'Label'])
                     f.savefig(results_dir+'Predicted_vs_label.pdf', format='pdf')
 
-                    plt.show()
+                    # plt.show()
 
                 mi = torch.zeros(1)
                 for el1_idx, pdf_x1_el in enumerate(pdf_x1):
                     for el2_idx, pdf_x2_el in enumerate(pdf_x2):
-                        mi += pdf_x1x2[el1_idx, el2_idx] * torch.log(
-                            pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el))
+                        mi += pdf_x1x2[el1_idx, el2_idx] * torch.log2(
+                            (pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el)) + 1E-10)
                 print('mutual information', mi)
+                # plt.figure()
+                # plt.imshow(pdf_x1x2,aspect='auto')
+                # plt.title('PDF')
+                # plt.figure()
+                # plt.plot(label, predicted_int)
+                # plt.show()
                 list_mi.append(mi)
-                return list_mi
-
+    if len(training):
+        return list_loss
+    else:
+        return list_mi
 
 
 def main():
@@ -378,7 +412,7 @@ def main():
 
     rank_NMF = 10
     range_weight_init = 10
-    model = NlinearRegression(rank_NMF, 1)
+    model = linearRegression(rank_NMF, 1)
     #model.linear.weight = torch.nn.Parameter(model.linear.weight*range_weight_init)
 
     coeff = [p for p in model.parameters()][0][0]
@@ -406,7 +440,6 @@ def main():
         H_train = []
         H_test = []
         accs = []  # accs: mean training accuracies for each batch
-        counter = 0
         print('Epoch', e)
         list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model, {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss)
         list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi)
@@ -424,7 +457,7 @@ def main():
     plt.ylabel('MI')
     fig.savefig(results_dir+'MI_linear.pdf', format='pdf')
 
-    plt.show()
+    #plt.show()
 
 if __name__ == "__main__":
     main()
