@@ -7,10 +7,9 @@ from torchnmf.metrics import kl_div
 import matplotlib.pyplot as plt
 from time import localtime, strftime
 from tqdm import trange
-
+from utils import addToNetMetadata, addHeaderToMetadata
 import matplotlib
-matplotlib.pyplot.ioff()
-
+matplotlib.pyplot.ioff() # turn off interactive mode
 import numpy as np
 import os
 import models
@@ -18,18 +17,26 @@ from datasets import load_analog_data
 from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron_IT
 from auxiliary import compute_classification_accuracy, plot_spikes
-
+import time
 from torch.autograd import Variable
+import pickle
+
+# Set seed:
 torch.manual_seed(0)
 
+# Flag to save figures:
 save_out = True
 
+# Experiment name:
 exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
 results_dir = './results/'+exp_id
 if save_out:
     if not(os.path.isdir(results_dir)):
         os.mkdir(results_dir)
 results_dir = results_dir+'/'
+
+# Filename metadata:
+metadatafilename = results_dir + '/metadata.txt'
 
 class linearRegression(torch.nn.Module):
     def __init__(self, inputSize, outputSize):
@@ -100,7 +107,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
             net = NMF(V_matrix.shape, rank=rank_NMF)
             net.fit(V_matrix.to_sparse())
-            batch_size = 20
+            #batch_size = 20
             # H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
 
             H[neuron_id] = net.H
@@ -339,6 +346,11 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
 
 def main():
+
+    # Create file with metadata
+    metadatafilename = results_dir+'/metadata.txt'
+    addHeaderToMetadata(metadatafilename, 'simulation: '+exp_id)
+
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(0)
@@ -384,7 +396,7 @@ def main():
 
     # Learning parameters
     nb_steps = params['data_steps']
-    nb_epochs = 300
+    nb_epochs = int(params['nb_epochs'])
 
     # Neuron parameters
     tau_mem = params['tau_mem']  # ms
@@ -401,7 +413,7 @@ def main():
     ###########################################
 
     # a = torch.empty((nb_inputs,))
-    n_param_values = 10
+    n_param_values = int(params['n_param_values'])
     a = torch.Tensor(np.linspace(-10, 10, n_param_values)).to(device)
     # nn.init.normal_(
     #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
@@ -415,22 +427,19 @@ def main():
     fanout = 1  # number of output neurons from the linear expansion
     neuron = models.MN_neuron_IT(params['nb_channels'], fanout, n_param_values, a, A1, A2, train=False)
 
-    batch_size = 20
+    batch_size = int(params['batch_size'])
 
     inputDim = 1  # takes variable 'x'
     outputDim = 1  # takes variable 'y'
-    learningRate = .1#10#0.01
+    learningRate = params['learningRate'] #10#0.01
 
-    rank_NMF = 10
+    rank_NMF = int(params['rank_NMF'])
     range_weight_init = 10
     model = linearRegression(rank_NMF, 1)
     #model.linear.weight = torch.nn.Parameter(model.linear.weight*range_weight_init)
 
     coeff = [p for p in model.parameters()][0][0]
     coeff = coeff.clone().detach()
-    # plt.figure()
-    # plt.hist(coeff)
-    # plt.show()
 
     #TODO: Check this
     if torch.cuda.is_available():
@@ -443,9 +452,21 @@ def main():
     dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory, generator=torch.Generator(device=device))
     # pbar = trange(nb_epochs)
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=learningRate)
+    params['optimizer'] = optimizer.__class__.__name__
+    print('Traning classifier with {} optimizer', params['optimizer'])
+
+    # Store parameters to metadata file:
+    for key in params.keys():
+        addToNetMetadata(metadatafilename, key, params[key])
+
+    # Add parameter range to metadata:
+    addToNetMetadata(metadatafilename, 'parameter range', varying_element.clone().detach().numpy())
+
     list_loss = []
     list_mi = []
+    t_start = time.time()
     for e in range(nb_epochs):
         local_loss = []
         H_train = []
@@ -454,6 +475,9 @@ def main():
         print('Epoch', e)
         list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model, {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss)
         list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi)
+
+    train_duration = time.time() - t_start
+    addToNetMetadata(metadatafilename, 'sim duration (sec)', train_duration)
 
     list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, final = True)
     fig = plt.figure()
@@ -470,7 +494,13 @@ def main():
     if save_out:
         fig.savefig(results_dir+'MI_linear.pdf', format='pdf')
 
-    #plt.show()
+    # Store data:
+    # Loss:
+    with open(results_dir+'Loss.pickle', 'wb') as f:
+        pickle.dump(list_loss, f)
+    # Mi:
+    with open(results_dir+'MI.pickle', 'wb') as f:
+        pickle.dump(list_mi, f)
 
 if __name__ == "__main__":
     main()
