@@ -376,7 +376,7 @@ def main():
 
     # Learning parameters
     nb_steps = params['data_steps']
-    nb_epochs = 50
+    nb_epochs = 300
 
     # Neuron parameters
     tau_mem = params['tau_mem']  # ms
@@ -426,9 +426,9 @@ def main():
 
     #TODO: Check this
     if torch.cuda.is_available():
-        pin_memory=False
-    else:
         pin_memory=True
+    else:
+        pin_memory=False
 
     # The log softmax function across output units
     dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
