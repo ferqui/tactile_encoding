@@ -7,7 +7,7 @@ from torchnmf.metrics import kl_div
 import matplotlib.pyplot as plt
 from time import localtime, strftime
 from tqdm import trange
-from utils import addToNetMetadata, addHeaderToMetadata, set_results_folder
+from utils import addToNetMetadata, addHeaderToMetadata, set_results_folder, generate_dict
 import matplotlib
 matplotlib.pyplot.ioff() # turn off interactive mode
 import numpy as np
@@ -27,14 +27,7 @@ torch.manual_seed(0)
 # Flag to save figures:
 save_out = True
 
-# Experiment name:
-exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
 
-# Set results folder:
-results_dir = set_results_folder('a', exp_id)
-
-# Filename metadata:
-metadatafilename = results_dir + '/metadata.txt'
 
 class linearRegression(torch.nn.Module):
     def __init__(self, inputSize, outputSize):
@@ -343,7 +336,16 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         return list_mi
 
 
-def main():
+def MI_neuron_params(neuron_param_values, sweep_param_name):
+
+    # Experiment name:
+    exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
+
+    # Set results folder:
+    results_dir = set_results_folder(sweep_param_name, exp_id)
+
+    # Filename metadata:
+    metadatafilename = results_dir + '/metadata.txt'
 
     # Create file with metadata
     addHeaderToMetadata(metadatafilename, 'simulation: '+exp_id)
@@ -411,13 +413,14 @@ def main():
 
     # a = torch.empty((nb_inputs,))
     n_param_values = int(params['n_param_values'])
-    a = torch.Tensor(np.linspace(-10, 10, n_param_values)).to(device)
+    #a = torch.Tensor(np.linspace(-10, 10, n_param_values)).to(device)
+    a = torch.Tensor(neuron_param_values['a']).to(device)
     # nn.init.normal_(
     #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A1 = torch.Tensor(np.linspace(0, 0, n_param_values)).to(device)
+    A1 = torch.Tensor(neuron_param_values['A1']).to(device)
 
-    A2 = torch.Tensor(np.linspace(0, 0, n_param_values)).to(device)
+    A2 = torch.Tensor(neuron_param_values['A2']).to(device)
 
     varying_element = a
 
@@ -458,8 +461,10 @@ def main():
     for key in params.keys():
         addToNetMetadata(metadatafilename, key, params[key])
 
-    # Add parameter range to metadata:
-    addToNetMetadata(metadatafilename, 'parameter range', varying_element.clone().detach().numpy())
+    header = 'Neuron params'
+    for key in neuron_param_values.keys():
+        addToNetMetadata(metadatafilename, key, neuron_param_values[key], header=header)
+        header=''
 
     list_loss = []
     list_mi = []
@@ -500,4 +505,12 @@ def main():
         pickle.dump(list_mi, f)
 
 if __name__ == "__main__":
-    main()
+
+    n_param_values = 10
+    sweep_param_name = ['a', 'A1', 'A2']
+
+    variable_range = np.linspace(-10, 10, n_param_values)
+
+    for param in sweep_param_name:
+        dict_keys = generate_dict(param, variable_range)
+        MI_neuron_params(dict_keys, param)

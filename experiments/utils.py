@@ -1,5 +1,5 @@
 import os
-
+import numpy as np
 
 def addHeaderToMetadata(filename, header):
     file = os.path.join(filename)
@@ -51,3 +51,20 @@ def set_results_folder(input_parameter_name, exp_id):
         os.mkdir(sim_dir)
 
     return sim_dir
+
+def generate_dict(key_to_change, variable_range):
+    file_dir_params = '../parameters/'
+    param_filename = 'parameters_mn'
+    file_name_parameters = file_dir_params + param_filename + '.txt'
+    params = {}
+    num_values = len(variable_range)
+
+    with open(file_name_parameters) as file:
+        for line in file:
+            (key, value) = line.split()
+            if key == key_to_change:
+                params[key] = variable_range
+            else:
+                params[key] = np.linspace(float(value), float(value), num_values)
+
+    return params
