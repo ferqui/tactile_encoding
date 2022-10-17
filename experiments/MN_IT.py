@@ -431,8 +431,8 @@ def main():
         pin_memory=False
 
     # The log softmax function across output units
-    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
-    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory, generator=torch.Generator(device='cuda'))
+    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory, generator=torch.Generator(device='cuda'))
     # pbar = trange(nb_epochs)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
