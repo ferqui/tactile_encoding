@@ -108,7 +108,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
             #     H[neuron_id, i * batch_size:(i + 1) * (batch_size),i] = 1
 
             import scipy.spatial as sp
-            cdist = 1 - sp.distance.cdist(net().clone().detach(), V_matrix.clone().detach(), 'cosine')
+            cdist = 1 - sp.distance.cdist(net().clone().detach().cpu(), V_matrix.cpu().clone().detach().cpu(), 'cosine')
             diagonal_cdist = cdist.diagonal()
             diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
 
