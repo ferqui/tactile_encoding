@@ -250,6 +250,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 pdf_x1 = torch.sum(pdf_x1x2, dim=1)/num_occ # to check
                 pdf_x2 = torch.sum(pdf_x1x2, dim=0)/num_occ
                 pdf_x1x2 = pdf_x1x2 / num_occ
+
                 if final == True:
                     f = plt.figure()
                     plt.imshow(pdf_x1x2)
@@ -259,12 +260,14 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.ylabel('Label')
                     plt.title('Prob matrix')
                     plt.colorbar()
-                    f.savefig(results_dir+'pdf_joint.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir+'pdf_joint.pdf', format='pdf')
 
                     f = plt.figure()
                     plt.imshow(x_local[:, selected_neuron_id, :], aspect='auto')
                     plt.title('XLOCAL')
-                    f.savefig(results_dir+'xlocal.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir+'xlocal.pdf', format='pdf')
 
                     f = plt.figure()
                     plt.imshow(s_out_rec_train[:, 0, selected_neuron_id, :], aspect='auto')
@@ -272,7 +275,8 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.title('INPUT NMF')
                     plt.xlabel('Time')
                     plt.ylabel('TrialxVariable')
-                    f.savefig(results_dir+'Input_nmf.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir+'Input_nmf.pdf', format='pdf')
 
                     # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
                     print('s_out_train shape', s_out_rec_train.shape)
@@ -282,14 +286,16 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.title('H NMF')
                     plt.xlabel('Time')
                     plt.ylabel('TrialxVariable')
-                    f.savefig(results_dir+'H.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir+'H.pdf', format='pdf')
 
                     f = plt.figure()
                     plt.title('W NMF')
                     plt.imshow(net.W.clone().detach(), aspect='auto', interpolation='nearest')
                     plt.xlabel('Time')
                     plt.ylabel('Rank')
-                    f.savefig(results_dir + 'W_nmf.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir + 'W_nmf.pdf', format='pdf')
 
                     f=plt.figure()
                     plt.imshow(net().clone().detach(), aspect='auto', interpolation='nearest')
@@ -297,7 +303,8 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.title('OUT NMF')
                     plt.xlabel('Time')
                     plt.ylabel('TrialxVariable')
-                    f.savefig(results_dir+'Out_nmf.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir+'Out_nmf.pdf', format='pdf')
 
                     f = plt.figure()
                     plt.imshow(torch.concat(output_vs_label, dim=1), aspect='auto', cmap='seismic',
@@ -307,7 +314,8 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     # plt.xlabel('Output|Label')
                     plt.ylabel('TrialxVariable')
                     plt.xticks([0, 1], ['Output', 'Label'])
-                    f.savefig(results_dir+'Predicted_vs_label.pdf', format='pdf')
+                    if save_out:
+                        f.savefig(results_dir+'Predicted_vs_label.pdf', format='pdf')
 
                     # plt.show()
 
@@ -452,13 +460,15 @@ def main():
     plt.plot(list_loss)
     plt.xlabel('Epochs x Trials')
     plt.ylabel('Loss')
-    fig.savefig(results_dir+'Loss_linear_.pdf', format='pdf')
+    if save_out:
+        fig.savefig(results_dir+'Loss_linear_.pdf', format='pdf')
 
     fig = plt.figure()
     plt.plot(list_mi)
     plt.xlabel('Epochs x Trials')
     plt.ylabel('MI')
-    fig.savefig(results_dir+'MI_linear.pdf', format='pdf')
+    if save_out:
+        fig.savefig(results_dir+'MI_linear.pdf', format='pdf')
 
     #plt.show()
 
