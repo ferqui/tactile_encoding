@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from time import localtime, strftime
 from tqdm import trange
 
+import matplotlib
+matplotlib.pyplot.ioff()
+
 import numpy as np
 import os
 import models
@@ -247,7 +250,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 pdf_x1 = torch.sum(pdf_x1x2, dim=1)/num_occ # to check
                 pdf_x2 = torch.sum(pdf_x1x2, dim=0)/num_occ
                 pdf_x1x2 = pdf_x1x2 / num_occ
-                if final == -1:
+                if final == True:
                     f = plt.figure()
                     plt.imshow(pdf_x1x2)
                     plt.xticks([i for i in range(len(predicted_range))],np.array(predicted_range))
@@ -274,7 +277,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
                     print('s_out_train shape', s_out_rec_train.shape)
                     f = plt.figure()
-                    plt.imshow(net.H.clone().detach(), aspect='auto')
+                    plt.imshow(net.H.clone().detach(), aspect='auto', interpolation='nearest')
                     # plt.ylim([0, 128*2])
                     plt.title('H NMF')
                     plt.xlabel('Time')
@@ -283,13 +286,13 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
                     f = plt.figure()
                     plt.title('W NMF')
-                    plt.imshow(net.W.clone().detach(), aspect='auto')
+                    plt.imshow(net.W.clone().detach(), aspect='auto', interpolation='nearest')
                     plt.xlabel('Time')
                     plt.ylabel('Rank')
                     f.savefig(results_dir + 'W_nmf.pdf', format='pdf')
 
                     f=plt.figure()
-                    plt.imshow(net().clone().detach(), aspect='auto')
+                    plt.imshow(net().clone().detach(), aspect='auto', interpolation='nearest')
                     # plt.ylim([0, 128*2])
                     plt.title('OUT NMF')
                     plt.xlabel('Time')
