@@ -7,7 +7,7 @@ from torchnmf.metrics import kl_div
 import matplotlib.pyplot as plt
 from time import localtime, strftime
 from tqdm import trange
-from utils import addToNetMetadata, addHeaderToMetadata
+from utils import addToNetMetadata, addHeaderToMetadata, set_results_folder
 import matplotlib
 matplotlib.pyplot.ioff() # turn off interactive mode
 import numpy as np
@@ -29,11 +29,9 @@ save_out = True
 
 # Experiment name:
 exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
-results_dir = './results/'+exp_id
-if save_out:
-    if not(os.path.isdir(results_dir)):
-        os.mkdir(results_dir)
-results_dir = results_dir+'/'
+
+# Set results folder:
+results_dir = set_results_folder('a', exp_id)
 
 # Filename metadata:
 metadatafilename = results_dir + '/metadata.txt'
@@ -348,7 +346,6 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 def main():
 
     # Create file with metadata
-    metadatafilename = results_dir+'/metadata.txt'
     addHeaderToMetadata(metadatafilename, 'simulation: '+exp_id)
 
     device = torch.device(
@@ -485,14 +482,14 @@ def main():
     plt.xlabel('Epochs x Trials')
     plt.ylabel('Loss')
     if save_out:
-        fig.savefig(results_dir+'Loss_linear_.pdf', format='pdf')
+        fig.savefig(results_dir+'Loss.pdf', format='pdf')
 
     fig = plt.figure()
     plt.plot(list_mi)
     plt.xlabel('Epochs x Trials')
     plt.ylabel('MI')
     if save_out:
-        fig.savefig(results_dir+'MI_linear.pdf', format='pdf')
+        fig.savefig(results_dir+'MI.pdf', format='pdf')
 
     # Store data:
     # Loss:
