@@ -29,7 +29,6 @@ def set_results_folder(input_parameter_name, exp_id):
     Prepare path to experiment folder.
     """
 
-    experiment_type = input_parameter_name
     results_dir = './results/'
 
     if not (os.path.isdir(results_dir)):
@@ -37,15 +36,14 @@ def set_results_folder(input_parameter_name, exp_id):
 
     sim_dir = os.path.join(
         results_dir,
-        experiment_type)
+        exp_id)
 
     if not (os.path.isdir(sim_dir)):
         os.mkdir(sim_dir)
 
-    folder_name = exp_id
     sim_dir = os.path.join(
         sim_dir,
-        folder_name)
+        input_parameter_name)
 
     if not (os.path.isdir(sim_dir)):
         os.mkdir(sim_dir)
