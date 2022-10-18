@@ -26,9 +26,28 @@ torch.manual_seed(0)
 
 # ---------------------------- Input -----------------------------------
 save_out = True # Flag to save figures:
-n_param_values = 10
+n_param_values = 200
 sweep_param_name = ['a', 'A1', 'A2']
-variable_range = np.linspace(-10, 10, n_param_values)
+
+###########################################
+##              Parameters               ##
+###########################################
+threshold = "enc"
+run = "_3"
+
+file_dir_params = '../parameters/'
+param_filename = 'parameters_th' + str(threshold)
+file_name_parameters = file_dir_params + param_filename + '.txt'
+params = {}
+with open(file_name_parameters) as file:
+    for line in file:
+        (key, value) = line.split()
+        if key == 'time_bin_size' or key == 'nb_input_copies' or key=='n_param_values':
+            params[key] = int(value)
+        else:
+            params[key] = np.double(value)
+
+variable_range = np.linspace(-10, 10, params['n_param_values'])
 
 
 # ----------------------- Experiment Folders ----------------------------
@@ -364,23 +383,23 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     if cuda:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-    ###########################################
-    ##              Parameters               ##
-    ###########################################
-    threshold = "enc"
-    run = "_3"
-
-    file_dir_params = '../parameters/'
-    param_filename = 'parameters_th' + str(threshold)
-    file_name_parameters = file_dir_params + param_filename + '.txt'
-    params = {}
-    with open(file_name_parameters) as file:
-        for line in file:
-            (key, value) = line.split()
-            if key == 'time_bin_size' or key == 'nb_input_copies':
-                params[key] = int(value)
-            else:
-                params[key] = np.double(value)
+    # ###########################################
+    # ##              Parameters               ##
+    # ###########################################
+    # threshold = "enc"
+    # run = "_3"
+    #
+    # file_dir_params = '../parameters/'
+    # param_filename = 'parameters_th' + str(threshold)
+    # file_name_parameters = file_dir_params + param_filename + '.txt'
+    # params = {}
+    # with open(file_name_parameters) as file:
+    #     for line in file:
+    #         (key, value) = line.split()
+    #         if key == 'time_bin_size' or key == 'nb_input_copies':
+    #             params[key] = int(value)
+    #         else:
+    #             params[key] = np.double(value)
 
     ###########################################
     ##                Dataset                ##
@@ -418,7 +437,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     ###########################################
 
     # a = torch.empty((nb_inputs,))
-    n_param_values = int(params['n_param_values'])
+    n_param_values = params['n_param_values']
     #a = torch.Tensor(np.linspace(-10, 10, n_param_values)).to(device)
 
     tensor_params = dict.fromkeys(neuron_param_values.keys(), None)
