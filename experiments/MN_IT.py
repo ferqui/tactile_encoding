@@ -39,12 +39,12 @@ params = {}
 with open(file_name_parameters) as file:
     for line in file:
         (key, value) = line.split()
-        if key == 'time_bin_size' or key == 'nb_input_copies' or key=='n_param_values':
+        if key == 'time_bin_size' or key == 'nb_input_copies' or key=='n_param_values' or key=='min_range' or key=='max_range':
             params[key] = int(value)
         else:
             params[key] = np.double(value)
 
-variable_range = np.linspace(-10, 10, params['n_param_values'])
+variable_range = np.linspace(params['min_range'], params['max_range'], params['n_param_values'])
 
 
 # ----------------------- Experiment Folders ----------------------------
