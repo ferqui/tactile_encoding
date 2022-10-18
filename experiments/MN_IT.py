@@ -24,9 +24,16 @@ import pickle
 # Set seed:
 torch.manual_seed(0)
 
-# Flag to save figures:
-save_out = True
+# ---------------------------- Input -----------------------------------
+save_out = True # Flag to save figures:
+n_param_values = 10
+sweep_param_name = ['a', 'A1', 'A2']
+variable_range = np.linspace(-10, 10, n_param_values)
 
+
+# ----------------------- Experiment Folders ----------------------------
+# Experiment name:
+exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
 
 
 class linearRegression(torch.nn.Module):
@@ -50,7 +57,8 @@ class NlinearRegression(torch.nn.Module):
         out = self.NLregression(x)
         return out
 
-def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}, list_loss=[], list_mi=[], final = False):
+def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}, list_loss=[], list_mi=[],
+              final = False, results_dir=None):
     #training has optimizer,criterion
     counter = 0
 
@@ -336,19 +344,17 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         return list_mi
 
 
-def MI_neuron_params(neuron_param_values, sweep_param_name):
-
-    # Experiment name:
-    exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
+def MI_neuron_params(neuron_param_values, name_param_sweeped):
 
     # Set results folder:
-    results_dir = set_results_folder(sweep_param_name, exp_id)
+    results_dir = set_results_folder(name_param_sweeped, exp_id)
+    results_dir += '/'
 
     # Filename metadata:
     metadatafilename = results_dir + '/metadata.txt'
 
     # Create file with metadata
-    addHeaderToMetadata(metadatafilename, 'simulation: '+exp_id)
+    addHeaderToMetadata(metadatafilename, 'Simulation')
 
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -414,18 +420,28 @@ def MI_neuron_params(neuron_param_values, sweep_param_name):
     # a = torch.empty((nb_inputs,))
     n_param_values = int(params['n_param_values'])
     #a = torch.Tensor(np.linspace(-10, 10, n_param_values)).to(device)
-    a = torch.Tensor(neuron_param_values['a']).to(device)
-    # nn.init.normal_(
-    #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A1 = torch.Tensor(neuron_param_values['A1']).to(device)
+    tensor_params = dict.fromkeys(neuron_param_values.keys(), None)
+    for key in tensor_params.keys():
+        tensor_params[key] = torch.Tensor(neuron_param_values[key]).to(device)
 
-    A2 = torch.Tensor(neuron_param_values['A2']).to(device)
+    varying_element = tensor_params[name_param_sweeped]
 
-    varying_element = a
+    # a = torch.Tensor(neuron_param_values['a']).to(device)
+    # # nn.init.normal_(
+    # #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    #
+    # A1 = torch.Tensor(neuron_param_values['A1']).to(device)
+    #
+    # A2 = torch.Tensor(neuron_param_values['A2']).to(device)
 
     fanout = 1  # number of output neurons from the linear expansion
-    neuron = models.MN_neuron_IT(params['nb_channels'], fanout, n_param_values, a, A1, A2, train=False)
+    #TODO: Change input parameters list
+    neuron = models.MN_neuron_IT(params['nb_channels'], fanout, n_param_values,
+                                 tensor_params['a'],
+                                 tensor_params['A1'],
+                                 tensor_params['A2'],
+                                 train=False)
 
     batch_size = int(params['batch_size'])
 
@@ -475,13 +491,14 @@ def MI_neuron_params(neuron_param_values, sweep_param_name):
         H_test = []
         accs = []  # accs: mean training accuracies for each batch
         print('Epoch', e)
-        list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model, {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss)
-        list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi)
+        list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model,
+                              {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss, results_dir=results_dir)
+        list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, results_dir=results_dir)
 
     train_duration = time.time() - t_start
     addToNetMetadata(metadatafilename, 'sim duration (sec)', train_duration)
 
-    list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, final = True)
+    list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, final = True, results_dir=results_dir)
     fig = plt.figure()
     plt.plot(list_loss)
     plt.xlabel('Epochs x Trials')
@@ -506,11 +523,10 @@ def MI_neuron_params(neuron_param_values, sweep_param_name):
 
 if __name__ == "__main__":
 
-    n_param_values = 10
-    sweep_param_name = ['a', 'A1', 'A2']
+    for name_param in sweep_param_name:
 
-    variable_range = np.linspace(-10, 10, n_param_values)
+        # Generate dictionary with parameter values:
+        dict_keys = generate_dict(name_param, variable_range)
 
-    for param in sweep_param_name:
-        dict_keys = generate_dict(param, variable_range)
-        MI_neuron_params(dict_keys, param)
+        # Run mutual information analysis
+        MI_neuron_params(dict_keys, name_param)
