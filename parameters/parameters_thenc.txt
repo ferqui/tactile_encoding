@@ -9,6 +9,6 @@ reg_spikes 0.004
 reg_neurons 0.000001
 learningRate 0.01
 nb_epochs 300
-n_param_values 10
+n_param_values 200
 batch_size 20
 rank_NMF 10
