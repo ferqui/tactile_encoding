@@ -29,6 +29,7 @@ torch.manual_seed(0)
 save_out = True # Flag to save figures:
 sweep_param_name = ['a', 'A1', 'A2']
 
+run_with_fake_input = True
 # ---------------------------- Parameters -----------------------------------
 threshold = "enc"
 run = "_3"
@@ -96,12 +97,14 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
 
-        # s_out_rec_train = torch.zeros_like(s_out_rec_train)
-        # step_t = 15
-        # for i in range(10):
-        #     s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
-            #print(i*step_t)
-        ## s_out_rec_train shape: trial x time x fanout x variable x channels
+        if run_with_fake_input:
+            # Overwrite input data with fake one
+            s_out_rec_train = torch.zeros_like(s_out_rec_train)
+            step_t = 15
+            for i in range(params['n_param_values']):
+                s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
+               # print(i*step_t)
+            # s_out_rec_train shape: trial x time x fanout x variable x channels
 
         s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
 
@@ -121,18 +124,31 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         for neuron_id in [selected_neuron_id]:
             V_matrix = s_out_rec_train[:, 0, neuron_id, :]
 
+            if run_with_fake_input:
+                # Store V input:
+                with open(results_dir+'V_matrix.pickle', 'wb') as f:
+                    pickle.dump(V_matrix.clone().detach().numpy(), f)
+
             net = NMF(V_matrix.shape, rank=rank_NMF)
             net.fit(V_matrix.to_sparse())
             #batch_size = 20
             # H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
 
             H[neuron_id] = net.H
-            # for i in range(rank_NMF):
-            #     H[neuron_id, i * batch_size:(i + 1) * (batch_size),i] = 1
+            H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
+            for i in range(rank_NMF):
+                H[neuron_id, i * int(params['batch_size']):(i + 1) * int(params['batch_size']),i] = 1
 
-            # cdist = 1 - sp.distance.cdist(net().clone().detach().cpu(), V_matrix.cpu().clone().detach().cpu(), 'cosine')
-            # diagonal_cdist = cdist.diagonal()
-            # diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
+            if run_with_fake_input:
+                # Store H:
+                with open(results_dir+'H_matrix.pickle', 'wb') as f:
+                    pickle.dump(net.H.clone().detach().numpy(), f)
+
+                cdist = 1 - sp.distance.cdist(net().clone().detach().cpu(), V_matrix.cpu().clone().detach().cpu(), 'cosine')
+                diagonal_cdist = cdist.diagonal()
+                diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
+                with open(results_dir+'diag_cdist_nonan.pickle', 'wb') as f:
+                    pickle.dump(diag_cdist_nonan, f)
 
             # print('gigi diag',np.mean(diag_cdist_nonan))
             # plt.imshow(cdist,aspect = 'auto')
@@ -150,7 +166,6 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                                    label.clone().detach()]
                 coeff = [p for p in model.parameters()][0][0]
                 coeff = coeff.clone().detach()
-                #plt.plot(coeff)
                 if counter == -1:
 
                     idx_param_value = 0
@@ -202,12 +217,12 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.title('W NMF')
                     plt.xlabel('Time')
                     plt.ylabel('Rank')
-                    # plt.figure()
-                    # plt.imshow(net().clone().detach(), aspect='auto')
-                    # # plt.ylim([0, 128*2])
-                    # plt.title('OUT NMF')
-                    # plt.xlabel('Time')
-                    # plt.ylabel('TrialxVariable')
+                    plt.figure()
+                    plt.imshow(net().clone().detach(), aspect='auto')
+                    # plt.ylim([0, 128*2])
+                    plt.title('OUT NMF')
+                    plt.xlabel('Time')
+                    plt.ylabel('TrialxVariable')
                     plt.figure()
                     plt.imshow(torch.concat(output_vs_label, dim=1), aspect='auto', cmap='seismic', interpolation='nearest')
                     plt.colorbar()
@@ -215,7 +230,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     # plt.xlabel('Output|Label')
                     plt.ylabel('TrialxVariable')
                     plt.xticks([0, 1], ['Output', 'Label'])
-                    # plt.show()
+                    plt.show()
                     print('eee macarena')
 
                 loss = training['criterion'](outputs, label)
@@ -303,7 +318,7 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
                     print('s_out_train shape', s_out_rec_train.shape)
                     f = plt.figure()
-                    plt.imshow(net.H.clone().detach(), aspect='auto', interpolation='nearest')
+                    plt.imshow(H[neuron_id].clone().detach(), aspect='auto', interpolation='nearest')
                     # plt.ylim([0, 128*2])
                     plt.title('H NMF')
                     plt.xlabel('Time')
@@ -318,6 +333,11 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.ylabel('Rank')
                     if save_out:
                         f.savefig(results_dir + 'W_nmf.pdf', format='pdf')
+
+                    if run_with_fake_input:
+                        # Store V input:
+                        with open(results_dir + 'W.pickle', 'wb') as f:
+                            pickle.dump(net.W.clone().detach().numpy(), f)
 
                     f=plt.figure()
                     plt.imshow(net().clone().detach(), aspect='auto', interpolation='nearest')
@@ -338,6 +358,22 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.xticks([0, 1], ['Output', 'Label'])
                     if save_out:
                         f.savefig(results_dir+'Predicted_vs_label.pdf', format='pdf')
+
+                    if run_with_fake_input:
+                        # Store Out nmf input:
+                        with open(results_dir + 'Out_nmf.pickle', 'wb') as f:
+                            pickle.dump(net().clone().detach().numpy(), f)
+                        # Store Out classifier:
+                        with open(results_dir + 'Out_classifier.pickle', 'wb') as f:
+                            pickle.dump(predicted.clone().detach().numpy(), f)
+                        # Store Learned W coefficients:
+                        with open(results_dir + 'w_classifier.pickle', 'wb') as f:
+                            coeff = [p for p in model.parameters()][0][0]
+                            coeff = coeff.clone().detach()
+                            pickle.dump(coeff[:, None].clone().detach().numpy(), f)
+                        # Store joint probability matrix:
+                        with open(results_dir + 'pdf_x1x2.pickle', 'wb') as f:
+                            pickle.dump(pdf_x1x2.clone().detach().numpy(), f)
 
                     # plt.show()
 
@@ -363,8 +399,13 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 def MI_neuron_params(neuron_param_values, name_param_sweeped):
 
     # Set results folder:
-    results_dir = set_results_folder(name_param_sweeped, exp_id)
-    results_dir += '/'
+    if run_with_fake_input:
+        results_dir = './results/controlled_stim/'
+        if not (os.path.isdir(results_dir)):
+            os.mkdir(results_dir)
+    else:
+        results_dir = set_results_folder(name_param_sweeped, exp_id)
+        results_dir += '/'
 
     # Filename metadata:
     metadatafilename = results_dir + '/metadata.txt'
@@ -521,10 +562,19 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
 
 if __name__ == "__main__":
 
-    for name_param in sweep_param_name:
-
+    if run_with_fake_input:
+        name_param = 'a'
         # Generate dictionary with parameter values:
         dict_keys = generate_dict(name_param, variable_range)
 
         # Run mutual information analysis
         MI_neuron_params(dict_keys, name_param)
+
+    else:
+        for name_param in sweep_param_name:
+
+            # Generate dictionary with parameter values:
+            dict_keys = generate_dict(name_param, variable_range)
+
+            # Run mutual information analysis
+            MI_neuron_params(dict_keys, name_param)
