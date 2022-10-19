@@ -20,6 +20,7 @@ from auxiliary import compute_classification_accuracy, plot_spikes
 import time
 from torch.autograd import Variable
 import pickle
+import scipy.spatial as sp
 
 # Set seed:
 torch.manual_seed(0)
@@ -129,10 +130,9 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
             # for i in range(rank_NMF):
             #     H[neuron_id, i * batch_size:(i + 1) * (batch_size),i] = 1
 
-            import scipy.spatial as sp
-            cdist = 1 - sp.distance.cdist(net().clone().detach().cpu(), V_matrix.cpu().clone().detach().cpu(), 'cosine')
-            diagonal_cdist = cdist.diagonal()
-            diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
+            # cdist = 1 - sp.distance.cdist(net().clone().detach().cpu(), V_matrix.cpu().clone().detach().cpu(), 'cosine')
+            # diagonal_cdist = cdist.diagonal()
+            # diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
 
             # print('gigi diag',np.mean(diag_cdist_nonan))
             # plt.imshow(cdist,aspect = 'auto')
