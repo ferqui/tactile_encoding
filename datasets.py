@@ -51,7 +51,7 @@ def load_analog_data(file_name, upsample_fac, specify_letters = []):
     data = (data-rshp.mean(0))/(rshp.std(0)+1e-3)
 
     x_train, x_test, y_train, y_test = train_test_split(
-        data, labels, test_size=0.2, shuffle=True, stratify=labels)
+        data.cpu(), labels.cpu(), test_size=0.2, shuffle=True, stratify=labels.cpu())
 
     ds_train = TensorDataset(x_train, y_train)
     ds_test = TensorDataset(x_test, y_test)
