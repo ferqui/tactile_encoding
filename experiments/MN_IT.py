@@ -29,7 +29,7 @@ torch.manual_seed(0)
 save_out = True # Flag to save figures:
 sweep_param_name = ['a', 'A1', 'A2']
 
-run_with_fake_input = True
+run_with_fake_input = False
 # ---------------------------- Parameters -----------------------------------
 threshold = "enc"
 run = "_3"
@@ -76,12 +76,16 @@ class NlinearRegression(torch.nn.Module):
         return out
 
 def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, training ={}, list_loss=[], list_mi=[],
-              final = False, results_dir=None):
+              final = False, results_dir=None, net = None):
     #training has optimizer,criterion
     counter = 0
+    list_loss_local = []
+    list_mi_local = []
 
     for x_local, y_local in dataset:
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
+
+
         # x_local = x_local[0, :] * torch.ones_like(x_local)
         # Reset all the layers in the network
         neuron.reset()
@@ -97,13 +101,13 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
 
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
 
-        if run_with_fake_input:
+        # if run_with_fake_input:
             # Overwrite input data with fake one
-            s_out_rec_train = torch.zeros_like(s_out_rec_train)
-            step_t = 15
-            for i in range(params['n_param_values']):
-                s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
-               # print(i*step_t)
+        # s_out_rec_train = torch.zeros_like(s_out_rec_train)
+        # step_t = 15
+        # for i in range(params['n_param_values']):
+        #     s_out_rec_train[:,i*step_t:(i+1)*(step_t),:,i,:] = 1
+        #    # print(i*step_t)
             # s_out_rec_train shape: trial x time x fanout x variable x channels
 
         s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
@@ -115,156 +119,37 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         label_min = label.min()
         label_diff = label.max()-label.min()
         label_norm = (label - label_min)/(label_diff)
-        # print('label_norm min max',label_norm.min(),label_norm.max())
-
-        # plt.show()
-
         H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
         selected_neuron_id = 4
+        net = None
         for neuron_id in [selected_neuron_id]:
             V_matrix = s_out_rec_train[:, 0, neuron_id, :]
-
-            if run_with_fake_input:
-                # Store V input:
-                with open(results_dir+'V_matrix.pickle', 'wb') as f:
-                    pickle.dump(V_matrix.clone().detach().numpy(), f)
-
-            net = NMF(V_matrix.shape, rank=rank_NMF)
-            net.fit(V_matrix.to_sparse())
-            #batch_size = 20
-            # H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
-
+            if net is None:
+                net = NMF(V_matrix.shape, rank=rank_NMF)
+            net.fit(V_matrix)
             H[neuron_id] = net.H
-            H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
-            for i in range(rank_NMF):
-                H[neuron_id, i * int(params['batch_size']):(i + 1) * int(params['batch_size']),i] = 1
-
-            if run_with_fake_input:
-                # Store H:
-                with open(results_dir+'H_matrix.pickle', 'wb') as f:
-                    pickle.dump(net.H.clone().detach().numpy(), f)
-
-                cdist = 1 - sp.distance.cdist(net().clone().detach().cpu(), V_matrix.cpu().clone().detach().cpu(), 'cosine')
-                diagonal_cdist = cdist.diagonal()
-                diag_cdist_nonan = diagonal_cdist[np.isnan(diagonal_cdist) == False]
-                with open(results_dir+'diag_cdist_nonan.pickle', 'wb') as f:
-                    pickle.dump(diag_cdist_nonan, f)
-
-            # print('gigi diag',np.mean(diag_cdist_nonan))
-            # plt.imshow(cdist,aspect = 'auto')
-            # plt.colorbar()
-            # plt.show()
-            # plt.show()
-
+            plt.imshow(H[neuron_id].clone().detach(),aspect = 'auto',interpolation='nearest')
+            plt.show()
             if len(training):
-                # print('training total spikes for neuron', neuron_id, ':', V_matrix.sum())
                 counter += 1
                 training['optimizer'].zero_grad()
                 outputs = model(H[neuron_id])
                 outputs_norm = (outputs - label_min) / (label_diff)
-                output_vs_label = [outputs.clone().detach(),
-                                   label.clone().detach()]
-                coeff = [p for p in model.parameters()][0][0]
-                coeff = coeff.clone().detach()
-                if counter == -1:
-
-                    idx_param_value = 0
-                    idx_fanout = 0
-                    for trial in range(3):#range(vmem_neuron.shape[0]):
-
-                        p = plt.plot(thr_neuron[trial,:,idx_fanout,idx_param_value,selected_neuron_id])
-                        idx_out_spikes_in_trial = s_out_rec_train[idx_param_value*x_local.shape[0]+trial,idx_fanout, neuron_id,:]==1
-                        v = vmem_neuron[trial,:,idx_fanout,idx_param_value,selected_neuron_id]
-
-                        plt.vlines(np.arange(x_local.shape[1])[idx_out_spikes_in_trial], float(v.min()), float(v.max()), color=p[0].get_color(), linestyle='dashed')
-
-                        plt.plot(v, label=str(len(np.where(idx_out_spikes_in_trial==True)[0])), linestyle='dotted', color=p[0].get_color())
-
-                        plt.legend()
-
-                    plt.title('V neuron across trials')
-                    plt.xlabel('Time')
-                    plt.ylabel('vmem')
-
-                    plt.figure()
-                    plt.imshow(x_local[:,4,:],aspect = 'auto')
-                    plt.title('XLOCAL')
-
-                    plt.figure()
-                    plt.imshow(s_out_rec_train[:, 0, selected_neuron_id, :], aspect='auto')
-                    # plt.ylim([0, 128*2])
-                    plt.title('INPUT NMF')
-                    plt.xlabel('Time')
-                    plt.ylabel('TrialxVariable')
-
-                    # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
-                    print('s_out_train shape', s_out_rec_train.shape)
-                    plt.figure()
-                    plt.imshow(H[neuron_id].clone().detach(), aspect='auto',interpolation='nearest')
-                    # plt.ylim([0, 128*2])
-                    plt.title('H NMF')
-                    plt.xlabel('Rank')
-                    plt.ylabel('TrialxVariable')
-                    plt.figure()
-                    plt.imshow(coeff[:,None].clone().detach(), aspect='auto',interpolation='nearest')
-                    # plt.ylim([0, 128*2])
-                    plt.title('w classifier')
-                    plt.xlabel('Rank')
-                    plt.ylabel('TrialxVariable')
-                    plt.figure()
-                    plt.imshow(net.W.clone().detach(), aspect='auto')
-                    # plt.ylim([0, 128*2])
-                    plt.title('W NMF')
-                    plt.xlabel('Time')
-                    plt.ylabel('Rank')
-                    plt.figure()
-                    plt.imshow(net().clone().detach(), aspect='auto')
-                    # plt.ylim([0, 128*2])
-                    plt.title('OUT NMF')
-                    plt.xlabel('Time')
-                    plt.ylabel('TrialxVariable')
-                    plt.figure()
-                    plt.imshow(torch.concat(output_vs_label, dim=1), aspect='auto', cmap='seismic', interpolation='nearest')
-                    plt.colorbar()
-                    plt.title('OUTPUT vs LABEL')
-                    # plt.xlabel('Output|Label')
-                    plt.ylabel('TrialxVariable')
-                    plt.xticks([0, 1], ['Output', 'Label'])
-                    plt.show()
-                    print('eee macarena')
 
                 loss = training['criterion'](outputs, label)
-                # if torch.isnan(loss):
                 print('loss',loss)
                 # get gradients w.r.t to parameters
                 loss.backward()
-                list_loss.append(loss.clone().detach())
+                list_loss_local.append(loss.clone().detach())
                 # update parameters
                 training['optimizer'].step()
                 acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
-
-                # print('counter end train', counter)
-
             else:
-                # print('testing xlocal mean',x_local.mean())
-                # print('test total spikes for neuron', neuron_id, ':', V_matrix.sum())
                 predicted = model(H[neuron_id])
-                # plt.figure()
-                # plt.imshow(H[neuron_id].clone().detach(),aspect = 'auto',interpolation='nearest')
-                # plt.title('H[4]')
-                # plt.figure()
-                # plt.imshow(net.H.clone().detach(), aspect='auto',interpolation='nearest')
-                # plt.title('net.H')
-                # plt.figure()
-                # plt.imshow(predicted.clone().detach(), aspect='auto',interpolation='nearest')
-                # # print(model.parameters())
-                # plt.show()
                 output_vs_label = [predicted.clone().detach(),
                                    label.clone().detach()]
-
                 outputs_norm = (predicted - label_min) / (label_diff)
-
                 acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
                 print('acc', acc)
 
@@ -389,18 +274,20 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 # plt.figure()
                 # plt.plot(label, predicted_int)
                 # plt.show()
-                list_mi.append(mi)
+                list_mi_local.append(mi)
     if len(training):
-        return list_loss
+        list_loss.append(torch.mean(torch.Tensor(list_loss_local)))
+        return list_loss, net
     else:
-        return list_mi
+        list_mi.append(torch.mean(torch.Tensor(list_mi_local)))
+        return list_mi, net
 
 
 def MI_neuron_params(neuron_param_values, name_param_sweeped):
 
     # Set results folder:
     if run_with_fake_input:
-        results_dir = './results/controlled_stim/'
+        results_dir = '../results/controlled_stim/'
         if not (os.path.isdir(results_dir)):
             os.mkdir(results_dir)
     else:
@@ -490,7 +377,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
 
     rank_NMF = int(params['rank_NMF'])
     range_weight_init = 10
-    model = linearRegression(rank_NMF, 1)
+    model = NlinearRegression(rank_NMF, 1)
     #model.linear.weight = torch.nn.Parameter(model.linear.weight*range_weight_init)
 
     coeff = [p for p in model.parameters()][0][0]
@@ -524,15 +411,18 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     list_loss = []
     list_mi = []
     t_start = time.time()
+    H_initial = None
+    # net = NMF((), rank=rank_NMF, H=H_initial)
+    net = None
     for e in range(nb_epochs):
         local_loss = []
         H_train = []
         H_test = []
         accs = []  # accs: mean training accuracies for each batch
         print('Epoch', e)
-        list_loss = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model,
-                              {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss, results_dir=results_dir)
-        list_mi = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, results_dir=results_dir)
+        list_loss,net = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model,
+                              {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss, results_dir=results_dir,net = net)
+        list_mi,net = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, results_dir=results_dir,net=net)
 
     train_duration = time.time() - t_start
     addToNetMetadata(metadatafilename, 'sim duration (sec)', train_duration)

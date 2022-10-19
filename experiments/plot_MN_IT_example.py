@@ -4,31 +4,31 @@ import pickle
 from matplotlib import gridspec
 #sns.set_style('whitegrid')
 
-with open('results/controlled_stim/Loss.pickle', 'rb') as f:
+with open('../results/controlled_stim/Loss.pickle', 'rb') as f:
     loss = pickle.load(f)
 
-with open('results/controlled_stim/MI.pickle', 'rb') as f:
+with open('../results/controlled_stim/MI.pickle', 'rb') as f:
     MI = pickle.load(f)
 
-with open('results/controlled_stim/H_matrix.pickle', 'rb') as f:
+with open('../results/controlled_stim/H_matrix.pickle', 'rb') as f:
     H_matrix = pickle.load(f)
 
-with open('results/controlled_stim/V_matrix.pickle', 'rb') as f:
+with open('../results/controlled_stim/V_matrix.pickle', 'rb') as f:
     V_matrix = pickle.load(f)
 
-with open('results/controlled_stim/W.pickle', 'rb') as f:
+with open('../results/controlled_stim/W.pickle', 'rb') as f:
     W = pickle.load(f)
 
-with open('results/controlled_stim/Out_nmf.pickle', 'rb') as f:
+with open('../results/controlled_stim/Out_nmf.pickle', 'rb') as f:
     out_nmf = pickle.load(f)
 
-with open('results/controlled_stim/Out_classifier.pickle', 'rb') as f:
+with open('../results/controlled_stim/Out_classifier.pickle', 'rb') as f:
     out_classifier = pickle.load(f)
 
-with open('results/controlled_stim/w_classifier.pickle', 'rb') as f:
+with open('../results/controlled_stim/w_classifier.pickle', 'rb') as f:
     w_classifier = pickle.load(f)
 
-with open('results/controlled_stim/pdf_x1x2.pickle', 'rb') as f:
+with open('../results/controlled_stim/pdf_x1x2.pickle', 'rb') as f:
     pdf_x1x2 = pickle.load(f)
 
 

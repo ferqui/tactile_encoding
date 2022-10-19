@@ -7,7 +7,7 @@ fwd_weight_scale 1
 weight_scale_factor 0.01
 reg_spikes 0.004
 reg_neurons 0.000001
-learningRate 0.1
+learningRate 0.01
 nb_epochs 50
 n_param_values 10
 batch_size 20
