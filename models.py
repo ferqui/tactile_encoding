@@ -112,7 +112,7 @@ class MN_neuron(nn.Module):
             self.state = self.NeuronState(V=torch.ones(x.shape[0], self.N, device=x.device) * self.EL,
                                           i1=torch.zeros(x.shape[0], self.N, device=x.device),
                                           i2=torch.zeros(x.shape[0], self.N, device=x.device),
-                                          Thr=torch.ones(x.shape[0], self.N, device=x.device) * self.Tr,
+                                          Thr=torch.ones(x.shape[0], self.N, device=x.device) * self.Tinf,
                                           spk=torch.zeros(x.shape[0], self.N, device=x.device))
 
         V = self.state.V
