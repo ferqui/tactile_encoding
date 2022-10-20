@@ -51,7 +51,7 @@ def main(args):
     ###########################################
     upsample_fac = 5
     file_name = "data/data_braille_letters_0.0.pkl"
-    data, labels, nb_channels, data_steps, _ = load_data(file_name, upsample_fac)
+    data, labels, nb_channels, data_steps, _, _ = load_data(file_name, upsample_fac)
 
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=0.2, shuffle=True, stratify=labels)
