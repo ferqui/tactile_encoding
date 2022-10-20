@@ -10,7 +10,7 @@ def plot_spikes(spikes):
     return fig
 
 @torch.no_grad()
-def compute_classification_accuracy(params, dataset, network, early, device):
+def compute_classification_accuracy(dataset, network, early, device):
     accs = []
     multi_accs = []
     ttc = None
@@ -23,7 +23,7 @@ def compute_classification_accuracy(params, dataset, network, early, device):
 
         spk_hidden = []
         s_out_rec = []
-        for t in range(params['data_steps']):
+        for t in range(x_local.shape[1]):
             out = network(x_local[:,t])
 
             spk_hidden.append(network[-2].state.S)
@@ -51,7 +51,7 @@ def compute_classification_accuracy(params, dataset, network, early, device):
 
     if early:
         max_time = int(54*25) #ms
-        time_bin_size = int(params['time_bin_size']) # ms
+        time_bin_size = int(1) # ms
         time = range(0,max_time,time_bin_size)
 
         mean_multi = np.mean(multi_accs, axis=0)
