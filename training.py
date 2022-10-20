@@ -9,10 +9,13 @@ from tqdm import trange
 
 import numpy as np
 
-from datasets import load_analog_data
+from datasets import load_data
 from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron
 from auxiliary import compute_classification_accuracy, plot_spikes
+
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
 
 firing_mode_dict = {
     'FA':{'a': 5, 'A1': 0, 'A2': 0},
@@ -47,8 +50,15 @@ def main(args):
     ##                Dataset                ##
     ###########################################
     upsample_fac = 5
-    file_name = "data/data_braille_letters_digits.pkl"
-    ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(file_name, upsample_fac)
+    file_name = "data/data_braille_letters_0.0.pkl"
+    data, labels, nb_channels, data_steps, _ = load_data(file_name, upsample_fac)
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        data, labels, test_size=0.2, shuffle=True, stratify=labels)
+
+    ds_train = TensorDataset(x_train, y_train)
+    ds_test = TensorDataset(x_test, y_test)
+
     params['nb_channels'] = nb_channels
     params['labels'] = labels
     params['data_steps'] = data_steps

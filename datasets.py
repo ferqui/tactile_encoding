@@ -5,52 +5,75 @@ import random
 import matplotlib.pyplot as plt
 
 # helper functions
-from scipy import signal
+from scipy import signal, ndimage
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
 
-
-def load_analog_data(file_name, upsample_fac):
-
-    data_dict = pd.read_pickle(file_name)
+def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0):
+    '''
+    Load the tactile Braille data.
+    '''
+    # TODO inlcude a dataloader (to open loading other data)
+    data_dict = pd.read_pickle(file_name)  # 1kHz data (new dataset)
 
     # Extract data
     data = data_dict['taxel_data']
     labels = data_dict['letter']
-    # find a way to use letters as labels
+    # TODO find a way to use letters as labels
     le = LabelEncoder()
     le.fit(labels)
-    # labels['categorical_label'] = le.transform(labels)
-    labels = le.transform(labels) # labels as int numbers
-
+    labels = le.transform(labels)  # labels as int numbers
     data_steps = len(data[0])
 
-    # Upsample
-    data_upsampled = []
+    # filter and resample
+    resample_fac = 1  # value < 1 downsample, otherwise upsample
+    data_resampled = []
+    data_resampled_split = []
+    filter_size = [int((data_steps*resample_fac)/75), 0]  # found manually
+    max_val = 111.0/10  # found by iterating over data beforehand
     for _, trial in enumerate(data):
-        data_upsampled.append(signal.resample(trial, data_steps*upsample_fac))
-    data_steps = len(data_upsampled[0]) # update data steps
+        if resample_fac == 1.0:
+            # no resampling, just filtering (smoothing)
+            data_dummy = ndimage.uniform_filter(
+                trial, size=filter_size, mode='nearest')  # smooth
 
-    # convert into tensors
-    data = torch.as_tensor(data_upsampled, dtype=torch.float)
+        elif resample_fac < 1.0:
+            # downsampling and filtering
+            data_dummy = signal.decimate(trial, int(
+                1/resample_fac), axis=0)  # downsample
+            data_dummy = ndimage.uniform_filter(
+                data_dummy, size=filter_size, mode='nearest')  # smooth
+        else:
+            # upsampling and filtering
+            data_dummy = signal.resample(
+                trial, data_steps*resample_fac)  # upsample
+            data_dummy = ndimage.uniform_filter(
+                data_dummy, size=filter_size, mode='nearest')  # smooth
+
+        # start at zero per sensor and normalize
+        first_val = np.tile(
+            data_dummy[int(data_steps*0.1)], (np.array(data_dummy).shape[0], 1))
+        data_dummy = np.array((data_dummy - first_val)/max_val)
+
+        # split each channel in two (positive, abs(negative))
+        # positive on first 12 negative on last 12
+        data_split = np.zeros(
+            (np.array(data_dummy).shape[0], np.array(data_dummy).shape[1]*2))
+        data_split[:, ::2] = np.where(data_dummy > 0, data_dummy, 0)
+        data_split[:, 1::2] = abs(np.where(data_dummy < 0, data_dummy, 0))
+
+        # discard the first 10% (not needed in the future when done in dataset creation)
+        data_resampled.append(data_dummy[int(data_steps*0.1):])
+        data_resampled_split.append(data_split[int(data_steps*0.1):])
+
+    data_steps = len(data_resampled[0])  # update data steps
+
+    data = torch.as_tensor(np.array(data_resampled_split), dtype=torch.float)  # data to feed to encoding
     labels = torch.as_tensor(labels, dtype=torch.long)
 
-    # # Select nonzero inputs
-    selected_chans = len(data[0][0])  # read out from data
-
-    # Standardize data
-    rshp = data.reshape((-1, data.shape[2]))
-    data = (data-rshp.mean(0))/(rshp.std(0)+1e-3)
-
-    x_train, x_test, y_train, y_test = train_test_split(
-        data, labels, test_size=0.2, shuffle=True, stratify=labels)
-
-    ds_train = TensorDataset(x_train, y_train)
-    ds_test = TensorDataset(x_test, y_test)
-
-    return ds_train, ds_test, labels, selected_chans, data_steps
-
+    selected_chans = len(data[0][0])
+    return data, labels, selected_chans, data_steps, le
 
 def load_event_data(params, file_name):
 
