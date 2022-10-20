@@ -21,7 +21,7 @@ import time
 from torch.autograd import Variable
 import pickle
 import scipy.spatial as sp
-
+matplotlib.use('Agg')
 # Set seed:
 torch.manual_seed(0)
 
@@ -128,8 +128,8 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                 net = NMF(V_matrix.shape, rank=rank_NMF)
             net.fit(V_matrix)
             H[neuron_id] = net.H
-            # plt.imshow(H[neuron_id].clone().detach(),aspect = 'auto',interpolation='nearest')
-            # plt.show()
+            plt.imshow(H[neuron_id].clone().detach(),aspect = 'auto',interpolation='nearest')
+            plt.show()
             if len(training):
                 counter += 1
                 training['optimizer'].zero_grad()
@@ -206,14 +206,14 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
                     plt.imshow(H[neuron_id].clone().detach(), aspect='auto', interpolation='nearest')
                     # plt.ylim([0, 128*2])
                     plt.title('H NMF')
-                    plt.xlabel('Rank')
+                    plt.xlabel('Time')
                     plt.ylabel('TrialxVariable')
                     if save_out:
                         f.savefig(results_dir+'H.pdf', format='pdf')
 
                     f = plt.figure()
                     plt.title('W NMF')
-                    plt.imshow(net.W.T.clone().detach(), aspect='auto', interpolation='nearest')
+                    plt.imshow(net.W.clone().detach(), aspect='auto', interpolation='nearest')
                     plt.xlabel('Time')
                     plt.ylabel('Rank')
                     if save_out:
@@ -282,10 +282,243 @@ def sim_batch(dataset, device, neuron, varying_element, rank_NMF, model, trainin
         list_mi.append(torch.mean(torch.Tensor(list_mi_local)))
         return list_mi, net
 
+def sim_batch_training(dataset, device, neuron, varying_element, rank_NMF, model, training ={}, list_loss=[], results_dir=None, net = None, neuron_id = 4, epoch = 0):
+    for x_local, y_local in dataset:
+        x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
+        neuron.reset()
+        s_out_rec = []
+        for t in range(x_local.shape[1]):
+            out = neuron(x_local[:, t, None, None]*1000)  # shape: n_batches x 1 fanout x n_param_values x n_channels
+            s_out_rec.append(out)
+        s_out_rec_train = torch.stack(s_out_rec, dim=1)
+        s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
+
+        ### s_out_rec_train shape:  trial x variable x fanout x channels x time
+        label = torch.ones([s_out_rec_train.shape[1], varying_element.shape[0]]) * varying_element
+        s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
+        label = label.T.flatten()[:, None]
+        label_min = label.min()
+        label_diff = label.max()-label.min()
+        label_norm = (label - label_min)/(label_diff)
+        H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
+        V_matrix = s_out_rec_train[:, 0, neuron_id, :]
+        net = NMF(V_matrix.shape, rank=rank_NMF)
+        net.fit(V_matrix)
+        H[neuron_id] = net.H
+        training['optimizer'].zero_grad()
+        outputs = model(H[neuron_id])
+        outputs_norm = (outputs - label_min) / (label_diff)
+        loss = training['criterion'](outputs, label)
+        # get gradients w.r.t to parameters
+        loss.backward()
+        list_loss.append([loss.item(),epoch])
+        # update parameters
+        training['optimizer'].step()
+    return list_loss, net
+
+def sim_batch_testing(dataset, device, neuron, varying_element, rank_NMF, model, list_mi=[],
+              final = False, results_dir=None, net = None, neuron_id = 4, epoch = 0):
+    list_mi_local = []
+    for x_local, y_local in dataset:
+        x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
+        neuron.reset()
+        s_out_rec = []
+        for t in range(x_local.shape[1]):
+            out = neuron(x_local[:, t, None, None]*1000)  # shape: n_batches x 1 fanout x n_param_values x n_channels
+            s_out_rec.append(out)
+        s_out_rec_train = torch.stack(s_out_rec, dim=1)
+        s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
+        ### s_out_rec_train shape:  trial x variable x fanout x channels x time
+        label = torch.ones([s_out_rec_train.shape[1], varying_element.shape[0]]) * varying_element
+        s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
+        label = label.T.flatten()[:, None]
+        label_min = label.min()
+        label_diff = label.max()-label.min()
+        label_norm = (label - label_min)/(label_diff)
+        H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
+        selected_neuron_id = 4
+        # net = None
+        V_matrix = s_out_rec_train[:, 0, neuron_id, :]
+        net = NMF(V_matrix.shape, rank=rank_NMF)
+        net.fit(V_matrix)
+        H[neuron_id] = net.H
+        predicted = model(H[neuron_id])
+        label_unique = torch.unique(label)
+        predicted_int = predicted.type(torch.int)
+        predicted_range = torch.unique(predicted_int)
+        pdf_x1x2 = torch.zeros([len(label_unique), len(predicted_range)])
+        for trial_idx in range(len(predicted_int)):
+            lab_pos = torch.where(label_unique == label[trial_idx])[0]
+            pred_pos = torch.where(predicted_range == predicted_int[trial_idx])[0]
+            pdf_x1x2[lab_pos, pred_pos] += 1
+        num_occ = torch.sum(pdf_x1x2)
+        pdf_x1 = torch.sum(pdf_x1x2, dim=1)/num_occ # to check
+        pdf_x2 = torch.sum(pdf_x1x2, dim=0)/num_occ
+        pdf_x1x2 = pdf_x1x2 / num_occ
+        mi = torch.zeros(1)
+        for el1_idx, pdf_x1_el in enumerate(pdf_x1):
+            for el2_idx, pdf_x2_el in enumerate(pdf_x2):
+                mi += pdf_x1x2[el1_idx, el2_idx] * torch.log2(
+                    (pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el)) + 1E-10)
+        list_mi.append([mi.item(),epoch])
+    return list_mi, net
+
+def sim_batch_final(dataset, device, neuron, varying_element, rank_NMF, model, list_mi=[],results_dir=None, net = None,
+                    neuron_id = 4, epoch = 0):
+    list_mi_local = []
+    for x_local, y_local in dataset:
+        x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
+        neuron.reset()
+        s_out_rec = []
+        for t in range(x_local.shape[1]):
+            out = neuron(x_local[:, t, None, None]*1000)  # shape: n_batches x 1 fanout x n_param_values x n_channels
+            s_out_rec.append(out)
+        s_out_rec_train = torch.stack(s_out_rec, dim=1)
+        s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
+        ### s_out_rec_train shape:  trial x variable x fanout x channels x time
+        label = torch.ones([s_out_rec_train.shape[1], varying_element.shape[0]]) * varying_element
+        s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
+        label = label.T.flatten()[:, None]
+        label_min = label.min()
+        label_diff = label.max()-label.min()
+        label_norm = (label - label_min)/(label_diff)
+        H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
+        V_matrix = s_out_rec_train[:, 0, neuron_id, :]
+        # if net is None:
+        net = NMF(V_matrix.shape, rank=rank_NMF)
+        net.fit(V_matrix)
+        H[neuron_id] = net.H
+        predicted = model(H[neuron_id])
+        output_vs_label = [predicted.clone().detach(),
+                           label.clone().detach()]
+        outputs_norm = (predicted - label_min) / (label_diff)
+        acc = ((outputs_norm - label_norm) ** 2).sum()/x_local.shape[0]
+        label_unique = torch.unique(label)
+        predicted_int = predicted.type(torch.int)
+        predicted_range = torch.unique(predicted_int)
+
+
+
+        pdf_x1x2 = torch.zeros([len(label_unique), len(predicted_range)])
+        for trial_idx in range(len(predicted_int)):
+
+            lab_pos = torch.where(label_unique == label[trial_idx])[0]
+            pred_pos = torch.where(predicted_range == predicted_int[trial_idx])[0]
+            pdf_x1x2[lab_pos, pred_pos] += 1
+
+        num_occ = torch.sum(pdf_x1x2)
+        pdf_x1 = torch.sum(pdf_x1x2, dim=1)/num_occ # to check
+        pdf_x2 = torch.sum(pdf_x1x2, dim=0)/num_occ
+        pdf_x1x2 = pdf_x1x2 / num_occ
+        f = plt.figure()
+        plt.imshow(pdf_x1x2.clone().detach().cpu())
+        plt.xticks([i for i in range(len(predicted_range))],np.array(predicted_range.cpu()))
+        plt.yticks([i for i in range(len(label_unique))],np.array(label_unique.cpu()))
+        plt.xlabel('Predicted')
+        plt.ylabel('Label')
+        plt.title('Prob matrix')
+        plt.colorbar()
+        if save_out:
+            f.savefig(results_dir+'pdf_joint.pdf', format='pdf')
+
+        f = plt.figure()
+        plt.imshow(x_local[:, neuron_id, :].clone().detach().cpu(), aspect='auto')
+        plt.title('XLOCAL')
+        if save_out:
+            f.savefig(results_dir+'xlocal.pdf', format='pdf')
+
+        f = plt.figure()
+        plt.imshow(s_out_rec_train[:, 0, neuron_id, :].clone().detach().cpu(), aspect='auto')
+        # plt.ylim([0, 128*2])
+        plt.title('INPUT NMF')
+        plt.xlabel('Time')
+        plt.ylabel('TrialxVariable')
+        if save_out:
+            f.savefig(results_dir+'Input_nmf.pdf', format='pdf')
+
+        # s_out_rec_train shape:  (trial x variable) x fanout x channels x time
+        # print('s_out_train shape', s_out_rec_train.shape)
+        f = plt.figure()
+        plt.imshow(H[neuron_id].clone().detach().cpu(), aspect='auto', interpolation='nearest')
+        # plt.ylim([0, 128*2])
+        plt.title('H NMF')
+        plt.xlabel('Time')
+        plt.ylabel('TrialxVariable')
+        if save_out:
+            f.savefig(results_dir+'H.pdf', format='pdf')
+
+        f = plt.figure()
+        plt.title('W NMF')
+        plt.imshow(net.W.clone().detach().cpu(), aspect='auto', interpolation='nearest')
+        plt.xlabel('Time')
+        plt.ylabel('Rank')
+        if save_out:
+            f.savefig(results_dir + 'W_nmf.pdf', format='pdf')
+
+        if run_with_fake_input:
+            # Store V input:
+            with open(results_dir + 'W.pickle', 'wb') as f:
+                pickle.dump(net.W.clone().detach().cpu()(), f)
+
+        f=plt.figure()
+        plt.imshow(net().clone().detach().cpu(), aspect='auto', interpolation='nearest')
+        # plt.ylim([0, 128*2])
+        plt.title('OUT NMF')
+        plt.xlabel('Time')
+        plt.ylabel('TrialxVariable')
+        if save_out:
+            f.savefig(results_dir+'Out_nmf.pdf', format='pdf')
+
+        f = plt.figure()
+        plt.imshow(torch.concat(output_vs_label, dim=1).clone().detach().cpu(), aspect='auto', cmap='seismic',
+                   interpolation='nearest')
+        plt.colorbar()
+        plt.title('OUTPUT vs LABEL')
+        # plt.xlabel('Output|Label')
+        plt.ylabel('TrialxVariable')
+        plt.xticks([0, 1], ['Output', 'Label'])
+        if save_out:
+            f.savefig(results_dir+'Predicted_vs_label.pdf', format='pdf')
+
+        if run_with_fake_input:
+            # Store Out nmf input:
+            with open(results_dir + 'Out_nmf.pickle', 'wb') as f:
+                pickle.dump(net().clone().detach().cpu(), f)
+            # Store Out classifier:
+            with open(results_dir + 'Out_classifier.pickle', 'wb') as f:
+                pickle.dump(predicted.clone().detach().cpu(), f)
+            # Store Learned W coefficients:
+            with open(results_dir + 'w_classifier.pickle', 'wb') as f:
+                coeff = [p for p in model.parameters()][0][0]
+                coeff = coeff.clone().detach()
+                pickle.dump(coeff[:, None].clone().detach().cpu(), f)
+            # Store joint probability matrix:
+            with open(results_dir + 'pdf_x1x2.pickle', 'wb') as f:
+                pickle.dump(pdf_x1x2.clone().detach().cpu(), f)
+        mi = torch.zeros(1)
+        for el1_idx, pdf_x1_el in enumerate(pdf_x1):
+            for el2_idx, pdf_x2_el in enumerate(pdf_x2):
+                mi += pdf_x1x2[el1_idx, el2_idx] * torch.log2(
+                    (pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el)) + 1E-10)
+                # print('mutual information', mi)
+                # plt.figure()
+                # plt.imshow(pdf_x1x2,aspect='auto')
+                # plt.title('PDF')
+                # plt.figure()
+                # plt.plot(label, predicted_int)
+                # plt.show()
+                list_mi.append([mi.item(),epoch])
+    # list_mi.append(torch.mean(torch.Tensor(list_mi_local)))
+    return list_mi, net
 
 def MI_neuron_params(neuron_param_values, name_param_sweeped):
 
     # Set results folder:
+
+    iscuda = torch.cuda.is_available()
+    # #Forcing CPU
+    # iscuda = False
+    # print('NOTE: Forced CPU')
     if run_with_fake_input:
         results_dir = '../results/controlled_stim/'
         if not (os.path.isdir(results_dir)):
@@ -301,10 +534,10 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     addHeaderToMetadata(metadatafilename, 'Simulation')
 
     device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+        'cuda') if iscuda else torch.device('cpu')
     torch.manual_seed(0)
 
-    cuda = torch.cuda.is_available()
+    cuda = iscuda
     if cuda:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
@@ -375,6 +608,8 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     outputDim = 1  # takes variable 'y'
     learningRate = params['learningRate'] #10#0.01
 
+    neuron_id = int(params['neuron_id'])
+
     rank_NMF = int(params['rank_NMF'])
     range_weight_init = 10
     model = NlinearRegression(rank_NMF, 1)
@@ -384,10 +619,12 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     coeff = coeff.clone().detach()
 
     #TODO: Check this
-    if torch.cuda.is_available():
+    if iscuda:
         pin_memory=True
+        num_workers = 0
     else:
         pin_memory=False
+        num_workers = 32
 
     # The log softmax function across output units
     dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory, generator=torch.Generator(device=device))
@@ -397,7 +634,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     #optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
     optimizer = torch.optim.Adamax(model.parameters(), lr=learningRate)
     params['optimizer'] = optimizer.__class__.__name__
-    print('Traning classifier with {} optimizer', params['optimizer'])
+    print('Training classifier with {} optimizer'.format(params['optimizer']))
 
     # Store parameters to metadata file:
     for key in params.keys():
@@ -414,20 +651,35 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
     H_initial = None
     # net = NMF((), rank=rank_NMF, H=H_initial)
     net = None
-    for e in range(nb_epochs):
+    pbar = trange(nb_epochs)
+    for e in pbar:
         local_loss = []
         H_train = []
         H_test = []
         accs = []  # accs: mean training accuracies for each batch
-        print('Epoch', e)
-        list_loss,net = sim_batch(dl_train, device, neuron, varying_element, rank_NMF, model,
-                              {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss, results_dir=results_dir,net = net)
-        list_mi,net = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, results_dir=results_dir,net=net)
-
+        # print('Epoch', e)
+        list_loss,net = sim_batch_training(dl_train, device, neuron, varying_element, rank_NMF, model,
+                              {'optimizer':optimizer, 'criterion':criterion}, list_loss=list_loss,
+                                           results_dir=results_dir,net = net,neuron_id=neuron_id, epoch = e)
+        list_mi,net = sim_batch_testing(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi,
+                                        results_dir=results_dir,net=net,neuron_id=neuron_id, epoch = e)
+        pbar.set_postfix_str("Mutual Information: " + str(np.round(list_mi[e][0],2)) + ' bits. Loss: ' + str(np.round(list_loss[e][0], 2)))
     train_duration = time.time() - t_start
     addToNetMetadata(metadatafilename, 'sim duration (sec)', train_duration)
 
-    list_mi, net = sim_batch(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi, final = True, results_dir=results_dir)
+    list_mi,net = sim_batch_final(dl_test, device, neuron, varying_element, rank_NMF, model, list_mi=list_mi,
+                              results_dir=results_dir,neuron_id=neuron_id, epoch = e)
+
+    # Store data:
+    # Loss:
+    list_loss = np.array(list_loss)
+    list_mi = np.array(list_mi)
+    with open(results_dir+'Loss.pickle', 'wb') as f:
+        pickle.dump(list_loss, f)
+    # Mi:
+    with open(results_dir+'MI.pickle', 'wb') as f:
+        pickle.dump(list_mi, f)
+
     fig = plt.figure()
     plt.plot(list_loss)
     plt.xlabel('Epochs x Trials')
@@ -436,19 +688,12 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped):
         fig.savefig(results_dir+'Loss.pdf', format='pdf')
 
     fig = plt.figure()
-    plt.plot(list_mi)
+    plt.plot(list_mi[:,0])
     plt.xlabel('Epochs x Trials')
     plt.ylabel('MI')
     if save_out:
         fig.savefig(results_dir+'MI.pdf', format='pdf')
 
-    # Store data:
-    # Loss:
-    with open(results_dir+'Loss.pickle', 'wb') as f:
-        pickle.dump(list_loss, f)
-    # Mi:
-    with open(results_dir+'MI.pickle', 'wb') as f:
-        pickle.dump(list_mi, f)
 
 if __name__ == "__main__":
 

@@ -40,7 +40,7 @@ def load_analog_data(file_name, upsample_fac, specify_letters = []):
     data_steps = len(data_upsampled[0]) # update data steps
 
     # convert into tensors
-    data = torch.as_tensor(data_upsampled, dtype=torch.float)
+    data = torch.as_tensor(np.array(data_upsampled), dtype=torch.float)
     labels = torch.as_tensor(labels, dtype=torch.long)
 
     # # Select nonzero inputs

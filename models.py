@@ -96,18 +96,13 @@ class MN_neuron_IT(nn.Module):
         one2N_matrix = torch.ones(1,self.fanout,self.channels, 1) # shape: 1 (single neuron) x fanout x channels x 1)
         #self.register_buffer('one2N_matrix', torch.ones(1, nb_inputs))
 
-        print('shape ones',one2N_matrix.shape)
-        print('a_value shape',a.shape)
         # shape of a is fanout x channels x params_n
         self.a = torch.permute(nn.Parameter(one2N_matrix*a, requires_grad=train),(0,1,3,2))
-        print('a_after shape',self.a.shape)
         # torch.nn.init.constant_(self.a, a)
         #self.A1 = A1 * self.C
         #self.A2 = A2 * self.C
         self.A1 = torch.permute(nn.Parameter(one2N_matrix*A1 * self.C, requires_grad=train),(0,1,3,2))
         self.A2 = torch.permute(nn.Parameter(one2N_matrix*A2 * self.C, requires_grad=train),(0,1,3,2))
-
-        print('device A1', self.A1.device)
         self.state = None
 
     def forward(self, x):
