@@ -14,7 +14,13 @@ from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron
 from auxiliary import compute_classification_accuracy, plot_spikes
 
-def main():
+firing_mode_dict = {
+    'FA':{'a': 5, 'A1': 0, 'A2': 0},
+    'SA':{'a': 0, 'A1': 0, 'A2': 0},
+    'MIX':{'a': 5, 'A1': 5, 'A2': -0.3},
+}
+
+def main(args):
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -48,7 +54,7 @@ def main():
     params['data_steps'] = data_steps
 
     # Network parameters
-    nb_input_copies = params['nb_input_copies']
+    nb_input_copies = args.expansion
     nb_inputs = params['nb_channels'] * nb_input_copies
     nb_hidden = 450
     nb_outputs = len(np.unique(params['labels']))
@@ -71,20 +77,20 @@ def main():
     ##                Network                ##
     ###########################################
 
-    a = torch.empty((nb_inputs,))
-    nn.init.normal_(
-        a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    # a = torch.empty((nb_inputs,))
+    # nn.init.normal_(
+    #     a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A1 = torch.empty((nb_inputs,))
-    nn.init.normal_(
-        A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    # A1 = torch.empty((nb_inputs,))
+    # nn.init.normal_(
+    #     A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A2 = torch.empty((nb_inputs,))
-    nn.init.normal_(
-        A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    # A2 = torch.empty((nb_inputs,))
+    # nn.init.normal_(
+    #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     network = nn.Sequential(Encoder(nb_inputs, encoder_weight_scale, nb_input_copies),
-                            MN_neuron(nb_inputs, a, A1, A2, train=True),
+                            MN_neuron(nb_inputs, firing_mode_dict[args.firing_mode], train=args.train),
                             LIF_neuron(nb_inputs, nb_hidden, alpha, beta, is_recurrent=True,
                                     fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale),
                             LIF_neuron(nb_hidden, nb_outputs, alpha, beta, is_recurrent=False, fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale)).to(device)
@@ -197,4 +203,15 @@ def main():
             np.round(accs_hist[1][-1] * 100, 2)) + '%, Loss: ' + str(np.round(mean_loss, 2)))
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser('Encoding')
+    parser.add_argument('--firing-mode', type=str, default='FA', choices=['FA', 'SA', 'MIX'], 
+        help="Choose between different firing modes")
+    parser.add_argument('--expansion', type=int, default=1,
+        help='Number of channel expansion (default: 1 (no expansion)).')
+    parser.add_argument('--train', action="store_true",
+        help='Train the MN neuron.')
+    args = parser.parse_args()
+    assert args.expansion > 0, "Expansion number should be greater that 0"
+    main(args)
