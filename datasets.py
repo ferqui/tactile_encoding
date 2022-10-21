@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
 
-def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0):
+def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1):
     '''
     Load the tactile Braille data.
     '''
@@ -31,7 +31,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0)
     data_resampled = []
     data_resampled_split = []
     filter_size = [int((data_steps*resample_fac)/75), 0]  # found manually
-    max_val = 111.0/10  # found by iterating over data beforehand
+    max_val = 111.0/norm_val  # found by iterating over data beforehand
     for _, trial in enumerate(data):
         if resample_fac == 1.0:
             # no resampling, just filtering (smoothing)
