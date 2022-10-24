@@ -1,3 +1,4 @@
+from turtle import forward
 import torch
 import torch.nn as nn
 import numpy as np
@@ -43,6 +44,7 @@ class SurrGradSpike(torch.autograd.Function):
 
 activation = SurrGradSpike.apply
 
+
 ## Encoder
 class Encoder(nn.Module):
     def __init__(self, nb_inputs, encoder_weight_scale, nb_input_copies):
@@ -60,6 +62,7 @@ class Encoder(nn.Module):
     def forward(self, inputs):
         encoder_currents = self.enc_gain * (inputs.tile((self.nb_input_copies,)) + self.enc_bias) 
         return encoder_currents
+
 
 ## MN neuron
 class MN_neuron(nn.Module):
@@ -138,6 +141,61 @@ class MN_neuron(nn.Module):
 
     def reset(self):
         self.state = None
+
+
+class IZHI_neuron(nn.Module):
+    NeuronState = namedtuple('NeuronState', ['V', 'i', 'spk'])
+    def __init__(self, nb_inputs, parameters_combination, a=0.02, b=0.2, d=8, tau=1, k=150, train=True): # default combination: M2O of the original paper
+        super(MN_neuron, self).__init__()
+
+        # One-to-one synapse
+        self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=train)
+
+        self.N = nb_inputs
+
+        self.Vr = -0.07
+        self.Tr = -0.03
+
+        self.a = a
+        self.b = b  # units of 1/s
+        self.d = self.d
+        self.k = k
+        self.tau = tau
+
+        self.dt = 1 / 1000
+
+        parameters_list = ["a", "b", "d", "tau", "k"]
+        for ii in parameters_list:
+            if ii in list(parameters_combination.keys()):
+                eval_string = "self.{}".format(ii) + " = " + str(parameters_combination[ii])
+                exec(eval_string)
+
+        self.state = None
+    
+    def forward(self, x):
+        if self.state is None:
+            self.state = self.NeuronState(V=torch.ones(x.shape[0], self.N, device=x.device) * self.Vr,
+                                          i=torch.zeros(x.shape[0], self.N, device=x.device),
+                                          spk=torch.zeros(x.shape[0], self.N, device=x.device))
+        
+        V = self.state.V
+        i = self.state.i
+
+        V = V + self.tau * (0.04 * (V**2) + (5 * V) + 140 - i + x)
+        i = i + self.tau * (self.a * ((self.b * V) - i))
+
+        spk = activation(V - self.Tr)
+
+        i = (1 - spk) * i + (spk) * (i + self.d)
+        V = (1 - spk) * V + (spk) * self.Vr
+
+        self.state = self.NeuronState(V=V, i=i, spk=spk)
+
+        return spk
+
+    def reset(self):
+        self.state = None
+
 
 ## LIF neuron
 class LIF_neuron(nn.Module):
