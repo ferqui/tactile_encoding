@@ -66,7 +66,7 @@ class Encoder(nn.Module):
 class MN_neuron_IT(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
-    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50, train=True):
+    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50,k1=200,k2 = 20, train=True):
         super(MN_neuron_IT, self).__init__()
 
         # One-to-one synapse
@@ -85,8 +85,8 @@ class MN_neuron_IT(nn.Module):
         self.Tr = -0.06
         self.Tinf = -0.05
 
-        self.b = b  # units of 1/s
-        self.G = G * self.C  # units of 1/s
+        # self.b = b  # units of 1/s
+        # self.G = G * self.C  # units of 1/s
         self.k1 = 200  # units of 1/s
         self.k2 = 20  # units of 1/s
 
@@ -103,6 +103,10 @@ class MN_neuron_IT(nn.Module):
         #self.A2 = A2 * self.C
         self.A1 = torch.permute(nn.Parameter(one2N_matrix*A1 * self.C, requires_grad=train),(0,1,3,2))
         self.A2 = torch.permute(nn.Parameter(one2N_matrix*A2 * self.C, requires_grad=train),(0,1,3,2))
+        self.b = torch.permute(nn.Parameter(one2N_matrix*b, requires_grad=train),(0,1,3,2))
+        self.G = torch.permute(nn.Parameter(one2N_matrix * G * self.C, requires_grad=train), (0, 1, 3, 2))
+        self.k1 = torch.permute(nn.Parameter(one2N_matrix * k1, requires_grad=train), (0, 1, 3, 2))
+        self.k2 = torch.permute(nn.Parameter(one2N_matrix * k2, requires_grad=train), (0, 1, 3, 2))
         self.state = None
 
     def forward(self, x):

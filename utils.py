@@ -1,6 +1,7 @@
 import os
 import numpy as np
 
+
 def addHeaderToMetadata(filename, header):
     file = os.path.join(filename)
 
@@ -24,34 +25,25 @@ def addToNetMetadata(filename, key, value, header=''):
     f.close()
 
 
-def set_results_folder(input_parameter_name, exp_id):
+def set_results_folder(depth, result_dir='experiments/results/'):
     """
     Prepare path to experiment folder.
     """
 
-    results_dir = './results/'
-
-    if not (os.path.isdir(results_dir)):
-        os.mkdir(results_dir)
-
-    sim_dir = os.path.join(
-        results_dir,
-        exp_id)
-
-    if not (os.path.isdir(sim_dir)):
-        os.mkdir(sim_dir)
-
-    sim_dir = os.path.join(
-        sim_dir,
-        input_parameter_name)
-
-    if not (os.path.isdir(sim_dir)):
-        os.mkdir(sim_dir)
-
+    if not (os.path.isdir(result_dir)):
+        os.mkdir(result_dir)
+    sim_dir = result_dir
+    for level in depth:
+        sim_dir = os.path.join(
+            sim_dir,
+            level)
+        if not (os.path.isdir(sim_dir)):
+            os.mkdir(sim_dir)
     return sim_dir
 
-def generate_dict(key_to_change, variable_range):
-    file_dir_params = '../parameters/'
+
+def generate_dict(key_to_change, variable_range, force_param_dict):
+    file_dir_params = 'parameters/'
     param_filename = 'parameters_mn'
     file_name_parameters = file_dir_params + param_filename + '.txt'
     params = {}
@@ -63,6 +55,9 @@ def generate_dict(key_to_change, variable_range):
             if key == key_to_change:
                 params[key] = variable_range
             else:
+
+                if key in force_param_dict.keys():
+                    value = force_param_dict[key]
                 params[key] = np.linspace(float(value), float(value), num_values)
 
     return params
