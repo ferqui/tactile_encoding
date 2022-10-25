@@ -19,8 +19,8 @@ from datasets import load_data
 from parameters import encoding_parameter
 
 neuron_model = 'mn_neuron' # iz_neuon, lif_neuron
-generations = 100 # stop criterion
-P = 5
+generations = 20 # stop criterion
+P = 10
 
 # Mihilas-Niebur neuron
 if neuron_model is 'mn_neuron':
@@ -47,7 +47,9 @@ for _, param in enumerate(parameter):
     if param[0] in parameters_list:
         parameter_to_optimize.append(param)
 
+record = []
 population_list = []
+param_width = []
 # create inital populataton of size P
 for counter in range(P):
     individual = {}
@@ -56,6 +58,9 @@ for counter in range(P):
     for _, param in enumerate(parameter_to_optimize):
         param_space = np.arange(param[1], param[2], param[3]) # create parameter space to draw from
         individual[param[0]] = random.choice(param_space) # draw a random number out of parameter space
+        # extract the parameter width for later
+        if counter == 0:
+            param_width.append(np.diff((param[1], param[2]))) # define parameter width (min - max)
     population_list.append(individual)
 
 # load data
@@ -64,7 +69,8 @@ data_dict = pd.read_pickle(
 data_neuron, labels, timestamps, le, data = load_data("./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False)
 # iterate for 'generataions' cicles
 for generation in range(generations):
-    fitness_raw = []
+    highest_fitness = 0
+    best_individual = None
     # validate fitness for each individual
     for identifier, individual in enumerate(population_list):
         # create neuron response for individual
@@ -91,5 +97,29 @@ for generation in range(generations):
         # output_thr = np.stack(output_thr)
 
         # TODO validate fitness (for now TOYexample: the more spikes the better)
-        fitness_raw = np.mean(), np.std()
-        print("BREAK")
+        fitness = np.sum(output_s) # change to something meaningful
+        individual['fitness'] = fitness
+        if fitness > highest_fitness:
+            highest_fitness = np.sum(output_s)
+            best_individual = identifier
+    
+    # safe outcome for the record
+    record.append(population_list)
+    
+    # create next generation
+    for identifier, individual in enumerate(population_list):
+        if identifier <= 0.75*len(population_list):
+            # create first 75% from best (TODO inlcude more vaiance like top 10%)
+            for counter, param in enumerate(parameter_to_optimize):
+                # print(param[1], param[2])
+                # print(population_list[best_individual][param[0]])
+                # print(np.random.normal(population_list[best_individual][param[0]], param_width[counter]*0.1, 1))
+                new_val = np.random.normal(population_list[best_individual][param[0]], param_width[counter]*0.1, 1)
+                individual[param[0]] =  new_val[0] # (mu, sigma, nb_samples)
+        else:
+            # create remaning 25% random
+            for _, param in enumerate(parameter_to_optimize):
+                param_space = np.arange(param[1], param[2], param[3]) # create parameter space to draw from
+                individual[param[0]] = random.choice(param_space) # draw a random number out of parameter space
+    print("Generation {} of {} finished".format(generation, generations))
+print("End of the evolution reached")
