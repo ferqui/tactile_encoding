@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 
 # helper functions
 from scipy import signal, ndimage
+from scipy.interpolate import interp1d
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset #, DataLoader
 
-def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1):
+def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False):
     '''
     Load the tactile Braille data.
     '''
@@ -20,6 +21,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     # Extract data
     data = data_dict['taxel_data']
     labels = data_dict['letter']
+    timestamps = data_dict['timestamp']
     # TODO find a way to use letters as labels
     le = LabelEncoder()
     le.fit(labels)
@@ -27,29 +29,39 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     data_steps = len(data[0])
 
     # filter and resample
-    resample_fac = 1  # value < 1 downsample, otherwise upsample
     data_resampled = []
     data_resampled_split = []
-    filter_size = [int((data_steps*resample_fac)/75), 0]  # found manually
+    timestamps_resampled = []
+    filter_size = [int((data_steps*upsample_fac)/75), 0]  # found manually
     max_val = 111.0/norm_val  # found by iterating over data beforehand
-    for _, trial in enumerate(data):
-        if resample_fac == 1.0:
-            # no resampling, just filtering (smoothing)
-            data_dummy = ndimage.uniform_filter(
-                trial, size=filter_size, mode='nearest')  # smooth
+    for counter, trial in enumerate(data):
+        # no resampling, just filtering (smoothing)
+        if upsample_fac == 1.0:
+            data_dummy = trial
+            timestamps_dummy = timestamps[counter]
+            if  filtering:
+                data_dummy = ndimage.uniform_filter(
+                    trial, size=filter_size, mode='nearest')  # smooth
 
-        elif resample_fac < 1.0:
-            # downsampling and filtering
+        # downsampling and filtering
+        elif upsample_fac < 1.0:
             data_dummy = signal.decimate(trial, int(
-                1/resample_fac), axis=0)  # downsample
-            data_dummy = ndimage.uniform_filter(
-                data_dummy, size=filter_size, mode='nearest')  # smooth
+                1/upsample_fac), axis=0)  # downsample
+            time_interpolate = interp1d(range(data_steps), timestamps[counter])
+            timestamps_dummy = time_interpolate(np.linspace(0, data_steps-1, int(data_steps/int(1/upsample_fac)+0.5)))
+            if filtering:
+                data_dummy = ndimage.uniform_filter(
+                    data_dummy, size=filter_size, mode='nearest')  # smooth
+        
+        # upsampling and filtering
         else:
-            # upsampling and filtering
             data_dummy = signal.resample(
-                trial, data_steps*resample_fac)  # upsample
-            data_dummy = ndimage.uniform_filter(
-                data_dummy, size=filter_size, mode='nearest')  # smooth
+                trial, data_steps*upsample_fac)  # upsample
+            time_interpolate = interp1d(range(data_steps), timestamps[counter])
+            timestamps_dummy = time_interpolate(np.linspace(0, data_steps-1, data_steps*upsample_fac))
+            if filtering:
+                data_dummy = ndimage.uniform_filter(
+                    data_dummy, size=filter_size, mode='nearest')  # smooth
 
         # start at zero per sensor and normalize
         first_val = np.tile(
@@ -64,6 +76,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
         data_split[:, 1::2] = abs(np.where(data_dummy < 0, data_dummy, 0))
 
         # discard the first 10% (not needed in the future when done in dataset creation)
+        timestamps_resampled.append(timestamps_dummy[int(data_steps*0.1):]-timestamps_dummy[int(data_steps*0.1)])
         data_resampled.append(data_dummy[int(data_steps*0.1):])
         data_resampled_split.append(data_split[int(data_steps*0.1):])
 
@@ -73,8 +86,8 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     data_split = torch.as_tensor(np.array(data_resampled_split), dtype=torch.float)  # data to feed to encoding
     labels = torch.as_tensor(labels, dtype=torch.long)
 
-    selected_chans = 2*len(data[0][0])
-    return data_split, labels, selected_chans, data_steps, le, data
+    # selected_chans = 2*len(data[0][0])
+    return data_split, labels, timestamps_resampled, le, data
 
 def load_event_data(params, file_name):
 
