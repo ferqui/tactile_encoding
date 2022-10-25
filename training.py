@@ -31,7 +31,7 @@ def main(args):
     ###########################################
     upsample_fac = 1
     file_name = "data/data_braille_letters_0.0.pkl"
-    data, labels, nb_channels, data_steps, _, _ = load_data(file_name, upsample_fac)
+    data, labels, nb_channels, _, _, _ = load_data(file_name, upsample_fac, norm_val=args.norm)
 
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=0.2, shuffle=True, stratify=labels)
@@ -193,6 +193,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Encoding')
     parser.add_argument('--firing-mode', type=str, default='FA', choices=['FA', 'SA', 'MIX'], 
         help="Choose between different firing modes")
+    parser.add_argument('--norm', type=float, default=10.0,
+        help='Data normalization')
     parser.add_argument('--expansion', type=int, default=1,
         help='Number of channel expansion (default: 1 (no expansion)).')
     parser.add_argument('--tau_mem', type=float, default=0.02,
