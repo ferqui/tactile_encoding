@@ -97,29 +97,5 @@ sns.catplot(data=pd.DataFrame(mi_finalsamples),x='stable_param',y='stable_value'
             kind='bar', height=4, col_wrap=3)
 plt.savefig(os.path.join(results_dir,folder_name,fig_folder,'MI_hist_sns_ics.pdf'), format='pdf')
 
-# fig = plt.figure(figsize=(8, 5))
-# gs = gridspec.GridSpec(1, 1)
-# gs.update(wspace=0.5, hspace=0.3, left=None, right=None)
-# axs = [fig.add_subplot(gs[0, 0])]
-# for param in folder.keys():
-#     axs[0].plot(loss[param], label=param)
-# axs[0].legend()
-# axs[0].set_title('Loss')
-# axs[0].set_xlabel('Training Epochs')
-# fig.savefig('results/figures/Loss.pdf', format='pdf')
-#
-# fig = plt.figure(figsize=(8, 5))
-# gs = gridspec.GridSpec(1, 1)
-# gs.update(wspace=0.5, hspace=0.3, left=None, right=None)
-# axs = [fig.add_subplot(gs[0, 0])]
-# for param in folder.keys():
-#     axs[0].plot(mi[param], label=param)
-# axs[0].legend()
-# axs[0].set_title('MI')
-# fig.savefig('results/figures/MI.pdf', format='pdf')
-# axs[0].set_title('MI')
-# axs[0].set_xlabel('Test Epochs')
-# fig.savefig('results/figures/MI.pdf', format='pdf')
-
 plt.show()
 
