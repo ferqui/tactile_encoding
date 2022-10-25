@@ -1,4 +1,4 @@
-from turtle import forward
+# from turtle import forward
 import torch
 import torch.nn as nn
 import numpy as np
@@ -64,7 +64,7 @@ class Encoder(nn.Module):
         return encoder_currents
 
 
-## MN neuron
+## Mihilas-Niebur neuron
 class MN_neuron(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
@@ -142,8 +142,8 @@ class MN_neuron(nn.Module):
     def reset(self):
         self.state = None
 
-
-class IZHI_neuron(nn.Module):
+# Izhikevich neuron
+class IZ_neuron(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i', 'spk'])
     def __init__(self, nb_inputs, parameters_combination, dt=1/1000, a=0.02, b=0.2, d=8, tau=1, k=150, train=True): # default combination: M2O of the original paper
         super(MN_neuron, self).__init__()

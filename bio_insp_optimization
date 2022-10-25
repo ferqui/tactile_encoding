@@ -1,0 +1,95 @@
+"""
+The bio inspired optimization is based on the evolution scheme.
+It goes as follows:
+1. create intial population of size P
+loop:
+    2. validate fitness of single individual P_n
+    3. select best x inidividuals and pertubate the genes (neuron parameters) 
+    and include y random individuals to create population of P
+    4. reached stop criterion end
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+import torch
+import pandas as pd
+
+from datasets import load_data
+from parameters import encoding_parameter
+
+neuron_model = 'mn_neuron' # iz_neuon, lif_neuron
+generations = 100 # stop criterion
+P = 5
+
+# Mihilas-Niebur neuron
+if neuron_model is 'mn_neuron':
+    from parameters.encoding_parameter import mn_parameter
+    from models import MN_neuron
+    neuron = MN_neuron
+    parameter = mn_parameter
+# Izhikevich neuron
+elif neuron_model is 'iz_neuron':
+    from parameters.encoding_parameter import iz_parameter
+    from models import IZ_neuron
+    neuron = IZ_neuron
+    parameter = iz_parameter
+# LIF neuron
+else:
+    from parameters.encoding_parameter import lif_parameter
+    from models import LIF_neuron
+    neuron = LIF_neuron
+    parameter = lif_parameter
+
+parameters_list = ["a", "A1", "A2"]
+parameter_to_optimize = []
+for _, param in enumerate(parameter):
+    if param[0] in parameters_list:
+        parameter_to_optimize.append(param)
+
+population_list = []
+# create inital populataton of size P
+for counter in range(P):
+    individual = {}
+    individual['identifier'] = counter
+    # create inital parameter values
+    for _, param in enumerate(parameter_to_optimize):
+        param_space = np.arange(param[1], param[2], param[3]) # create parameter space to draw from
+        individual[param[0]] = random.choice(param_space) # draw a random number out of parameter space
+    population_list.append(individual)
+
+# load data
+data_dict = pd.read_pickle(
+            "./data/data_braille_letters_0.0.pkl")  # 100Hz data (new resampled dataset)
+data_neuron, labels, timestamps, le, data = load_data("./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False)
+# iterate for 'generataions' cicles
+for generation in range(generations):
+    fitness_raw = []
+    # validate fitness for each individual
+    for identifier, individual in enumerate(population_list):
+        # create neuron response for individual
+        neurons = MN_neuron(24, individual, dt=1/100, train=False)
+
+        input = data_neuron
+        output_s = [] # monitor only spikes for now
+        # output_v = []
+        # output_I1 = []
+        # output_I2 = []
+        # output_thr = []
+
+        for t in range(input.shape[0]):
+            out = neurons(input[t])
+            output_s.append(out.cpu().numpy())
+            # output_v.append(neurons.state.V.cpu().numpy())
+            # output_I1.append(neurons.state.i1.cpu().numpy())
+            # output_I2.append(neurons.state.i2.cpu().numpy())
+            # output_thr.append(neurons.state.Thr.cpu().numpy())
+        output_s = np.stack(output_s)
+        # output_v = np.stack(output_v)
+        # output_I1 = np.stack(output_I1)
+        # output_I2 = np.stack(output_I2)
+        # output_thr = np.stack(output_thr)
+
+        # TODO validate fitness (for now TOYexample: the more spikes the better)
+        fitness_raw = np.mean(), np.std()
+        print("BREAK")
