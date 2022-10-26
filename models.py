@@ -68,7 +68,7 @@ class Encoder(nn.Module):
 class MN_neuron(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
-    def __init__(self, nb_inputs, parameters_combination, dt=1/1000, a=5, A1=10, A2=-0.6, b=10, G=50, k1=200, k2=20, R1=0, R2=1, train=True): # default combination: M2O of the original paper
+    def __init__(self, nb_inputs, parameters_combination, dt=1/1000, a=5, A1=10, A2=-0.6, b=10, G=50, k1=200, k2=20, R1=0, R2=1, train=False): # default combination: M2O of the original paper
         super(MN_neuron, self).__init__()
 
         # One-to-one synapse
@@ -158,7 +158,7 @@ class IZ_neuron(nn.Module):
 
         self.a = a
         self.b = b  # units of 1/s
-        self.d = self.d
+        self.d = d
         self.k = k
         self.tau = tau
 

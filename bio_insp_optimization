@@ -35,12 +35,12 @@ use_trainable_tc = False
 global use_dropout
 use_dropout = False
 global batch_size
-batch_size = 128
+batch_size = 64
 global lr
 lr = 0.0015
 
 # set the number of epochs you want to train the network (default = 300)
-epochs = 5
+epochs = 50
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
@@ -173,12 +173,12 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
-    print(seed)
     g = torch.Generator()
     g.manual_seed(seed)
-    print(g)
     generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
                             num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+
+    # torch.autograd.set_detect_anomaly(True)
 
     # The optimization loop
     loss_hist = []
@@ -206,18 +206,20 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
             # cross entropy loss on the active read-out layer
             log_p_y = log_softmax_fn(m)
 
+            # # L1 loss on total number of spikes (hidden layer)
+            # reg_loss = 1e-3**torch.mean(torch.sum(spk_rec, 1))
+            # # L2 loss on spikes per neuron (hidden layer)
+            # reg_loss += 1e-6* \
+            #     torch.mean(torch.sum(torch.sum(spk_rec, dim=0), dim=0)**2)
             # L1 loss on total number of spikes (hidden layer)
             reg_loss = 1e-3**torch.mean(torch.sum(spk_rec, 1))
             # L2 loss on spikes per neuron (hidden layer)
-            reg_loss += 1e-6* \
+            reg_loss = reg_loss + 1e-6* \
                 torch.mean(torch.sum(torch.sum(spk_rec, dim=0), dim=0)**2)
 
             # Here we combine supervised loss and the regularizer
             loss_val = loss_fn(log_p_y, y_local) + reg_loss
 
-
-            print("##########################################")
-            print("log_p_y: {}, reg_loss: {}, loss_fn(log_p_y, y_local): {}, loss_val: {}" .format(log_p_y, reg_loss, loss_fn(log_p_y, y_local), loss_val))
             optimizer.zero_grad()
             loss_val.backward()
             optimizer.step()
@@ -725,17 +727,18 @@ class trainable_time_constants:
             beta, mean=beta_mean, std=beta_mean/10)
         return alpha, beta
 
+
 # Init neuron model
 neuron_model = 'mn_neuron'  # iz_neuon, lif_neuron
 
 # Mihilas-Niebur neuron
-if neuron_model is 'mn_neuron':
+if neuron_model == 'mn_neuron':
     from parameters.encoding_parameter import mn_parameter
     from models import MN_neuron
     neuron = MN_neuron
     parameter = mn_parameter
 # Izhikevich neuron
-elif neuron_model is 'iz_neuron':
+elif neuron_model == 'iz_neuron':
     from parameters.encoding_parameter import iz_parameter
     from models import IZ_neuron
     neuron = IZ_neuron
@@ -778,7 +781,7 @@ for counter in range(P):
     population_list.append(individual)
 
 sampling_freq = 100.0 # Hz
-upsample_fac = 10.0
+upsample_fac = 1.0 # 10.0
 frequ = sampling_freq * upsample_fac
 dt = 1/frequ
 
@@ -787,7 +790,7 @@ data_dict = pd.read_pickle(
     "./data/data_braille_letters_0.0.pkl")  # 100Hz data (new resampled dataset)
 # preprocess data
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
-    "./data/data_braille_letters_0.0.pkl", upsample_fac=10.0, norm_val=1, filtering=True) # upsample to get 1kHz
+    "./data/data_braille_letters_0.0.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True) # upsample to get 1kHz
 
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
@@ -822,7 +825,7 @@ for generation in range(generations):
         output_s = np.stack(output_s)
 
         # split in train-test set
-        output_s = torch.as_tensor(np.array(output_s), dtype=torch.float) 
+        output_s = torch.as_tensor(output_s, dtype=torch.float) 
         x_train, x_test, y_train, y_test = train_test_split(
             output_s, labels_as_number, test_size=0.20, shuffle=True, stratify=labels_as_number, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
@@ -863,4 +866,6 @@ for generation in range(generations):
                 individual[param[0]] = random.choice(param_space)
     print("Generation {} of {} finished".format(generation, generations))
 # safe record for postprocessing
+with open('record.pkl', 'wb') as f:
+    pickle.dump(record, f)
 print("End of the evolution reached")
