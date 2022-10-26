@@ -94,11 +94,14 @@ def run_snn(inputs, layers):
         alpha2, beta2 = torch.abs(alpha2), torch.abs(beta2)
 
     bs = inputs.shape[0]
-    
-    # h1 = torch.einsum(
-    #     "abc,cd->abd", (inputs.tile((nb_input_copies,)), w1))
+    print("##########################################")
+    print(inputs.shape)
+    print("##########################################")
+    print(nb_input_copies)
     h1 = torch.einsum(
-        "abc,cd->abd", (inputs, w1))
+        "abc,cd->abd", (inputs.tile((nb_input_copies,)), w1))
+    # h1 = torch.einsum(
+    #     "abc,cd->abd", (inputs, w1))
     if use_dropout:
         h1 = dropout(h1)
     if use_trainable_tc:
@@ -824,7 +827,7 @@ for generation in range(generations):
         # data = torch.as_tensor(data, dtype=torch.float)
         # labels = torch.as_tensor(labels, dtype=torch.long)
         x_train, x_test, y_train, y_test = train_test_split(
-            data, labels_as_number, test_size=0.20, shuffle=True, stratify=labels, random_state=seed)
+            output_s, labels_as_number, test_size=0.20, shuffle=True, stratify=labels_as_number, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
 
