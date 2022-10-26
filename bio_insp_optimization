@@ -9,33 +9,22 @@ loop:
     4. reached stop criterion end
 """
 
-# TODO clean up!
 import os
-import numpy as np
-import matplotlib.pyplot as plt
 import random
-import torch
-import pandas as pd
-
-import warnings
-import os
 import pickle
-import random
-
 import numpy as np
 import pandas as pd
+import seaborn as sn
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-import seaborn as sn
 
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.model_selection import train_test_split
 
-from sklearn.metrics import confusion_matrix
-from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+
 from datasets import load_data
 
 ### Settings for the SNN
@@ -182,8 +171,10 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
+    print(seed)
     g = torch.Generator()
     g.manual_seed(seed)
+    print(g)
     generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
                             num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
 
@@ -578,7 +569,6 @@ class SurrGradSpike(torch.autograd.Function):
         grad_input = grad_output.clone()
         grad = grad_input/(SurrGradSpike.scale*torch.abs(input)+1.0)**2
         return grad
-
 
 spike_fn = SurrGradSpike.apply
 
