@@ -56,9 +56,9 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
         # upsampling and filtering
         else:
             data_dummy = signal.resample(
-                trial, data_steps*upsample_fac)  # upsample
+                trial, int(data_steps*upsample_fac))  # upsample
             time_interpolate = interp1d(range(data_steps), timestamps[counter])
-            timestamps_dummy = time_interpolate(np.linspace(0, data_steps-1, data_steps*upsample_fac))
+            timestamps_dummy = time_interpolate(np.linspace(0, data_steps-1, int(data_steps*upsample_fac)))
             if filtering:
                 data_dummy = ndimage.uniform_filter(
                     data_dummy, size=filter_size, mode='nearest')  # smooth
@@ -87,7 +87,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     labels = torch.as_tensor(labels, dtype=torch.long)
 
     # selected_chans = 2*len(data[0][0])
-    return data_split, labels, timestamps_resampled, le, data
+    return data_split, labels, timestamps_resampled, data_steps, le, data
 
 def load_event_data(params, file_name):
 
