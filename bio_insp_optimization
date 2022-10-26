@@ -758,7 +758,7 @@ for _, param in enumerate(parameter):
         parameter_to_optimize.append(param)
 
 ### Init evolutionary algorithm
-generations = 3  # number of generations to calculate
+generations = 10  # number of generations to calculate
 P = 5 # number of individuals in populations
 
 record = []
