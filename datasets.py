@@ -84,7 +84,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
 
     data = torch.as_tensor(np.array(data_resampled), dtype=torch.float) 
     data_split = torch.as_tensor(np.array(data_resampled_split), dtype=torch.float)  # data to feed to encoding
-    labels_as_number = torch.as_tensor(labels_as_number, dtype=torch.long)
+    labels_as_number = torch.as_tensor(np.array(labels_as_number), dtype=torch.long)
 
     # selected_chans = 2*len(data[0][0])
     return data_split, labels, timestamps_resampled, data_steps, labels_as_number, data
