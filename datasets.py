@@ -16,7 +16,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     Load the tactile Braille data.
     '''
     # TODO inlcude a dataloader (to open loading other data)
-    data_dict = pd.read_pickle(file_name)  # 1kHz data (new dataset)
+    data_dict = pd.read_pickle(file_name)  # 100Hz data (new new dataset)
 
     # Extract data
     data = data_dict['taxel_data']
