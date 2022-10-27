@@ -845,7 +845,7 @@ def calc_sigma(sigma_start, sigma_stop, generations, x):
 # iterate over generataions
 for generation in range(generations):
     print("Starting generation {} of {}.".format(generation+1, generations))
-    highest_fitness = None
+    highest_fitness = 0.0
     best_individual = None
     very_best_layers = None
 
