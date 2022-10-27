@@ -39,8 +39,11 @@ batch_size = 64
 global lr
 lr = 0.0015
 
+### Init evolutionary algorithm
+generations = 2  # number of generations to calculate
+P = 3 # number of individuals in populations
 # set the number of epochs you want to train the network (default = 300)
-epochs = 50
+epochs = 5
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
@@ -757,10 +760,6 @@ for _, param in enumerate(parameter):
     if param[0] in parameters_list:
         parameter_to_optimize.append(param)
 
-### Init evolutionary algorithm
-generations = 10  # number of generations to calculate
-P = 5 # number of individuals in populations
-
 record = []
 population_list = []
 param_width = []
@@ -795,6 +794,7 @@ data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
 for generation in range(generations):
+    print("Starting generation {} of {}.".format(generation+1, generations))
     highest_fitness = 0
     best_individual = None
 
@@ -849,23 +849,41 @@ for generation in range(generations):
     # create next generation
     # TODO include decreasing sigma to narrow down most optimial solution (linear vs. exp)
     for identifier, individual in enumerate(population_list):
-        if identifier <= 0.75*len(population_list):
-            # create first 75% from best (TODO inlcude more vaiance like top 10%)
-            for counter, param in enumerate(parameter_to_optimize):
-                # TODO change 0.1 with decreasing value over generations
-                # (mu, sigma, nb_samples)
-                new_val = np.random.normal(
-                    population_list[best_individual][param[0]], param_width[counter]*0.1, 1)
-                individual[param[0]] = new_val[0]
+        # keep best found individual so far (no perturbation)
+        if identifier == 0:
+            population_list[identifier] = population_list[best_individual]
         else:
+            # create first 75% from best (TODO inlcude more vaiance like top 10%)
+            if identifier <= 0.75*len(population_list):
+                for counter, param in enumerate(parameter_to_optimize):
+                    # TODO change 0.1 with decreasing value over generations
+                    # (mu, sigma, nb_samples)
+                    new_val = np.random.normal(
+                        population_list[best_individual][param[0]], param_width[counter]*0.1, 1)
+                    individual[param[0]] = new_val[0]
             # create remaning 25% random
-            for _, param in enumerate(parameter_to_optimize):
-                # create parameter space to draw from
-                param_space = np.arange(param[1], param[2], param[3])
-                # draw a random number out of parameter space
-                individual[param[0]] = random.choice(param_space)
-    print("Generation {} of {} finished".format(generation, generations))
-# safe record for postprocessing
-with open('record.pkl', 'wb') as f:
-    pickle.dump(record, f)
+            else:
+                for _, param in enumerate(parameter_to_optimize):
+                    # create parameter space to draw from
+                    param_space = np.arange(param[1], param[2], param[3])
+                    # draw a random number out of parameter space
+                    individual[param[0]] = random.choice(param_space)
+            population_list[identifier] = individual
+    print("Finished generation {} of {}.".format(generation+1, generations))
+    print("###################################################")
+
+# save record with increasing idx
+saved = False
+idx = 1
+while not saved:
+    path = 'record_' + str(idx) + '.pkl'
+    if path.isfile():
+        idx += 1
+    else:
+        # save record for postprocessing
+        with open(path, 'wb') as f:
+            pickle.dump(record, f)
+        saved = True
+
 print("End of the evolution reached")
+# TODO inlcude a fitness trace

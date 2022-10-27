@@ -65,7 +65,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
 
         # start at zero per sensor and normalize
         first_val = np.tile(
-            data_dummy[int(data_steps*0.1)], (np.array(data_dummy).shape[0], 1))
+            data_dummy, (np.array(data_dummy).shape[0], 1))
         data_dummy = np.array((data_dummy - first_val)/max_val)
 
         # split each channel in two (positive, abs(negative))
@@ -75,10 +75,9 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
         data_split[:, ::2] = np.where(data_dummy > 0, data_dummy, 0)
         data_split[:, 1::2] = abs(np.where(data_dummy < 0, data_dummy, 0))
 
-        # discard the first 10% (not needed in the future when done in dataset creation)
-        timestamps_resampled.append(timestamps_dummy[int(data_steps*0.1):]-timestamps_dummy[int(data_steps*0.1)])
-        data_resampled.append(data_dummy[int(data_steps*0.1):])
-        data_resampled_split.append(data_split[int(data_steps*0.1):])
+        timestamps_resampled.append(timestamps_dummy)
+        data_resampled.append(data_dummy)
+        data_resampled_split.append(data_split)
 
     data_steps = len(data_resampled[0])  # update data steps
 
