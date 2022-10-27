@@ -876,8 +876,8 @@ for generation in range(generations):
 saved = False
 idx = 1
 while not saved:
-    path = 'record_' + str(idx) + '.pkl'
-    if path.isfile():
+    path = './results/record_' + str(idx) + '.pkl'
+    if os.path.exists(path):
         idx += 1
     else:
         # save record for postprocessing

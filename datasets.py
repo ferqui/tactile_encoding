@@ -65,7 +65,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
 
         # start at zero per sensor and normalize
         first_val = np.tile(
-            data_dummy, (np.array(data_dummy).shape[0], 1))
+            data_dummy[0], (data_dummy.shape[0], 1))
         data_dummy = np.array((data_dummy - first_val)/max_val)
 
         # split each channel in two (positive, abs(negative))
