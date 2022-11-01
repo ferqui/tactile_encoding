@@ -127,7 +127,7 @@ class MN_neuron_IT(nn.Module):
         i1 += -self.k1 * i1 * self.dt
         i2 += -self.k2 * i2 * self.dt
 
-        V += self.dt * (self.linear.to(x.device, non_blocking=True) * x + i1 + i2 - self.G * (V - self.EL)) / self.C
+        V += self.dt * (self.linear.to(x.device, non_blocking=True) * x*self.gain + i1 + i2 - self.G * (V - self.EL)) / self.C
 
         Thr += self.dt * (self.a * (V - self.EL) - self.b * (Thr - self.Tinf))
 
