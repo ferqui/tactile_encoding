@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset #, DataLoader
 
-def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False):
+def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False, specify_letters = []):
     '''
     Load the tactile Braille data.
     '''
@@ -19,8 +19,15 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     data_dict = pd.read_pickle(file_name)  # 1kHz data (new dataset)
 
     # Extract data
-    data = data_dict['taxel_data']
-    labels = data_dict['letter']
+    if len(specify_letters) != 0:
+        letter_list = []
+        for letter in specify_letters:
+            letter_list.append(np.where(data_dict['letter'] == letter)[0])
+            labels = data_dict['letter'][np.array(letter_list).flatten()]
+            data = data_dict['taxel_data'][np.array(letter_list).flatten()]
+    else:
+        data = data_dict['taxel_data']
+        labels = data_dict['letter']
     timestamps = data_dict['timestamp']
     # TODO find a way to use letters as labels
     le = LabelEncoder()
