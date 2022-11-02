@@ -26,6 +26,11 @@ firing_mode_dict = {
 
 def main(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+    if args.seed >= 0:
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+
     ###########################################
     ##                Dataset                ##
     ###########################################
@@ -48,7 +53,7 @@ def main(args):
     nb_outputs = len(np.unique(labels))
 
     # Learning parameters
-    nb_epochs = 300
+    nb_epochs = 150
 
     # Neuron parameters
     tau_mem = args.tau_mem  # ms
@@ -261,6 +266,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser("Encoding")
+    parser.add_argument("--seed", type=int, default=-1, help="Random seed. Default: -1")
     parser.add_argument(
         "--firing-mode",
         type=str,

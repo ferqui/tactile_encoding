@@ -51,8 +51,10 @@ class Encoder(nn.Module):
 
         enc_gain = torch.empty((nb_inputs,), requires_grad=False)
         enc_bias = torch.empty((nb_inputs,), requires_grad=False)
-        torch.nn.init.normal_(enc_gain, mean=0.0, std=encoder_weight_scale)  # TODO update this parameter
-        torch.nn.init.normal_(enc_bias, mean=0.0, std=1.0)
+        torch.nn.init.constant_(enc_gain, 1.0)
+        torch.nn.init.constant_(enc_bias, 0)
+        # torch.nn.init.normal_(enc_gain, mean=0.0, std=encoder_weight_scale)  # TODO update this parameter
+        # torch.nn.init.normal_(enc_bias, mean=0.0, std=1.0)
 
         self.nb_input_copies = nb_input_copies
         self.register_buffer('enc_gain', enc_gain)
