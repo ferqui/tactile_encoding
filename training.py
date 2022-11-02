@@ -77,7 +77,9 @@ def main(args):
     #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     network = nn.Sequential(
-        Encoder(nb_inputs, encoder_weight_scale, nb_input_copies, ds_min=None, ds_max=None),
+        Encoder(
+            nb_inputs, encoder_weight_scale, nb_input_copies, ds_min=None, ds_max=None
+        ),
         MN_neuron(nb_inputs, firing_mode_dict[args.firing_mode], train=args.train),
         LIF_neuron(
             nb_inputs,
@@ -191,10 +193,11 @@ def main(args):
             optimizer.step()
             local_loss.append(loss_val.item())
 
-            # compare to labels
-            _, am = torch.max(m, 1)  # argmax over output units
-            tmp = np.mean((y_local == am).detach().cpu().numpy())
-            accs.append(tmp)
+            with torch.no_grad():
+                # compare to labels
+                _, am = torch.max(m, 1)  # argmax over output units
+                tmp = np.mean((y_local == am).detach().cpu().numpy())
+                accs.append(tmp)
 
         mean_loss = np.mean(local_loss)
         loss_hist.append(mean_loss)
@@ -203,31 +206,32 @@ def main(args):
         mean_accs = np.mean(accs)
         accs_hist[0].append(mean_accs)
 
-        # Calculate test accuracy in each epoch on the testing dataset
-        (
-            test_acc,
-            test_ttc,
-            mn_spk,
-            lif1_spk,
-            lif2_spk,
-            mn_mem,
-            lif1_mem,
-            lif2_mem,
-        ) = compute_classification_accuracy(dl_test, network, True, device)
-        accs_hist[1].append(test_acc)  # only safe best test
-        ttc_hist.append(test_ttc)
+        with torch.no_grad():
+            # Calculate test accuracy in each epoch on the testing dataset
+            (
+                test_acc,
+                test_ttc,
+                mn_spk,
+                lif1_spk,
+                lif2_spk,
+                mn_mem,
+                lif1_mem,
+                lif2_mem,
+            ) = compute_classification_accuracy(dl_test, network, True, device)
+            accs_hist[1].append(test_acc)  # only safe best test
+            ttc_hist.append(test_ttc)
 
-        ###########################################
-        ##               Plotting                ##
-        ###########################################
+            ###########################################
+            ##               Plotting                ##
+            ###########################################
 
-        fig1 = plot_spikes(mn_spk)
-        fig2 = plot_spikes(lif1_spk)
-        fig3 = plot_spikes(lif2_spk)
+            fig1 = plot_spikes(mn_spk.cpu())
+            fig2 = plot_spikes(lif1_spk.cpu())
+            fig3 = plot_spikes(lif2_spk.cpu())
 
-        fig4 = plot_voltages(mn_mem)
-        fig5 = plot_voltages(lif1_mem)
-        fig6 = plot_voltages(lif2_mem)
+            fig4 = plot_voltages(mn_mem.cpu())
+            fig5 = plot_voltages(lif1_mem.cpu())
+            fig6 = plot_voltages(lif2_mem.cpu())
 
         ###########################################
         ##                Logging                ##

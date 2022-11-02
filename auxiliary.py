@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_spikes(spikes, idx):
+def plot_spikes(spikes, idx=0):
     t, idx = np.where(spikes[idx].cpu().numpy())
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.scatter(x=t, y=idx, s=0.5)
@@ -11,7 +11,7 @@ def plot_spikes(spikes, idx):
     return fig
 
 
-def plot_voltages(voltage, idx):
+def plot_voltages(voltage, idx=0):
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(voltage[idx])
 
