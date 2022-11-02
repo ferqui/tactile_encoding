@@ -11,7 +11,54 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset #, DataLoader
 
-def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False):
+def load_analog_data(file_name, upsample_fac, specify_letters = []):
+
+    data_dict = pd.read_pickle(file_name)
+    # print(data_dict)
+    # Extract data
+    if len(specify_letters) != 0:
+        letter_list = []
+        for letter in specify_letters:
+            letter_list.append(np.where(data_dict['letter'] == letter)[0])
+            labels = data_dict['letter'][np.array(letter_list).flatten()]
+            data = data_dict['taxel_data'][np.array(letter_list).flatten()]
+    else:
+        data = data_dict['taxel_data']
+        labels = data_dict['letter']
+    # find a way to use letters as labels
+    le = LabelEncoder()
+    le.fit(labels)
+    # labels['categorical_label'] = le.transform(labels)
+    labels = le.transform(labels) # labels as int numbers
+
+    data_steps = len(data[0])
+
+    # Upsample
+    data_upsampled = []
+    for _, trial in enumerate(data):
+        data_upsampled.append(signal.resample(trial, data_steps*upsample_fac))
+    data_steps = len(data_upsampled[0]) # update data steps
+
+    # convert into tensors
+    data = torch.as_tensor(np.array(data_upsampled), dtype=torch.float)
+    labels = torch.as_tensor(labels, dtype=torch.long)
+
+    # # Select nonzero inputs
+    selected_chans = len(data[0][0])  # read out from data
+
+    # Standardize data
+    rshp = data.reshape((-1, data.shape[2]))
+    data = (data-rshp.mean(0))/(rshp.std(0)+1e-3)
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        data.cpu(), labels.cpu(), test_size=0.2, shuffle=True, stratify=labels.cpu())
+
+    ds_train = TensorDataset(x_train, y_train)
+    ds_test = TensorDataset(x_test, y_test)
+
+    return ds_train, ds_test, labels, selected_chans, data_steps
+
+def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False, specify_letters = []):
     '''
     Load the tactile Braille data.
     '''
@@ -19,8 +66,15 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     data_dict = pd.read_pickle(file_name)  # 1kHz data (new dataset)
 
     # Extract data
-    data = data_dict['taxel_data']
-    labels = data_dict['letter']
+    if len(specify_letters) != 0:
+        letter_list = []
+        for letter in specify_letters:
+            letter_list.append(np.where(data_dict['letter'] == letter)[0])
+            labels = data_dict['letter'][np.array(letter_list).flatten()]
+            data = data_dict['taxel_data'][np.array(letter_list).flatten()]
+    else:
+        data = data_dict['taxel_data']
+        labels = data_dict['letter']
     timestamps = data_dict['timestamp']
     # TODO find a way to use letters as labels
     le = LabelEncoder()

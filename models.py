@@ -46,7 +46,7 @@ activation = SurrGradSpike.apply
 
 ## Encoder
 class Encoder(nn.Module):
-    def __init__(self, nb_inputs, encoder_weight_scale, nb_input_copies):
+    def __init__(self, nb_inputs, encoder_weight_scale, nb_input_copies,ds_min,ds_max):
         super(Encoder, self).__init__()
 
         enc_gain = torch.empty((nb_inputs,), requires_grad=False)
@@ -57,10 +57,94 @@ class Encoder(nn.Module):
         self.nb_input_copies = nb_input_copies
         self.register_buffer('enc_gain', enc_gain)
         self.register_buffer('enc_bias', enc_bias)
+        self.ds_min = ds_min
+        self.ds_max = ds_max
 
     def forward(self, inputs):
-        encoder_currents = self.enc_gain * (inputs.tile((self.nb_input_copies,)) + self.enc_bias) 
+        encoder_currents = self.enc_gain * (inputs.tile((self.nb_input_copies,)) + self.enc_bias)
         return encoder_currents
+## MN neuron
+class MN_neuron_IT(nn.Module):
+    NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
+
+    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50,k1=200,k2 = 20, gain = 1, train=True):
+        super(MN_neuron_IT, self).__init__()
+
+        # One-to-one synapse
+
+        self.C = 1
+
+        self.channels = channels
+        self.fanout = fanout
+        self.params_n = params_n
+        self.linear = nn.Parameter(torch.ones(1, fanout), requires_grad=train)
+
+        self.EL = -0.07
+        self.Vr = -0.07
+        self.R1 = 0
+        self.R2 = 1
+        self.Tr = -0.06
+        self.Tinf = -0.05
+
+        # self.b = b  # units of 1/s
+        # self.G = G * self.C  # units of 1/s
+        self.k1 = 200  # units of 1/s
+        self.k2 = 20  # units of 1/s
+
+        self.dt = 1 / 1000
+
+        # self.a = nn.Parameter(torch.tensor(a), requires_grad=True)
+        one2N_matrix = torch.ones(1,self.fanout,self.channels, 1) # shape: 1 (single neuron) x fanout x channels x 1)
+        #self.register_buffer('one2N_matrix', torch.ones(1, nb_inputs))
+
+        # shape of a is fanout x channels x params_n
+        self.a = torch.permute(nn.Parameter(one2N_matrix*a, requires_grad=train),(0,1,3,2))
+        # torch.nn.init.constant_(self.a, a)
+        #self.A1 = A1 * self.C
+        #self.A2 = A2 * self.C
+        self.A1 = torch.permute(nn.Parameter(one2N_matrix*A1 * self.C, requires_grad=train),(0,1,3,2))
+        self.A2 = torch.permute(nn.Parameter(one2N_matrix*A2 * self.C, requires_grad=train),(0,1,3,2))
+        self.b = torch.permute(nn.Parameter(one2N_matrix*b, requires_grad=train),(0,1,3,2))
+        self.G = torch.permute(nn.Parameter(one2N_matrix * G * self.C, requires_grad=train), (0, 1, 3, 2))
+        self.k1 = torch.permute(nn.Parameter(one2N_matrix * k1, requires_grad=train), (0, 1, 3, 2))
+        self.k2 = torch.permute(nn.Parameter(one2N_matrix * k2, requires_grad=train), (0, 1, 3, 2))
+        self.gain = torch.permute(nn.Parameter(one2N_matrix * gain, requires_grad=train), (0, 1, 3, 2))
+        self.state = None
+
+    def forward(self, x):
+        if self.state is None:
+            # channels x fanout x trials
+            self.state = self.NeuronState(V=torch.ones(x.shape[0],self.fanout,self.params_n,self.channels, device=x.device) * self.EL,
+                                          i1=torch.zeros(x.shape[0],self.fanout,self.params_n,self.channels, device=x.device),
+                                          i2=torch.zeros(x.shape[0],self.fanout,self.params_n,self.channels, device=x.device),
+                                          Thr=torch.ones(x.shape[0],self.fanout,self.params_n,self.channels, device=x.device)* self.Tr,
+                                          spk=torch.zeros(x.shape[0],self.fanout,self.params_n,self.channels, device=x.device))
+
+        V = self.state.V
+        i1 = self.state.i1
+        i2 = self.state.i2
+        Thr = self.state.Thr
+
+        i1 += -self.k1 * i1 * self.dt
+        i2 += -self.k2 * i2 * self.dt
+
+        V += self.dt * (self.linear.to(x.device, non_blocking=True) * x*self.gain + i1 + i2 - self.G * (V - self.EL)) / self.C
+
+        Thr += self.dt * (self.a * (V - self.EL) - self.b * (Thr - self.Tinf))
+
+        spk = activation(V - Thr)
+
+        i1 = (1 - spk) * i1 + (spk) * (self.R1 * i1 + self.A1)
+        i2 = (1 - spk) * i2 + (spk) * (self.R2 * i2 + self.A2)
+        Thr = (1 - spk) * Thr + (spk) * torch.max(Thr, torch.tensor(self.Tr))
+        V = (1 - spk) * V + (spk) * self.Vr
+
+        self.state = self.NeuronState(V=V, i1=i1, i2=i2, Thr=Thr, spk=spk)
+
+        return spk
+
+    def reset(self):
+        self.state = None
 
 
 ## MN neuron

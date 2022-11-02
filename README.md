@@ -36,9 +36,9 @@ pip install -r requirements.txt
 2. Extract the files and add them in the main folder of this repository
 
 ## Run
-Create a parameters file in ./parameters and change the name of the file in the training.py script
+Run
 ```
-python training.py
+python experiments/MN_IT.py
 ```
 
 ## Plot the results
