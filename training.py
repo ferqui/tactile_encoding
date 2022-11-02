@@ -9,82 +9,73 @@ from tqdm import trange
 
 import numpy as np
 
-from datasets import load_analog_data
+from datasets import load_data
 from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron
 from auxiliary import compute_classification_accuracy, plot_spikes
 
-def main():
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+
+firing_mode_dict = {
+    'FA':{'a': 5, 'A1': 0, 'A2': 0},
+    'SA':{'a': 0, 'A1': 0, 'A2': 0},
+    'MIX':{'a': 5, 'A1': 5, 'A2': -0.3},
+}
+
+def main(args):
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-    ###########################################
-    ##              Parameters               ##
-    ###########################################
-    threshold = "enc"
-    run = "_3"
-
-    file_dir_params = 'parameters/'
-    param_filename = 'parameters_th' + str(threshold)
-    file_name_parameters = file_dir_params + param_filename + '.txt'
-    params = {}
-    with open(file_name_parameters) as file:
-        for line in file:
-            (key, value) = line.split()
-            if key == 'time_bin_size' or key == 'nb_input_copies':
-                params[key] = int(value)
-            else:
-                params[key] = np.double(value)
-
-
     ###########################################
     ##                Dataset                ##
     ###########################################
-    upsample_fac = 5
-    file_name = "data/data_braille_letters_digits.pkl"
-    ds_train, ds_test, labels, nb_channels, data_steps = load_analog_data(file_name, upsample_fac)
-    params['nb_channels'] = nb_channels
-    params['labels'] = labels
-    params['data_steps'] = data_steps
+    upsample_fac = 1
+    file_name = "data/data_braille_letters_0.0.pkl"
+    data, labels, nb_channels, _, _, _ = load_data(file_name, upsample_fac, norm_val=args.norm)
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        data, labels, test_size=0.2, shuffle=True, stratify=labels)
+
+    ds_train = TensorDataset(x_train, y_train)
+    ds_test = TensorDataset(x_test, y_test)
 
     # Network parameters
-    nb_input_copies = params['nb_input_copies']
-    nb_inputs = params['nb_channels'] * nb_input_copies
+    nb_input_copies = args.expansion
+    nb_inputs = nb_channels * nb_input_copies
     nb_hidden = 450
-    nb_outputs = len(np.unique(params['labels']))
+    nb_outputs = len(np.unique(labels))
 
     # Learning parameters
-    nb_steps = params['data_steps']
     nb_epochs = 300
 
     # Neuron parameters
-    tau_mem = params['tau_mem']  # ms
-    tau_syn = tau_mem / params['tau_ratio']
-    alpha = float(np.exp(-params['data_steps']*0.001 / tau_syn))
-    beta = float(np.exp(-params['data_steps']*0.001 / tau_mem))
+    tau_mem = args.tau_mem  # ms
+    tau_syn = tau_mem / args.tau_ratio
+    alpha = float(np.exp(-0.001 / tau_syn))
+    beta = float(np.exp(-0.001 / tau_mem))
 
     encoder_weight_scale = 1.0
-    fwd_weight_scale = params['fwd_weight_scale']
-    rec_weight_scale = params['weight_scale_factor'] * fwd_weight_scale
+    fwd_weight_scale = args.fwd_weight_scale
+    rec_weight_scale = args.weight_scale_factor * fwd_weight_scale
 
     ###########################################
     ##                Network                ##
     ###########################################
 
-    a = torch.empty((nb_inputs,))
-    nn.init.normal_(
-        a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    # a = torch.empty((nb_inputs,))
+    # nn.init.normal_(
+    #     a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A1 = torch.empty((nb_inputs,))
-    nn.init.normal_(
-        A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    # A1 = torch.empty((nb_inputs,))
+    # nn.init.normal_(
+    #     A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
-    A2 = torch.empty((nb_inputs,))
-    nn.init.normal_(
-        A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
+    # A2 = torch.empty((nb_inputs,))
+    # nn.init.normal_(
+    #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     network = nn.Sequential(Encoder(nb_inputs, encoder_weight_scale, nb_input_copies),
-                            MN_neuron(nb_inputs, a, A1, A2, train=True),
+                            MN_neuron(nb_inputs, firing_mode_dict[args.firing_mode], train=args.train),
                             LIF_neuron(nb_inputs, nb_hidden, alpha, beta, is_recurrent=True,
                                     fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale),
                             LIF_neuron(nb_hidden, nb_outputs, alpha, beta, is_recurrent=False, fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale)).to(device)
@@ -129,7 +120,7 @@ def main():
             spk_rec = []
             out_rec = []
             s_out_rec = []
-            for t in range(nb_steps):
+            for t in range(x_local.shape[1]):
                 out = network(x_local[:, t])
 
                 # Get the spikes of the hidden layer
@@ -145,9 +136,9 @@ def main():
             log_p_y = log_softmax_fn(m)
 
             # Here we can set up our regularizer loss
-            reg_loss = params['reg_spikes'] * torch.mean(
+            reg_loss = args.reg_spikes * torch.mean(
                 torch.sum(spk_rec, 1))  # e.g., L1 loss on total number of spikes (original: 1e-3)
-            reg_loss += params['reg_neurons'] * torch.mean(
+            reg_loss += args.reg_neurons * torch.mean(
                 torch.sum(torch.sum(spk_rec, dim=0), dim=0) ** 2)  # L2 loss on spikes per neuron (original: 2e-6)
 
             # Here we combine supervised loss and the regularizer
@@ -172,7 +163,7 @@ def main():
 
         # Calculate test accuracy in each epoch on the testing dataset
         test_acc, test_ttc, spk_hidden, spk_output = compute_classification_accuracy(
-            params, dl_test, network, True, device)
+            dl_test, network, True, device)
         accs_hist[1].append(test_acc)  # only safe best test
         ttc_hist.append(test_ttc)
 
@@ -197,4 +188,30 @@ def main():
             np.round(accs_hist[1][-1] * 100, 2)) + '%, Loss: ' + str(np.round(mean_loss, 2)))
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser('Encoding')
+    parser.add_argument('--firing-mode', type=str, default='FA', choices=['FA', 'SA', 'MIX'], 
+        help="Choose between different firing modes")
+    parser.add_argument('--norm', type=float, default=10.0,
+        help='Data normalization')
+    parser.add_argument('--expansion', type=int, default=1,
+        help='Number of channel expansion (default: 1 (no expansion)).')
+    parser.add_argument('--tau_mem', type=float, default=0.02,
+        help='Membrane time constant.')
+    parser.add_argument('--tau_ratio', type=float, default=2,
+        help='Tau ratio.')
+    parser.add_argument('--fwd_weight_scale', type=float, default=1,
+        help='fwd_weight_scale.')
+    parser.add_argument('--weight_scale_factor', type=float, default=0.01,
+        help='weight_scale_factor')
+    parser.add_argument('--reg_spikes', type=float, default=0.004,
+        help='reg_spikes')
+    parser.add_argument('--reg_neurons', type=float, default=0.000001,
+        help='reg_neurons')
+
+    parser.add_argument('--train', action="store_true",
+        help='Train the MN neuron.')
+    args = parser.parse_args()
+    assert args.expansion > 0, "Expansion number should be greater that 0"
+    main(args)
