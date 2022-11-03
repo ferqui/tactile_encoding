@@ -35,8 +35,9 @@ def main(args):
     ##                Dataset                ##
     ###########################################
     upsample_fac = 1
-    file_name = "data/data_braille_letters_0.0.pkl"
-    data, labels, _, _, _, _ = load_data(file_name, upsample_fac, norm_val=args.norm)
+    dt = (1 / 100.0) / upsample_fac
+    file_name = "data/data_braille_letters_all.pkl"
+    data, labels, _, _, _, _ = load_data(file_name, upsample_fac)
     nb_channels = data.shape[-1]
 
     x_train, x_test, y_train, y_test = train_test_split(
@@ -58,8 +59,8 @@ def main(args):
     # Neuron parameters
     tau_mem = args.tau_mem  # ms
     tau_syn = tau_mem / args.tau_ratio
-    alpha = float(np.exp(-0.001 / tau_syn))
-    beta = float(np.exp(-0.001 / tau_mem))
+    alpha = float(np.exp(-dt / tau_syn))
+    beta = float(np.exp(-dt / tau_mem))
 
     encoder_weight_scale = 1.0
     fwd_weight_scale = args.fwd_weight_scale
@@ -82,10 +83,10 @@ def main(args):
     #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     network = nn.Sequential(
-        Encoder(
-            nb_inputs, encoder_weight_scale, nb_input_copies, ds_min=None, ds_max=None
+        Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
+        MN_neuron(
+            nb_inputs, firing_mode_dict[args.firing_mode], dt=dt, train=args.train
         ),
-        MN_neuron(nb_inputs, firing_mode_dict[args.firing_mode], train=args.train),
         LIF_neuron(
             nb_inputs,
             nb_hidden,
@@ -122,7 +123,8 @@ def main(args):
     loss_hist = []
     accs_hist = [[], []]
 
-    writer = SummaryWriter()  # For logging purpose
+    if args.log:
+        writer = SummaryWriter(comment="")  # For logging purpose
 
     dl_train = DataLoader(
         ds_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
@@ -226,31 +228,33 @@ def main(args):
             accs_hist[1].append(test_acc)  # only safe best test
             ttc_hist.append(test_ttc)
 
-            ###########################################
-            ##               Plotting                ##
-            ###########################################
+            if args.log:
 
-            fig1 = plot_spikes(mn_spk.cpu())
-            fig2 = plot_spikes(lif1_spk.cpu())
-            fig3 = plot_spikes(lif2_spk.cpu())
+                ###########################################
+                ##               Plotting                ##
+                ###########################################
 
-            fig4 = plot_voltages(mn_mem.cpu())
-            fig5 = plot_voltages(lif1_mem.cpu())
-            fig6 = plot_voltages(lif2_mem.cpu())
+                fig1 = plot_spikes(mn_spk.cpu())
+                fig2 = plot_spikes(lif1_spk.cpu())
+                fig3 = plot_spikes(lif2_spk.cpu())
 
-        ###########################################
-        ##                Logging                ##
-        ###########################################
+                fig4 = plot_voltages(mn_mem.cpu())
+                fig5 = plot_voltages(lif1_mem.cpu())
+                fig6 = plot_voltages(lif2_mem.cpu())
 
-        writer.add_scalar("Accuracy/test", test_acc, global_step=e)
-        writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
-        writer.add_scalar("Loss", mean_loss, global_step=e)
-        writer.add_figure("MN spikes", fig1, global_step=e)
-        writer.add_figure("LIF1 spikes", fig2, global_step=e)
-        writer.add_figure("LIF2 spikes", fig3, global_step=e)
-        writer.add_figure("MN voltage", fig4, global_step=e)
-        writer.add_figure("LIF1 voltage", fig5, global_step=e)
-        writer.add_figure("LIF2 voltage", fig6, global_step=e)
+                ###########################################
+                ##                Logging                ##
+                ###########################################
+
+                writer.add_scalar("Accuracy/test", test_acc, global_step=e)
+                writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
+                writer.add_scalar("Loss", mean_loss, global_step=e)
+                writer.add_figure("MN spikes", fig1, global_step=e)
+                writer.add_figure("LIF1 spikes", fig2, global_step=e)
+                writer.add_figure("LIF2 spikes", fig3, global_step=e)
+                writer.add_figure("MN voltage", fig4, global_step=e)
+                writer.add_figure("LIF1 voltage", fig5, global_step=e)
+                writer.add_figure("LIF2 voltage", fig6, global_step=e)
 
         pbar.set_postfix_str(
             "Train accuracy: "
@@ -259,6 +263,19 @@ def main(args):
             + str(np.round(accs_hist[1][-1] * 100, 2))
             + "%, Loss: "
             + str(np.round(mean_loss, 2))
+        )
+
+    if args.log:
+        args_dict = args.__dict__
+        args_dict.pop("log")
+        writer.add_hparams(
+            args_dict,
+            {
+                "hparam/Accuracy/test": np.max(accs_hist[1]),
+                "hparam/Accuracy/train": np.max(accs_hist[0]),
+                "hparam/loss": np.min(loss_hist),
+            },
+            run_name=".",
         )
 
 
@@ -275,6 +292,9 @@ if __name__ == "__main__":
         help="Choose between different firing modes",
     )
     parser.add_argument("--norm", type=float, default=10.0, help="Data normalization")
+    parser.add_argument(
+        "--upsample", type=float, default=1.0, help="Data upsample (default 100Hz)"
+    )
     parser.add_argument(
         "--expansion",
         type=int,
@@ -295,6 +315,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reg_neurons", type=float, default=0.000001, help="reg_neurons"
     )
+
+    parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
     parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
     args = parser.parse_args()

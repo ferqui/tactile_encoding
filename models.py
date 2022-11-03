@@ -46,13 +46,13 @@ activation = SurrGradSpike.apply
 
 ## Encoder
 class Encoder(nn.Module):
-    def __init__(self, nb_inputs, encoder_weight_scale, nb_input_copies,ds_min,ds_max):
+    def __init__(self, nb_inputs, encoder_weight_scale=1.0, bias=0.0, nb_input_copies=1, ds_min=None, ds_max=None):
         super(Encoder, self).__init__()
 
         enc_gain = torch.empty((nb_inputs,), requires_grad=False)
         enc_bias = torch.empty((nb_inputs,), requires_grad=False)
-        torch.nn.init.constant_(enc_gain, 1.0)
-        torch.nn.init.constant_(enc_bias, 0)
+        torch.nn.init.constant_(enc_gain, encoder_weight_scale)
+        torch.nn.init.constant_(enc_bias, bias)
         # torch.nn.init.normal_(enc_gain, mean=0.0, std=encoder_weight_scale)  # TODO update this parameter
         # torch.nn.init.normal_(enc_bias, mean=0.0, std=1.0)
 
