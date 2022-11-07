@@ -11,7 +11,8 @@ import numpy as np
 
 from datasets import load_analog_data
 from parameters.MN_params import MNparams_dict, INIT_MODE
-from models import Encoder, LIF_neuron, MN_neuron
+from models import Encoder, LIF_neuron, MN_neuron_sp
+
 from auxiliary import compute_classification_accuracy, plot_spikes
 
 from sklearn.model_selection import train_test_split
@@ -26,6 +27,7 @@ firing_mode_dict = {
 def main(args):
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = 'cpu'
     ###########################################
     ##                Dataset                ##
     ###########################################
@@ -69,9 +71,27 @@ def main(args):
     # A2 = torch.empty((nb_inputs,))
     # nn.init.normal_(
     #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
-
+    a = 5
+    A1 = 10
+    A2 = 1
+    b = 10
+    G = 50
+    k1 = 200
+    k2 = 20
+    R1 = 0
+    R2 = 1
+    a = nn.Parameter(torch.Tensor([a]), requires_grad = True).to(device)
+    A1 = nn.Parameter(torch.Tensor([A1]), requires_grad = True).to(device)
+    A2 = nn.Parameter(torch.Tensor([A2]), requires_grad = True).to(device)
+    b = nn.Parameter(torch.Tensor([b]), requires_grad = True).to(device)
+    G = nn.Parameter(torch.Tensor([G]), requires_grad = False).to(device)
+    k1 = nn.Parameter(torch.Tensor([k1]), requires_grad = False).to(device)
+    k2 = nn.Parameter(torch.Tensor([k2]), requires_grad = False).to(device)
+    R1 = nn.Parameter(torch.Tensor([R1]), requires_grad = False).to(device)
+    R2 = nn.Parameter(torch.Tensor([R2]), requires_grad = False).to(device)
+    torch.autograd.set_detect_anomaly(True)
     network = nn.Sequential(Encoder(nb_inputs, encoder_weight_scale, nb_input_copies),
-                            MN_neuron(nb_inputs, firing_mode_dict[args.firing_mode], train=args.train),
+                            MN_neuron_sp(nb_inputs, firing_mode_dict[args.firing_mode], train=args.train, a = a, A1 = A1, A2 = A2,  b=b, G=G, k1=k1, k2=k2, R1=R1, R2=R2),
                             LIF_neuron(nb_inputs, nb_hidden, alpha, beta, is_recurrent=True,
                                     fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale),
                             LIF_neuron(nb_hidden, nb_outputs, alpha, beta, is_recurrent=False, fwd_weight_scale=fwd_weight_scale, rec_weight_scale=rec_weight_scale)).to(device)
@@ -95,9 +115,11 @@ def main(args):
 
     writer = SummaryWriter()  # For logging purpose
 
-    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
+    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
     pbar = trange(nb_epochs)
+    parameter_rec = {'a': [], 'A1':[], 'A2':[],'w1':[],'w1_rec':[],'w2':[]}
+
     for e in pbar:
         local_loss = []
         accs = []  # accs: mean training accuracies for each batch
@@ -118,12 +140,12 @@ def main(args):
             s_out_rec = []
             for t in range(x_local.shape[1]):
                 out = network(x_local[:, t])
-
                 # Get the spikes of the hidden layer
                 spk_rec.append(network[-2].state.S)
                 # Get the voltage of the last layer
                 out_rec.append(network[-1].state.mem)
                 s_out_rec.append(out)
+
             spk_rec = torch.stack(spk_rec, dim=1)
             out_rec = torch.stack(out_rec, dim=1)
             s_out_rec = torch.stack(s_out_rec, dim=1)
@@ -149,6 +171,13 @@ def main(args):
             _, am = torch.max(m, 1)  # argmax over output units
             tmp = np.mean((y_local == am).detach().cpu().numpy())
             accs.append(tmp)
+        parameter_rec['a'].append(a.clone().detach().numpy())
+        parameter_rec['A1'].append(A1.clone().detach().numpy())
+        parameter_rec['A2'].append(A2.clone().detach().numpy())
+
+        parameter_rec['w1'].append(network[-2].weight.clone().detach().numpy())
+        parameter_rec['w1_rec'].append(network[-2].weight_rec.clone().detach().numpy())
+        parameter_rec['w2'].append(network[-1].weight.clone().detach().numpy())
 
         mean_loss = np.mean(local_loss)
         loss_hist.append(mean_loss)
@@ -183,6 +212,20 @@ def main(args):
         pbar.set_postfix_str("Train accuracy: " + str(np.round(accs_hist[0][-1] * 100, 2)) + '%. Test accuracy: ' + str(
             np.round(accs_hist[1][-1] * 100, 2)) + '%, Loss: ' + str(np.round(mean_loss, 2)))
 
+    plt.figure()
+    plt.plot(np.array(parameter_rec['a']))
+    plt.figure()
+    plt.plot(np.array(parameter_rec['A1']))
+    plt.figure()
+    plt.plot(np.array(parameter_rec['A2']))
+    plt.figure()
+    plt.plot(np.array(parameter_rec['w1'])[:,:,0])
+    plt.figure()
+    plt.plot(np.array(parameter_rec['w1_rec'])[:,:,0])
+    plt.figure()
+    plt.plot(np.array(parameter_rec['w2'])[:,:,0])
+
+    plt.show()
 if __name__ == "__main__":
     import argparse
 
