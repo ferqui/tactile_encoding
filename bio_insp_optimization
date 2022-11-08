@@ -8,7 +8,8 @@ loop:
     and include y random individuals to create population of P
     4. reached stop criterion end
 """
-
+# TODO use logging to keep track of prints (https://realpython.com/python-logging/)
+import logging
 import os
 import random
 import pickle
@@ -40,16 +41,22 @@ global lr
 lr = 0.0001
 
 # Init evolutionary algorithm
-generations = 2  # number of generations to calculate
-P = 2  # number of individuals in populations
+generations = 100  # number of generations to calculate
+P = 20  # number of individuals in populations
 # set the number of epochs you want to train the network (default = 300)
-epochs = 3
+epochs = 50
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
            'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
-# create folder to safe plots later (if not present)
+# create folder to safe results and plots
+path = './results'
+isExist_data = os.path.exists(path)
+
+if not isExist_data:
+    os.makedirs(path)
+
 if save_fig:
     path = './plots'
     isExist_plots = os.path.exists(path)
@@ -374,11 +381,13 @@ def build_and_train(data_steps, ds_train, ds_test, epochs=epochs):
     idx_best_test = np.argmax(accs_hist[1])
     acc_train_at_best_test = accs_hist[0][idx_best_test]*100
 
+    print("\n------------------------------------------------------------------------------------")
     print("Final results: ")
     print("Best training accuracy: {:.2f}% and according test accuracy: {:.2f}% at epoch: {}".format(
         acc_best_train, acc_test_at_best_train, idx_best_train+1))
     print("Best test accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
         acc_best_test, acc_train_at_best_test, idx_best_test+1))
+    print("------------------------------------------------------------------------------------")
     print("------------------------------------------------------------------------------------\n")
     return loss_hist, accs_hist, best_layers
 
@@ -815,7 +824,7 @@ param_width = []
 # create inital populataton of size P
 for counter in range(P):
     individual = {}
-    individual['identifier'] = counter
+    individual['individual'] = counter+1
     # create inital parameter values
     for _, param in enumerate(parameter_to_optimize):
         # create parameter space to draw from
@@ -838,9 +847,10 @@ frequ = sampling_freq * upsample_fac
 dt = 1/frequ
 
 # preprocess data
+print("Start preparing data.")
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
     "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True)
-
+print("Finished data prepartion.\n")
 # linear decrease
 
 
@@ -850,6 +860,7 @@ def calc_sigma(sigma_start, sigma_stop, generations, x):
 
 
 # init datastorage
+print("Initialize data storage.")
 file_storage_found = False
 idx_file_storage = 1
 while not file_storage_found:
@@ -866,7 +877,9 @@ if save_fig:
 
     if not isExist_record:
         os.makedirs(path_for_plots)
+print("Data storage initialized.\n")
 
+print("Starting optimization.")
 # TODO inlcude a first split to have the validation set
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
@@ -890,7 +903,7 @@ for generation in range(generations):
 
     # find fitness for each individual
     for identifier, individual in enumerate(population_list):
-        print("Starting individual {} of {} in generation {} of {}.".format(
+        print("\nStarting individual {} of {} in generation {} of {}.".format(
             identifier+1, len(population_list), generation+1, generations))
         # create neuron response for individual
         neurons = MN_neuron(24, individual, dt=dt, train=False)
@@ -915,7 +928,7 @@ for generation in range(generations):
         loss_hist, acc_hist, best_layers = build_and_train(
             data_steps, ds_train, ds_test, epochs=epochs)
 
-        individual['fitness'] = max(acc_hist[1])
+        individual['fitness'] = max(acc_hist[1])*100
         if max(acc_hist[1]) > highest_fitness:
             # TODO inlcude std of acc here as second metric
             highest_fitness = max(acc_hist[1])
@@ -925,8 +938,16 @@ for generation in range(generations):
             # TODO use spike count second metric
             print("Find a second metric to deside which is better")
 
+    # best individual
+    print("*******************************************")
+    print("Best individual: {}" .format(best_individual+1))
+    print("*******************************************")
+
+    # TODO when changing population_list, old entries in record change too
     # save record for postprocessing
-    record.append(population_list)
+    # data_dummy = population_list.copy()
+    # record.append(data_dummy)
+    record.append(population_list[:])
     # TODO create pandas df to dump
     with open(file_storage_path, 'wb') as f:
         pickle.dump(record, f)
@@ -936,32 +957,40 @@ for generation in range(generations):
         ConfusionMatrix(ds_test, save_fig, very_best_layer, letters)
         NetworkActivity(ds_test, save_fig, very_best_layer, letters)
 
-    # calc sigma to reduce searchspace over generations
-    # start at 10% and end at 1% of search space
-    sigma = calc_sigma(0.9, 0.01, generations, generation)
+    # do not create a new generation in the last trial
+    if generation < generations-1:
+        # calc sigma to reduce searchspace over generations
+        # start at 100% and end at 1% of search space
+        sigma = calc_sigma(1.0, 0.01, generations, generation)
 
-    # create next generation
-    for identifier, individual in enumerate(population_list):
-        # keep best found individual so far (no perturbation)
-        if identifier == 0:
-            population_list[identifier] = population_list[best_individual]
-        else:
-            # create first 75% from best
-            if identifier <= 0.75*len(population_list):
-                for counter, param in enumerate(parameter_to_optimize):
-                    # (mu, sigma, nb_samples)
-                    new_val = np.random.normal(
-                        population_list[best_individual][param[0]], param_width[counter]*sigma, 1)
-                    individual[param[0]] = new_val[0]
-            # create remaning 25% random
-            else:
+        # create next generation
+        best_individual_dict = population_list[best_individual]
+        population_list = []
+        for counter in range(P):
+            individual = {}
+            individual['individual'] = counter+1
+            # keep best found individual so far (no perturbation)
+            if counter == 0:
                 for _, param in enumerate(parameter_to_optimize):
-                    # create parameter space to draw from
-                    param_space = np.linspace(
-                        param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
-                    # draw a random number out of parameter space
-                    individual[param[0]] = random.choice(param_space)
-            population_list[identifier] = individual
+                    individual[param[0]] = best_individual_dict[param[0]]
+            else:
+                # create first 75% from best
+                if counter <= 0.75*P:
+                    for counter, param in enumerate(parameter_to_optimize):
+                        # (mu, sigma, nb_samples)
+                        new_val = np.random.normal(
+                            best_individual_dict[param[0]], param_width[counter]*sigma, 1)
+                        individual[param[0]] = new_val[0]
+                # create remaning 25% random
+                else:
+                    for _, param in enumerate(parameter_to_optimize):
+                        # create parameter space to draw from
+                        param_space = np.linspace(
+                            param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
+                        # draw a random number out of parameter space
+                        individual[param[0]] = random.choice(param_space)
+            population_list.append(individual)
+
     print("Finished generation {} of {}.".format(generation+1, generations))
     print("###################################################\n\n")
 
