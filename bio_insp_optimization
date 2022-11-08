@@ -35,15 +35,15 @@ use_trainable_tc = False
 global use_dropout
 use_dropout = False
 global batch_size
-batch_size = 64
+batch_size = 128
 global lr
-lr = 0.0015
+lr = 0.0001
 
 # Init evolutionary algorithm
-generations = 5  # number of generations to calculate
-P = 10  # number of individuals in populations
+generations = 2  # number of generations to calculate
+P = 2  # number of individuals in populations
 # set the number of epochs you want to train the network (default = 300)
-epochs = 50
+epochs = 3
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
@@ -51,10 +51,10 @@ letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
 
 # create folder to safe plots later (if not present)
 if save_fig:
-    path = '../plots'
-    isExist = os.path.exists(path)
+    path = './plots'
+    isExist_plots = os.path.exists(path)
 
-    if not isExist:
+    if not isExist_plots:
         os.makedirs(path)
 
 # check for available GPU and distribute work
@@ -229,9 +229,9 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
             # reg_loss += 1e-6* \
             #     torch.mean(torch.sum(torch.sum(spk_rec, dim=0), dim=0)**2)
             # L1 loss on total number of spikes (hidden layer)
-            reg_loss = 1e-3**torch.mean(torch.sum(spk_rec, 1))
+            reg_loss = 1e-4**torch.mean(torch.sum(spk_rec, 1))
             # L2 loss on spikes per neuron (hidden layer)
-            reg_loss = reg_loss + 1e-6 * \
+            reg_loss = reg_loss + 1e-8 * \
                 torch.mean(torch.sum(torch.sum(spk_rec, dim=0), dim=0)**2)
 
             # Here we combine supervised loss and the regularizer
@@ -258,8 +258,7 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
         if dataset_test is not None:
             test_acc = compute_classification_accuracy(
                 dataset_test,
-                layers=layers_update,
-                early=True
+                layers=layers_update
             )
             accs_hist[1].append(test_acc)  # only safe best test
 
@@ -384,7 +383,7 @@ def build_and_train(data_steps, ds_train, ds_test, epochs=epochs):
     return loss_hist, accs_hist, best_layers
 
 
-def compute_classification_accuracy(dataset, layers=None, early=False):
+def compute_classification_accuracy(dataset, layers=None):
     """ Computes classification accuracy on supplied data in batches. """
 
     generator = DataLoader(dataset, batch_size=batch_size,
@@ -458,12 +457,13 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
         trues.extend(y_local.detach().cpu().numpy())
         preds.extend(am.detach().cpu().numpy())
 
-    print("Accuracy from Confusion Matrix: {} +- {}".format(np.mean(accs), np.std(accs)))
+    print("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
+          * 100, np.std(accs)*100))
 
     cm = confusion_matrix(trues, preds, normalize='true')
     cm_df = pd.DataFrame(cm, index=[ii for ii in labels], columns=[
                          jj for jj in labels])
-    plt.figure(figsize=(12, 9))
+    plt.figure("cm", figsize=(12, 9))
     sn.heatmap(cm_df,
                annot=True,
                fmt='.1g',
@@ -474,8 +474,8 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
     plt.ylabel('True\n')
     plt.xticks(rotation=0)
     if save:
-        path_to_save_fig = "../plots/generation_" + \
-            str(generation) + "_individual_" + str(identifier)
+        path_to_save_fig = path_for_plots + "/generation_" + \
+            str(generation+1) + "_individual_" + str(identifier+1)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -484,6 +484,7 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
             path_to_save_fig = path_to_save_fig + "_dropout"
         path_to_save_fig = path_to_save_fig + "_cm.png"
         plt.savefig(path_to_save_fig, dpi=300)
+        plt.close()
     else:
         plt.show()
 
@@ -522,7 +523,7 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
     gs = GridSpec(1, nb_plt)
 
     # hidden layer
-    fig = plt.figure(figsize=(8, 6), dpi=300)
+    fig = plt.figure("hidden layer", figsize=(8, 6), dpi=300)
     plt.title("Hidden layer 1")
     for i in range(nb_plt):
         plt.subplot(gs[i])
@@ -533,8 +534,8 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             plt.ylabel("Units")
         sn.despine()
     if save:
-        path_to_save_fig = "../plots/generation_" + \
-            str(generation) + "_individual_" + str(identifier)
+        path_to_save_fig = path_for_plots + "/generation_" + \
+            str(generation+1) + "_individual_" + str(identifier+1)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -543,9 +544,10 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             path_to_save_fig = path_to_save_fig + "_dropout"
         path_to_save_fig = path_to_save_fig + "_hidden_layer.png"
         plt.savefig(path_to_save_fig, dpi=300)
+        plt.close()
 
     # output layer
-    fig = plt.figure(figsize=(8, 6), dpi=300)
+    fig = plt.figure("output layer", figsize=(8, 6), dpi=300)
     plt.title("Output layer")
     for i in range(nb_plt):
         plt.subplot(gs[i])
@@ -556,8 +558,8 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             plt.ylabel("Units")
         sn.despine()
     if save:
-        path_to_save_fig = "../plots/generation_" + \
-            str(generation) + "_individual_" + str(identifier)
+        path_to_save_fig = path_for_plots + "/generation_" + \
+            str(generation+1) + "_individual_" + str(identifier+1)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -566,6 +568,7 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             path_to_save_fig = path_to_save_fig + "_dropout"
         path_to_save_fig = path_to_save_fig + "_output_layer.png"
         plt.savefig(path_to_save_fig, dpi=300)
+        plt.close()
     else:
         plt.show()
 
@@ -817,14 +820,16 @@ for counter in range(P):
     for _, param in enumerate(parameter_to_optimize):
         # create parameter space to draw from
         # 2* increases the searchspace
-        param_space = np.linspace(param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
+        param_space = np.linspace(
+            param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
         # draw a random number out of parameter space
         individual[param[0]] = random.choice(param_space)
         # extract the parameter width for later
         if counter == 0:
             # define parameter width (min - max)
             # see above (2*)
-            param_width.append(np.diff((param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]))))
+            param_width.append(
+                np.diff((param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]))))
     population_list.append(individual)
 
 sampling_freq = 100.0  # Hz
@@ -837,14 +842,35 @@ data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
     "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True)
 
 # linear decrease
+
+
 def calc_sigma(sigma_start, sigma_stop, generations, x):
     sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
     return sigma
 
+
+# init datastorage
+file_storage_found = False
+idx_file_storage = 1
+while not file_storage_found:
+    file_storage_path = './results/record_' + str(idx_file_storage) + '.pkl'
+    if os.path.isfile(file_storage_path):
+        idx_file_storage += 1
+    else:
+        file_storage_found = True
+
+# create folder to safe plots later (if not present)
+if save_fig:
+    path_for_plots = './plots/record_' + str(idx_file_storage)
+    isExist_record = os.path.exists(path_for_plots)
+
+    if not isExist_record:
+        os.makedirs(path_for_plots)
+
+# TODO inlcude a first split to have the validation set
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
 for generation in range(generations):
-    print("Starting generation {} of {}.".format(generation+1, generations))
     highest_fitness = 0.0
     best_individual = None
     very_best_layers = None
@@ -864,6 +890,8 @@ for generation in range(generations):
 
     # find fitness for each individual
     for identifier, individual in enumerate(population_list):
+        print("Starting individual {} of {} in generation {} of {}.".format(
+            identifier+1, len(population_list), generation+1, generations))
         # create neuron response for individual
         neurons = MN_neuron(24, individual, dt=dt, train=False)
 
@@ -897,16 +925,20 @@ for generation in range(generations):
             # TODO use spike count second metric
             print("Find a second metric to deside which is better")
 
-    # safe outcome for the record
+    # save record for postprocessing
     record.append(population_list)
-    # some plotting
+    # TODO create pandas df to dump
+    with open(file_storage_path, 'wb') as f:
+        pickle.dump(record, f)
+
+    # plots of the best individual in this generation
     if save_fig:
-        ConfusionMatrix(ds_test, layers=very_best_layer, save=save_fig)
-        NetworkActivity(ds_test, layers=very_best_layer, save=save_fig)
+        ConfusionMatrix(ds_test, save_fig, very_best_layer, letters)
+        NetworkActivity(ds_test, save_fig, very_best_layer, letters)
 
     # calc sigma to reduce searchspace over generations
     # start at 10% and end at 1% of search space
-    sigma = calc_sigma(0.5, 0.01, generations, generation)
+    sigma = calc_sigma(0.9, 0.01, generations, generation)
 
     # create next generation
     for identifier, individual in enumerate(population_list):
@@ -925,25 +957,12 @@ for generation in range(generations):
             else:
                 for _, param in enumerate(parameter_to_optimize):
                     # create parameter space to draw from
-                    param_space = np.linspace(param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
+                    param_space = np.linspace(
+                        param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
                     # draw a random number out of parameter space
                     individual[param[0]] = random.choice(param_space)
             population_list[identifier] = individual
     print("Finished generation {} of {}.".format(generation+1, generations))
     print("###################################################\n\n")
 
-# save record with increasing idx
-saved = False
-idx = 1
-while not saved:
-    path = './results/record_' + str(idx) + '.pkl'
-    if os.path.exists(path):
-        idx += 1
-    else:
-        # save record for postprocessing
-        with open(path, 'wb') as f:
-            pickle.dump(record, f)
-        saved = True
-
-# TODO inlcude a fitness trace
 print("End of the evolution reached")
