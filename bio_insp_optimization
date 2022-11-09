@@ -9,7 +9,7 @@ loop:
     4. reached stop criterion end
 """
 # TODO use logging to keep track of prints (https://realpython.com/python-logging/)
-import logging
+# import logging
 import os
 import random
 import pickle
@@ -42,9 +42,9 @@ lr = 0.0001
 
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
-P = 20  # number of individuals in populations
-# set the number of epochs you want to train the network (default = 300)
-epochs = 50
+P = 50  # number of individuals in populations
+# set the number of epochs you want to train the network
+epochs = 100 # default = 300
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
@@ -484,7 +484,7 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
     plt.xticks(rotation=0)
     if save:
         path_to_save_fig = path_for_plots + "/generation_" + \
-            str(generation+1) + "_individual_" + str(identifier+1)
+            str(generation+1) + "_individual_" + str(best_individual+1)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -544,7 +544,7 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
         sn.despine()
     if save:
         path_to_save_fig = path_for_plots + "/generation_" + \
-            str(generation+1) + "_individual_" + str(identifier+1)
+            str(generation+1) + "_individual_" + str(best_individual+1)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -568,7 +568,7 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
         sn.despine()
     if save:
         path_to_save_fig = path_for_plots + "/generation_" + \
-            str(generation+1) + "_individual_" + str(identifier+1)
+            str(generation+1) + "_individual_" + str(best_individual+1)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -885,8 +885,8 @@ print("Starting optimization.")
 # iterate over generataions
 for generation in range(generations):
     highest_fitness = 0.0
-    best_individual = None
-    very_best_layers = None
+    best_individual = []
+    very_best_layers = []
 
     # set seed for train-test split (fix seed for one generation to allow comparability)
     global seed
@@ -919,7 +919,8 @@ for generation in range(generations):
         # split in train-test set
         output_s = torch.as_tensor(output_s, dtype=torch.float)
         x_train, x_test, y_train, y_test = train_test_split(
-            output_s, labels_as_number, test_size=0.20, shuffle=True, stratify=labels_as_number, random_state=seed)
+            output_s, labels_as_number, test_size=0.20, shuffle=True, 
+            stratify=labels_as_number, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
 
@@ -943,11 +944,10 @@ for generation in range(generations):
     print("Best individual: {}" .format(best_individual+1))
     print("*******************************************")
 
-    # TODO when changing population_list, old entries in record change too
+    # TODO do not keep all data in memory, but just load, append, and dump
     # save record for postprocessing
-    # data_dummy = population_list.copy()
-    # record.append(data_dummy)
-    record.append(population_list[:])
+    record.append(population_list) # check if slicing ([:]) is still needed
+    record.append(best_individual)
     # TODO create pandas df to dump
     with open(file_storage_path, 'wb') as f:
         pickle.dump(record, f)
@@ -981,7 +981,7 @@ for generation in range(generations):
                         new_val = np.random.normal(
                             best_individual_dict[param[0]], param_width[counter]*sigma, 1)
                         individual[param[0]] = new_val[0]
-                # create remaning 25% random
+                # create remaining 25% random
                 else:
                     for _, param in enumerate(parameter_to_optimize):
                         # create parameter space to draw from

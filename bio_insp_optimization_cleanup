@@ -148,9 +148,10 @@ frequ = sampling_freq * upsample_fac
 dt = 1/frequ
 
 # preprocess data
+print("Start preparing data.")
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
     "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True)
-
+print("Finished data prepartion.\n")
 # linear decrease
 
 
@@ -160,22 +161,33 @@ def calc_sigma(sigma_start, sigma_stop, generations, x):
 
 
 # init datastorage
+print("Initialize data storage.")
 file_storage_found = False
 idx_file_storage = 1
 while not file_storage_found:
     file_storage_path = './results/record_' + str(idx_file_storage) + '.pkl'
-    if os.path.isfile(path):
+    if os.path.isfile(file_storage_path):
         idx_file_storage += 1
     else:
         file_storage_found = True
 
+# create folder to safe plots later (if not present)
+if save_fig:
+    path_for_plots = './plots/record_' + str(idx_file_storage)
+    isExist_record = os.path.exists(path_for_plots)
+
+    if not isExist_record:
+        os.makedirs(path_for_plots)
+print("Data storage initialized.\n")
+
+print("Starting optimization.")
 # TODO inlcude a first split to have the validation set
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
 for generation in range(generations):
     highest_fitness = 0.0
-    best_individual = None
-    very_best_layers = None
+    best_individual = []
+    very_best_layers = []
 
     # set seed for train-test split (fix seed for one generation to allow comparability)
     global seed
@@ -192,7 +204,7 @@ for generation in range(generations):
 
     # find fitness for each individual
     for identifier, individual in enumerate(population_list):
-        print("Starting individual {} of {} in generation {} of {}.".format(
+        print("\nStarting individual {} of {} in generation {} of {}.".format(
             identifier+1, len(population_list), generation+1, generations))
         # create neuron response for individual
         neurons = MN_neuron(24, individual, dt=dt, train=False)
@@ -220,7 +232,7 @@ for generation in range(generations):
             use_trainable_out=use_trainable_out, 
             use_dropout=use_dropout)
 
-        individual['fitness'] = max(acc_hist[1])
+        individual['fitness'] = max(acc_hist[1])*100
         if max(acc_hist[1]) > highest_fitness:
             # TODO inlcude std of acc here as second metric
             highest_fitness = max(acc_hist[1])
@@ -230,43 +242,65 @@ for generation in range(generations):
             # TODO use spike count second metric
             print("Find a second metric to deside which is better")
 
+    # best individual
+    print("*******************************************")
+    print("Best individual: {}" .format(best_individual+1))
+    print("*******************************************")
+
+    # TODO do not keep all data in memory, but just load, append, and dump
     # save record for postprocessing
-    record.append(population_list)
+    record.append(population_list) # check if slicing ([:]) is still needed
+    record.append(best_individual)
     # TODO create pandas df to dump
     with open(file_storage_path, 'wb') as f:
         pickle.dump(record, f)
 
+    # TODO change to validation set here
     # plots of the best individual in this generation
     if save_fig:
-        ConfusionMatrix(ds_test, save_fig, very_best_layer, letters)
-        NetworkActivity(ds_test, save_fig, very_best_layer, letters)
+        ConfusionMatrix(device, ds_test, save_fig, very_best_layer,
+            generation, best_individual, letters, seed, seed_worker, batch_size, 
+            use_trainable_tc=use_trainable_tc, use_trainable_out=use_trainable_out, 
+            use_dropout=use_dropout)
+        NetworkActivity(device, ds_test, save_fig, very_best_layer,
+            generation, best_individual, seed, seed_worker, batch_size, 
+            use_trainable_tc=use_trainable_tc, use_trainable_out=use_trainable_out, 
+            use_dropout=use_dropout)
 
-    # calc sigma to reduce searchspace over generations
-    # start at 10% and end at 1% of search space
-    sigma = calc_sigma(0.9, 0.01, generations, generation)
+    # do not create a new generation in the last trial
+    if generation < generations-1:
+        # calc sigma to reduce searchspace over generations
+        # start at 100% and end at 1% of search space
+        sigma = calc_sigma(1.0, 0.01, generations, generation)
 
-    # create next generation
-    for identifier, individual in enumerate(population_list):
-        # keep best found individual so far (no perturbation)
-        if identifier == 0:
-            population_list[identifier] = population_list[best_individual]
-        else:
-            # create first 75% from best
-            if identifier <= 0.75*len(population_list):
-                for counter, param in enumerate(parameter_to_optimize):
-                    # (mu, sigma, nb_samples)
-                    new_val = np.random.normal(
-                        population_list[best_individual][param[0]], param_width[counter]*sigma, 1)
-                    individual[param[0]] = new_val[0]
-            # create remaning 25% random
-            else:
+        # create next generation
+        best_individual_dict = population_list[best_individual]
+        population_list = []
+        for counter in range(P):
+            individual = {}
+            individual['individual'] = counter+1
+            # keep best found individual so far (no perturbation)
+            if counter == 0:
                 for _, param in enumerate(parameter_to_optimize):
-                    # create parameter space to draw from
-                    param_space = np.linspace(
-                        param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
-                    # draw a random number out of parameter space
-                    individual[param[0]] = random.choice(param_space)
-            population_list[identifier] = individual
+                    individual[param[0]] = best_individual_dict[param[0]]
+            else:
+                # create first 75% from best
+                if counter <= 0.75*P:
+                    for counter, param in enumerate(parameter_to_optimize):
+                        # (mu, sigma, nb_samples)
+                        new_val = np.random.normal(
+                            best_individual_dict[param[0]], param_width[counter]*sigma, 1)
+                        individual[param[0]] = new_val[0]
+                # create remaining 25% random
+                else:
+                    for _, param in enumerate(parameter_to_optimize):
+                        # create parameter space to draw from
+                        param_space = np.linspace(
+                            param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
+                        # draw a random number out of parameter space
+                        individual[param[0]] = random.choice(param_space)
+            population_list.append(individual)
+
     print("Finished generation {} of {}.".format(generation+1, generations))
     print("###################################################\n\n")
 

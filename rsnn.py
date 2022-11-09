@@ -315,7 +315,7 @@ def build_and_train(device, data_steps, dt, ds_train, ds_test, epochs, labels, l
     return loss_hist, accs_hist, best_layers
 
 
-def compute_classification_accuracy(dataset, layers=None, early=False):
+def compute_classification_accuracy(dataset, layers=None):
     """ Computes classification accuracy on supplied data in batches. """
 
     generator = DataLoader(dataset, batch_size=batch_size,
@@ -351,7 +351,7 @@ def compute_classification_accuracy(dataset, layers=None, early=False):
     return np.mean(accs)
 
 
-def ConfusionMatrix(dataset, save, layers, labels):
+def ConfusionMatrix(device, dataset, save, layers, generation, best_individual, labels, seed, seed_worker, batch_size, use_trainable_tc=False, use_trainable_out=False, use_dropout=False):
 
     g = torch.Generator()
     g.manual_seed(seed)
@@ -406,7 +406,7 @@ def ConfusionMatrix(dataset, save, layers, labels):
     plt.xticks(rotation=0)
     if save:
         path_to_save_fig = "../plots/generation_" + \
-            str(generation) + "_individual_" + str(identifier)
+            str(generation) + "_individual_" + str(best_individual)
         if use_trainable_tc:
             path_to_save_fig = path_to_save_fig + "_train_tc"
         if use_trainable_out:
@@ -419,7 +419,7 @@ def ConfusionMatrix(dataset, save, layers, labels):
         plt.show()
 
 
-def NetworkActivity(dataset, save, layers, labels):
+def NetworkActivity(device, dataset, save, layers, generation, best_individual, seed, seed_worker, batch_size, use_trainable_tc=False, use_trainable_out=False, use_dropout=False):
 
     g = torch.Generator()
     g.manual_seed(seed)

@@ -1,7 +1,7 @@
 import os
 import pickle
-import numpy as np
-import pandas as pd
+# import numpy as np
+# import pandas as pd
 
 # init dataloading (load the last trial)
 file_storage_found = False
@@ -15,6 +15,7 @@ while not file_storage_found:
 
 # put id here if NOT last should be loaded
 file_storage_path = './results/record_' + str(idx_file_storage-1) + '.pkl'
+# file_storage_path = './results/record_' + str(1) + '.pkl'
 
 with open(file_storage_path, 'rb') as f:
     data = pickle.load(f)
