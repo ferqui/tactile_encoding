@@ -80,7 +80,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     le = LabelEncoder()
     le.fit(labels)
     labels = le.transform(labels)  # labels as int numbers
-    data_steps = len(data[0])
+    data_steps = len(data.iloc[0])
 
     # filter and resample
     data_resampled = []
