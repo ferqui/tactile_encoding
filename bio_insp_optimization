@@ -8,8 +8,9 @@ loop:
     and include y random individuals to create population of P
     4. reached stop criterion end
 """
-# TODO use logging to keep track of prints (https://realpython.com/python-logging/)
-# import logging
+# TODO use logging to keep track of logging.infos (https://realpython.com/python-logging/)
+import logging
+import sys
 import os
 import random
 import pickle
@@ -44,7 +45,7 @@ lr = 0.0001
 generations = 100  # number of generations to calculate
 P = 50  # number of individuals in populations
 # set the number of epochs you want to train the network
-epochs = 100 # default = 300
+epochs = 100  # default = 300
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
@@ -64,6 +65,36 @@ if save_fig:
     if not isExist_plots:
         os.makedirs(path)
 
+# init datastorage
+file_storage_found = False
+idx_file_storage = 1
+while not file_storage_found:
+    file_storage_path = f'./results/experiment_{idx_file_storage}.pkl'
+    if os.path.isfile(file_storage_path):
+        idx_file_storage += 1
+    else:
+        file_storage_found = True
+
+# create folder to safe plots later (if not present)
+if save_fig:
+    path_for_plots = f'./plots/experiment_{idx_file_storage}'
+    isExist_record = os.path.exists(path_for_plots)
+
+    if not isExist_record:
+        os.makedirs(path_for_plots)
+
+isExist_data = os.path.exists('./logs')
+
+if not isExist_data:
+    os.makedirs('./logs')
+
+logging.getLogger().addHandler(logging.FileHandler(
+    f'./logs/experiment_{idx_file_storage}.log'))
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+logging.getLogger().setLevel(logging.INFO)
+
+logging.info("Data storage initialized.\n")
+
 # check for available GPU and distribute work
 if torch.cuda.device_count() > 1:
     torch.cuda.empty_cache()
@@ -71,29 +102,29 @@ if torch.cuda.device_count() > 1:
     gpu_sel = 1
     gpu_av = [torch.cuda.is_available()
               for ii in range(torch.cuda.device_count())]
-    print("Detected {} GPUs. The load will be shared.".format(
+    logging.info("Detected {} GPUs. The load will be shared.".format(
         torch.cuda.device_count()))
     for gpu in range(len(gpu_av)):
         if True in gpu_av:
             if gpu_av[gpu_sel]:
                 device = torch.device("cuda:"+str(gpu))
                 # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
-                print("Selected GPUs: {}" .format("cuda:"+str(gpu)))
+                logging.info("Selected GPUs: {}" .format("cuda:"+str(gpu)))
             else:
                 device = torch.device("cuda:"+str(gpu_av.index(True)))
         else:
             device = torch.device("cpu")
-            print("No GPU detected. Running on CPU.")
+            logging.warning("No GPU detected. Running on CPU.")
 else:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-        print("Single GPU detected. Setting up the simulation there.")
+        logging.info("Single GPU detected. Setting up the simulation there.")
         device = torch.device("cuda:0")
         # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
     else:
         device = torch.device("cpu")
-        print("No GPU detected. Running on CPU.")
+        logging.warning("No GPU detected. Running on CPU.")
 
 
 def run_snn(inputs, layers):
@@ -282,7 +313,7 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
                 for ii in layers_update:
                     best_acc_layers.append(ii.detach().clone())
 
-        print("Epoch {}/{} done. Train accuracy: {:.2f}%, Test accuracy: {:.2f}%, Loss: {:.5f}.".format(
+        logging.info("Epoch {}/{} done. Train accuracy: {:.2f}%, Test accuracy: {:.2f}%, Loss: {:.5f}.".format(
             e + 1, nb_epochs, accs_hist[0][-1]*100, accs_hist[1][-1]*100, loss_hist[-1]))
 
     return loss_hist, accs_hist, best_acc_layers
@@ -381,14 +412,17 @@ def build_and_train(data_steps, ds_train, ds_test, epochs=epochs):
     idx_best_test = np.argmax(accs_hist[1])
     acc_train_at_best_test = accs_hist[0][idx_best_test]*100
 
-    print("\n------------------------------------------------------------------------------------")
-    print("Final results: ")
-    print("Best training accuracy: {:.2f}% and according test accuracy: {:.2f}% at epoch: {}".format(
+    logging.info(
+        "\n------------------------------------------------------------------------------------")
+    logging.info("Final results: ")
+    logging.info("Best training accuracy: {:.2f}% and according test accuracy: {:.2f}% at epoch: {}".format(
         acc_best_train, acc_test_at_best_train, idx_best_train+1))
-    print("Best test accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
+    logging.info("Best test accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
         acc_best_test, acc_train_at_best_test, idx_best_test+1))
-    print("------------------------------------------------------------------------------------")
-    print("------------------------------------------------------------------------------------\n")
+    logging.info(
+        "------------------------------------------------------------------------------------")
+    logging.info(
+        "------------------------------------------------------------------------------------\n")
     return loss_hist, accs_hist, best_layers
 
 
@@ -466,8 +500,8 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
         trues.extend(y_local.detach().cpu().numpy())
         preds.extend(am.detach().cpu().numpy())
 
-    print("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
-          * 100, np.std(accs)*100))
+    logging.info("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
+                                                                             * 100, np.std(accs)*100))
 
     cm = confusion_matrix(trues, preds, normalize='true')
     cm_df = pd.DataFrame(cm, index=[ii for ii in labels], columns=[
@@ -483,15 +517,14 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
     plt.ylabel('True\n')
     plt.xticks(rotation=0)
     if save:
-        path_to_save_fig = path_for_plots + "/generation_" + \
-            str(generation+1) + "_individual_" + str(best_individual+1)
+        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
         if use_trainable_tc:
-            path_to_save_fig = path_to_save_fig + "_train_tc"
+            path_to_save_fig = f'{path_to_save_fig}_train_tc'
         if use_trainable_out:
-            path_to_save_fig = path_to_save_fig + "_train_out"
+            path_to_save_fig = f'{path_to_save_fig}_train_out'
         if use_dropout:
-            path_to_save_fig = path_to_save_fig + "_dropout"
-        path_to_save_fig = path_to_save_fig + "_cm.png"
+            path_to_save_fig = f'{path_to_save_fig}_dropout'
+        path_to_save_fig = f'{path_to_save_fig}_cm.png'
         plt.savefig(path_to_save_fig, dpi=300)
         plt.close()
     else:
@@ -543,15 +576,14 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             plt.ylabel("Units")
         sn.despine()
     if save:
-        path_to_save_fig = path_for_plots + "/generation_" + \
-            str(generation+1) + "_individual_" + str(best_individual+1)
+        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
         if use_trainable_tc:
-            path_to_save_fig = path_to_save_fig + "_train_tc"
+            path_to_save_fig = f'{path_to_save_fig}_train_tc'
         if use_trainable_out:
-            path_to_save_fig = path_to_save_fig + "_train_out"
+            path_to_save_fig = f'{path_to_save_fig}_train_out'
         if use_dropout:
-            path_to_save_fig = path_to_save_fig + "_dropout"
-        path_to_save_fig = path_to_save_fig + "_hidden_layer.png"
+            path_to_save_fig = f'{path_to_save_fig}_dropout'
+        path_to_save_fig = f'{path_to_save_fig}_hidden_layer.png'
         plt.savefig(path_to_save_fig, dpi=300)
         plt.close()
 
@@ -567,15 +599,14 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             plt.ylabel("Units")
         sn.despine()
     if save:
-        path_to_save_fig = path_for_plots + "/generation_" + \
-            str(generation+1) + "_individual_" + str(best_individual+1)
+        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
         if use_trainable_tc:
-            path_to_save_fig = path_to_save_fig + "_train_tc"
+            path_to_save_fig = f'{path_to_save_fig}_train_tc'
         if use_trainable_out:
-            path_to_save_fig = path_to_save_fig + "_train_out"
+            path_to_save_fig = f'{path_to_save_fig}_train_out'
         if use_dropout:
-            path_to_save_fig = path_to_save_fig + "_dropout"
-        path_to_save_fig = path_to_save_fig + "_output_layer.png"
+            path_to_save_fig = f'{path_to_save_fig}_dropout'
+        path_to_save_fig = f'{path_to_save_fig}_output_layer.png'
         plt.savefig(path_to_save_fig, dpi=300)
         plt.close()
     else:
@@ -847,10 +878,10 @@ frequ = sampling_freq * upsample_fac
 dt = 1/frequ
 
 # preprocess data
-print("Start preparing data.")
+logging.info("Start preparing data.")
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
     "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True)
-print("Finished data prepartion.\n")
+logging.info("Finished data prepartion.\n")
 # linear decrease
 
 
@@ -859,27 +890,7 @@ def calc_sigma(sigma_start, sigma_stop, generations, x):
     return sigma
 
 
-# init datastorage
-print("Initialize data storage.")
-file_storage_found = False
-idx_file_storage = 1
-while not file_storage_found:
-    file_storage_path = './results/record_' + str(idx_file_storage) + '.pkl'
-    if os.path.isfile(file_storage_path):
-        idx_file_storage += 1
-    else:
-        file_storage_found = True
-
-# create folder to safe plots later (if not present)
-if save_fig:
-    path_for_plots = './plots/record_' + str(idx_file_storage)
-    isExist_record = os.path.exists(path_for_plots)
-
-    if not isExist_record:
-        os.makedirs(path_for_plots)
-print("Data storage initialized.\n")
-
-print("Starting optimization.")
+logging.info("Starting optimization.")
 # TODO inlcude a first split to have the validation set
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
@@ -894,7 +905,7 @@ for generation in range(generations):
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    print("Seed set to {}".format(seed))
+    logging.info("Seed set to {}".format(seed))
 
     def seed_worker(worker_id):
         worker_seed = torch.initial_seed() % 2**32
@@ -903,7 +914,7 @@ for generation in range(generations):
 
     # find fitness for each individual
     for identifier, individual in enumerate(population_list):
-        print("\nStarting individual {} of {} in generation {} of {}.".format(
+        logging.info("\nStarting individual {} of {} in generation {} of {}.".format(
             identifier+1, len(population_list), generation+1, generations))
         # create neuron response for individual
         neurons = MN_neuron(24, individual, dt=dt, train=False)
@@ -919,7 +930,7 @@ for generation in range(generations):
         # split in train-test set
         output_s = torch.as_tensor(output_s, dtype=torch.float)
         x_train, x_test, y_train, y_test = train_test_split(
-            output_s, labels_as_number, test_size=0.20, shuffle=True, 
+            output_s, labels_as_number, test_size=0.20, shuffle=True,
             stratify=labels_as_number, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
@@ -937,16 +948,16 @@ for generation in range(generations):
             very_best_layer = best_layers
         elif max(acc_hist[1]) == highest_fitness:
             # TODO use spike count second metric
-            print("Find a second metric to deside which is better")
+            logging.info("Find a second metric to deside which is better")
 
     # best individual
-    print("*******************************************")
-    print("Best individual: {}" .format(best_individual+1))
-    print("*******************************************")
+    logging.info("*******************************************")
+    logging.info("Best individual: {}" .format(best_individual+1))
+    logging.info("*******************************************")
 
     # TODO do not keep all data in memory, but just load, append, and dump
     # save record for postprocessing
-    record.append(population_list) # check if slicing ([:]) is still needed
+    record.append(population_list)  # check if slicing ([:]) is still needed
     record.append(best_individual)
     # TODO create pandas df to dump
     with open(file_storage_path, 'wb') as f:
@@ -991,7 +1002,8 @@ for generation in range(generations):
                         individual[param[0]] = random.choice(param_space)
             population_list.append(individual)
 
-    print("Finished generation {} of {}.".format(generation+1, generations))
-    print("###################################################\n\n")
+    logging.info("Finished generation {} of {}.".format(
+        generation+1, generations))
+    logging.info("###################################################\n\n")
 
-print("End of the evolution reached")
+logging.info("End of the evolution reached")
