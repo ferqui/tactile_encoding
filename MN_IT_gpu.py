@@ -21,7 +21,7 @@ torch.manual_seed(0)
 
 # ---------------------------- Input -----------------------------------
 save_out = True  # Flag to save figures:
-sweep_param_name = ['a', 'A1', 'A2', 'b', 'G', 'k1', 'k2']
+sweep_param_name = ['a', 'A1', 'A2', 'b', 'G', 'k1', 'k2','gain']
 sweep_ranges = [[-10, 10], [-100, 100], [-1000, 1000]]
 
 MNclasses = {
@@ -610,6 +610,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
                                  tensor_params['G'],
                                  tensor_params['k1'],
                                  tensor_params['k2'],
+
                                  train=False)
 
     batch_size = int(params['batch_size'])

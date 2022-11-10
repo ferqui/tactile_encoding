@@ -14,7 +14,7 @@ import os
 import models
 from datasets import load_analog_data, load_data
 from sklearn.model_selection import train_test_split
-
+from experiments.plot_MN_IT import plot_the_data
 import time
 import pickle
 Current_PATH = os.getcwd()
@@ -24,18 +24,20 @@ torch.manual_seed(0)
 
 # ---------------------------- Input -----------------------------------
 save_out = True  # Flag to save figures:
-sweep_param_name = ['gain']
+sweep_param_name = ['gain','a', 'A1', 'A2', 'b', 'G', 'k1', 'k2']
+sweep_param_name = ['b', 'G', 'k1', 'k2']
+
 sweep_ranges = [[-10, 10], [-100, 100], [-1000, 1000]]
 
 MNclasses = {
-    'A2B': {'a':0,'A1':0,'A2': 0},
-    'C2J': {'a':5,'A1':0,'A2': 0},
-    'K': {'a':30,'A1':0,'A2': 0},
-    'L': {'a':30,'A1':10,'A2': -0.6},
-    'M2O': {'a':5,'A1':10,'A2': -0.6},
-    'P2Q': {'a':5,'A1':5,'A2': -0.3},
-    'R': {'a':0,'A1':8,'A2': -0.1},
-    'S': {'a':5,'A1':-3,'A2': 0.5},
+    # 'A2B': {'a':0,'A1':0,'A2': 0},
+    # 'C2J': {'a':5,'A1':0,'A2': 0},
+    # 'K': {'a':30,'A1':0,'A2': 0},
+    # 'L': {'a':30,'A1':10,'A2': -0.6},
+    # 'M2O': {'a':5,'A1':10,'A2': -0.6},
+    # 'P2Q': {'a':5,'A1':5,'A2': -0.3},
+    # 'R': {'a':0,'A1':8,'A2': -0.1},
+    # 'S': {'a':5,'A1':-3,'A2': 0.5},
     'T': {'a':-80,'A1':0,'A2': 0}
 }
 
@@ -464,7 +466,7 @@ def sim_batch_final(dataset, device, neuron, varying_element, rank_NMF, model, l
                 list_mi.append([mi.item(), epoch])
 
     fig0,axis0 = plt.subplots(nrows = 1, ncols =1)
-    axis0.imshow(V_matrix,aspect='auto')
+    axis0.imshow(V_matrix.clone().detach().cpu(),aspect='auto')
     axis0.set_xlabel('Time')
     axis0.set_ylabel('Trial x Stimulus')
     axis0.set_title('Raster Plot')
@@ -572,7 +574,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     nb_channels = data.shape[-1]
 
     x_train, x_test, y_train, y_test = train_test_split(
-        data, labels, test_size=0.2, shuffle=True, stratify=labels
+        data.cpu(), labels.cpu(), test_size=0.2, shuffle=True, stratify=labels.cpu()
     )
 
     ds_train = TensorDataset(x_train, y_train)
@@ -729,7 +731,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     # plt.ylabel('MI')
     # if save_out:
     #     fig.savefig(results_dir+'MI.pdf', format='pdf')
-    return result_plots
+    return result_plots,results_dir
 
 if __name__ == "__main__":
     print('Current path',Current_PATH)
@@ -748,9 +750,11 @@ if __name__ == "__main__":
                 dict_keys = generate_dict(name_param, variable_range,force_param_dict=MNclasses[MNclass])
 
                 # Run mutual information analysis
-                result_plots = MI_neuron_params(dict_keys, name_param, variable_range_extremes, MNclass)
+                result_plots,results_dir = MI_neuron_params(dict_keys, name_param, variable_range_extremes, MNclass)
                 for key in result_plots:
                     result_plots[key][1].set_title('Class {}: Sweeping {} from {} to {}'.format(MNclass, name_param, variable_range_extremes[0],
                                                                     variable_range_extremes[1]))
                     writer.add_figure(key,result_plots[key][0],global_step=counter)
                 counter += 1
+    sweep_range_string = [str(element) for element in sweep_ranges]
+    plot_the_data(exp_id,sweep_range_string,results_dir,sweep_param_name,writer = writer)
