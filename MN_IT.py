@@ -25,19 +25,19 @@ torch.manual_seed(0)
 # ---------------------------- Input -----------------------------------
 save_out = True  # Flag to save figures:
 sweep_param_name = ['gain','a', 'A1', 'A2', 'b', 'G', 'k1', 'k2']
-sweep_param_name = ['b', 'G', 'k1', 'k2']
-
+# sweep_param_name = ['b', 'G', 'k1', 'k2']
+letters = ['A','B']
 sweep_ranges = [[-10, 10], [-100, 100], [-1000, 1000]]
 
 MNclasses = {
-    # 'A2B': {'a':0,'A1':0,'A2': 0},
-    # 'C2J': {'a':5,'A1':0,'A2': 0},
-    # 'K': {'a':30,'A1':0,'A2': 0},
-    # 'L': {'a':30,'A1':10,'A2': -0.6},
-    # 'M2O': {'a':5,'A1':10,'A2': -0.6},
-    # 'P2Q': {'a':5,'A1':5,'A2': -0.3},
-    # 'R': {'a':0,'A1':8,'A2': -0.1},
-    # 'S': {'a':5,'A1':-3,'A2': 0.5},
+    'A2B': {'a':0,'A1':0,'A2': 0},
+    'C2J': {'a':5,'A1':0,'A2': 0},
+    'K': {'a':30,'A1':0,'A2': 0},
+    'L': {'a':30,'A1':10,'A2': -0.6},
+    'M2O': {'a':5,'A1':10,'A2': -0.6},
+    'P2Q': {'a':5,'A1':5,'A2': -0.3},
+    'R': {'a':0,'A1':8,'A2': -0.1},
+    'S': {'a':5,'A1':-3,'A2': 0.5},
     'T': {'a':-80,'A1':0,'A2': 0}
 }
 
@@ -534,7 +534,7 @@ def sim_batch_final(dataset, device, neuron, varying_element, rank_NMF, model, l
     return list_mi, net,result_plots
 
 
-def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MNclass):
+def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MNclass,letter = 'A'):
     # Set results folder:
 
     iscuda = torch.cuda.is_available()
@@ -547,7 +547,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         if not (os.path.isdir(results_dir)):
             os.mkdir(results_dir)
     else:
-        results_dir = set_results_folder([exp_id,MNclass, name_param_sweeped, str(extremes_sweep)])
+        results_dir = set_results_folder([exp_id,letter,MNclass, name_param_sweeped, str(extremes_sweep)])
         results_dir += '/'
 
     # Filename metadata:
@@ -570,7 +570,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     upsample_fac = 1
     dt = (1 / 100.0) / upsample_fac
     file_name = "data/data_braille_letters_all.pkl"
-    data, labels, _, _, _, _ = load_data(file_name, upsample_fac, specify_letters=['A'])
+    data, labels, _, _, _, _ = load_data(file_name, upsample_fac, specify_letters=[letter])
     nb_channels = data.shape[-1]
 
     x_train, x_test, y_train, y_test = train_test_split(
@@ -700,6 +700,9 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
                                          results_dir=results_dir, net=net, neuron_id=neuron_id, epoch=e, list_spikecount= list_spikecount)
         pbar.set_postfix_str("Mutual Information: " + str(np.round(list_mi[e][0], 2)) + ' bits. Loss: ' + str(
             np.round(list_loss[e][0], 2)) + ' Avg spike count: ' + str(np.round(list_spikecount['mean'][e])) + '(±' + str(np.round(list_spikecount['std'][e])) + ")")
+        if np.isnan(list_loss[e][0]).all():
+            print('All loss were nan, no spikes here. Exiting training')
+            break
     train_duration = time.time() - t_start
     addToNetMetadata(metadatafilename, 'sim duration (sec)', train_duration)
 
@@ -737,24 +740,25 @@ if __name__ == "__main__":
     print('Current path',Current_PATH)
     writer = SummaryWriter(comment="")  # For logging purpose
     counter = 0
-    for MNclass in MNclasses:
-        for name_param in sweep_param_name:
-            for variable_range_extremes in sweep_ranges:
+    for letter in letters:
+        for MNclass in MNclasses:
+            for name_param in sweep_param_name:
+                for variable_range_extremes in sweep_ranges:
 
-                print('-------------------------------------------')
-                print('Class {}: Sweeping {} from {} to {}'.format(MNclass, name_param, variable_range_extremes[0],
-                                                                    variable_range_extremes[1]))
-                # Generate dictionary with parameter values:
-                variable_range = torch.linspace(variable_range_extremes[0], variable_range_extremes[1],
-                                                params['n_param_values'])
-                dict_keys = generate_dict(name_param, variable_range,force_param_dict=MNclasses[MNclass])
+                    print('-------------------------------------------')
+                    print('Letter {} Class {}: Sweeping {} from {} to {}'.format(letter,MNclass, name_param, variable_range_extremes[0],
+                                                                        variable_range_extremes[1]))
+                    # Generate dictionary with parameter values:
+                    variable_range = torch.linspace(variable_range_extremes[0], variable_range_extremes[1],
+                                                    params['n_param_values'])
+                    dict_keys = generate_dict(name_param, variable_range,force_param_dict=MNclasses[MNclass])
 
-                # Run mutual information analysis
-                result_plots,results_dir = MI_neuron_params(dict_keys, name_param, variable_range_extremes, MNclass)
-                for key in result_plots:
-                    result_plots[key][1].set_title('Class {}: Sweeping {} from {} to {}'.format(MNclass, name_param, variable_range_extremes[0],
-                                                                    variable_range_extremes[1]))
-                    writer.add_figure(key,result_plots[key][0],global_step=counter)
-                counter += 1
-    sweep_range_string = [str(element) for element in sweep_ranges]
-    plot_the_data(exp_id,sweep_range_string,results_dir,sweep_param_name,writer = writer)
+                    # Run mutual information analysis
+                    result_plots,results_dir = MI_neuron_params(dict_keys, name_param, variable_range_extremes, MNclass,letter)
+                    for key in result_plots:
+                        result_plots[key][1].set_title('Class {}: Sweeping {} from {} to {}'.format(MNclass, name_param, variable_range_extremes[0],
+                                                                        variable_range_extremes[1]))
+                        writer.add_figure(key,result_plots[key][0],global_step=counter)
+                    counter += 1
+        sweep_range_string = [str(element) for element in sweep_ranges]
+    plot_the_data(exp_id,sweep_range_string,results_dir,sweep_param_name,writer = writer,letters = letters)
