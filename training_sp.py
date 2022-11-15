@@ -54,7 +54,7 @@ def main(args):
     nb_outputs = len(np.unique(labels))
 
     # Learning parameters
-    nb_epochs = 100
+    nb_epochs = 150
 
     # Neuron parameters
     tau_mem = args.tau_mem  # ms
@@ -83,30 +83,32 @@ def main(args):
     #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     a = 5
-    A1 = 10
-    A2 = 1
+    A1 = 0
+    A2 = 0
     b = 10
     G = 50
     k1 = 200
     k2 = 20
     R1 = 0
     R2 = 1
+    C = 1
     a = nn.Parameter(torch.Tensor([a]), requires_grad=True)
     print('a',a)
 
     A1 = nn.Parameter(torch.Tensor([A1]), requires_grad=True)
     A2 = nn.Parameter(torch.Tensor([A2]), requires_grad=True)
-    b = nn.Parameter(torch.Tensor([b]), requires_grad=False).to(device)
-    G = nn.Parameter(torch.Tensor([G]), requires_grad=False).to(device)
-    k1 = nn.Parameter(torch.Tensor([k1]), requires_grad=False).to(device)
-    k2 = nn.Parameter(torch.Tensor([k2]), requires_grad=False).to(device)
-    R1 = nn.Parameter(torch.Tensor([R1]), requires_grad=False).to(device)
-    R2 = nn.Parameter(torch.Tensor([R2]), requires_grad=False).to(device)
+    b = nn.Parameter(torch.Tensor([b]), requires_grad=False)
+    G = nn.Parameter(torch.Tensor([G]), requires_grad=False)
+    k1 = nn.Parameter(torch.Tensor([k1]), requires_grad=False)
+    k2 = nn.Parameter(torch.Tensor([k2]), requires_grad=False)
+    R1 = nn.Parameter(torch.Tensor([R1]), requires_grad=False)
+    R2 = nn.Parameter(torch.Tensor([R2]), requires_grad=False)
+    C = nn.Parameter(torch.Tensor([C]), requires_grad=False)
 
     network = nn.Sequential(
         Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
         MN_neuron_sp(
-            nb_inputs, firing_mode_dict[args.firing_mode], dt=dt, train=args.train, a = a, A1 = A1, A2 = A2,  b=b, G=G, k1=k1, k2=k2, R1=R1, R2=R2
+            nb_inputs, firing_mode_dict[args.firing_mode], dt=dt, train=args.train, a = a, A1 = A1, A2 = A2,  b=b, G=G, k1=k1, k2=k2, R1=R1, R2=R2, C = C
         ),
         LIF_neuron(
             nb_inputs,
@@ -128,13 +130,21 @@ def main(args):
         ),
     ).to(device)
     print(network)
-
+    a.to(device)
+    A1.to(device)
+    A2.to(device)
+    b.to(device)
+    G.to(device)
+    k1.to(device)
+    k2.to(device)
+    R1.to(device)
+    R2.to(device)
     ###########################################
     ##               Training                ##
     ###########################################
     batch_size = 128
 
-    optimizer = torch.optim.Adamax(network.parameters(), lr=0.5, betas=(0.9, 0.995))
+    optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
 
     # The log softmax function across output units
     log_softmax_fn = nn.LogSoftmax(dim=1)
@@ -148,10 +158,10 @@ def main(args):
         writer = SummaryWriter(comment="")  # For logging purpose
 
     dl_train = DataLoader(
-        ds_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
+        ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
     )
     dl_test = DataLoader(
-        ds_test, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
+        ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
     )
     pbar = trange(nb_epochs)
     parameter_rec = {'a': [], 'A1':[], 'A2':[],'w1':[],'w1_rec':[],'w2':[]}

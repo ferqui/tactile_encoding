@@ -253,6 +253,7 @@ class IZHI_neuron(nn.Module):
         for ii in parameters_list:
             if ii in list(parameters_combination.keys()):
                 eval_string = "self.{}".format(ii) + " = " + str(parameters_combination[ii])
+                print(eval_string)
                 exec(eval_string)
 
         self.state = None
@@ -285,13 +286,13 @@ class MN_neuron_sp(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
     def __init__(self, nb_inputs, parameters_combination, dt=1 / 1000, a=5, A1=10, A2=-0.6, b=10, G=50, k1=200, k2=20,
-                 R1=0, R2=1, train=True):  # default combination: M2O of the original paper
+                 R1=0, R2=1, C = 1, train=True):  # default combination: M2O of the original paper
         super(MN_neuron_sp, self).__init__()
 
         # One-to-one synapse
         self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=False)
 
-        self.C = 1
+        self.C = C
 
         self.N = nb_inputs
 
@@ -302,9 +303,10 @@ class MN_neuron_sp(nn.Module):
 
         self.a = a
         self.A1 = A1
+
         self.A2 = A2
         self.b = b  # units of 1/s
-        self.G = G * self.C  # units of 1/s
+        self.G = G  # units of 1/s
         self.k1 = k1  # units of 1/s
         self.k2 = k2  # units of 1/s
         self.R1 = R1
@@ -320,7 +322,6 @@ class MN_neuron_sp(nn.Module):
                                           i2=torch.zeros(x.shape[0], self.N, device=x.device),
                                           Thr=torch.ones(x.shape[0], self.N, device=x.device) * self.Tinf,
                                           spk=torch.zeros(x.shape[0], self.N, device=x.device))
-
         V = self.state.V
         i1 = self.state.i1
         i2 = self.state.i2
