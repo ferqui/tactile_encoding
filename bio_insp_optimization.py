@@ -43,7 +43,7 @@ lr = 0.0001
 
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
-P = 50  # number of individuals in populations
+P = 10  # number of individuals in populations
 # set the number of epochs you want to train the network
 epochs = 100  # default = 300
 save_fig = True  # set True to save the plots
@@ -881,9 +881,13 @@ dt = 1/frequ
 logging.info("Start preparing data.")
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
     "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True)
+# create validation split
+# split in train-test and validation set
+x_train_test, x_validation, y_train_test, y_validation = train_test_split(
+    data_neuron, labels_as_number, test_size=0.10, shuffle=True,
+    stratify=labels_as_number)
 logging.info("Finished data prepartion.\n")
 # linear decrease
-
 
 def calc_sigma(sigma_start, sigma_stop, generations, x):
     sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
@@ -919,9 +923,8 @@ for generation in range(generations):
         # create neuron response for individual
         neurons = MN_neuron(24, individual, dt=dt, train=False)
 
-        input = data_neuron
+        input = x_train_test
         output_s = []
-
         for t in range(input.shape[0]):
             out = neurons(input[t])
             output_s.append(out.cpu().numpy())
@@ -930,8 +933,8 @@ for generation in range(generations):
         # split in train-test set
         output_s = torch.as_tensor(output_s, dtype=torch.float)
         x_train, x_test, y_train, y_test = train_test_split(
-            output_s, labels_as_number, test_size=0.20, shuffle=True,
-            stratify=labels_as_number, random_state=seed)
+            output_s, y_train_test, test_size=0.20, shuffle=True,
+            stratify=y_train_test, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
 
@@ -940,7 +943,24 @@ for generation in range(generations):
         loss_hist, acc_hist, best_layers = build_and_train(
             data_steps, ds_train, ds_test, epochs=epochs)
 
+        # create validation set
+        input = x_validation
+        output_s = []
+
+        for t in range(input.shape[0]):
+            out = neurons(input[t])
+            output_s.append(out.cpu().numpy())
+        output_s = np.stack(output_s)
+
+        # calculate validation
+        output_s = torch.as_tensor(output_s, dtype=torch.float)
+        ds_validation = TensorDataset(output_s, y_validation)
+        test_acc = compute_classification_accuracy(
+                ds_validation,
+                layers=best_layers
+            )
         individual['fitness'] = max(acc_hist[1])*100
+        individual['validation'] = test_acc
         if max(acc_hist[1]) > highest_fitness:
             # TODO inlcude std of acc here as second metric
             highest_fitness = max(acc_hist[1])
@@ -948,7 +968,7 @@ for generation in range(generations):
             very_best_layer = best_layers
         elif max(acc_hist[1]) == highest_fitness:
             # TODO use spike count second metric
-            logging.info("Find a second metric to deside which is better")
+            logging.warning("Find a second metric to deside which is better")
 
     # best individual
     logging.info("*******************************************")
