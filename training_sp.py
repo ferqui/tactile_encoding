@@ -95,16 +95,16 @@ def main(args):
     a = nn.Parameter(torch.Tensor([a]), requires_grad=True)
     print('a',a)
 
-    A1 = nn.Parameter(torch.Tensor([A1]), requires_grad=True)
-    A2 = nn.Parameter(torch.Tensor([A2]), requires_grad=True)
-    b = nn.Parameter(torch.Tensor([b]), requires_grad=False)
-    G = nn.Parameter(torch.Tensor([G]), requires_grad=False)
+    A1 = nn.Parameter(torch.Tensor([A1]), requires_grad=False)
+    A2 = nn.Parameter(torch.Tensor([A2]), requires_grad=False)
+    b = nn.Parameter(torch.Tensor([b]), requires_grad=True)
+    G = nn.Parameter(torch.Tensor([G]), requires_grad=True)
     k1 = nn.Parameter(torch.Tensor([k1]), requires_grad=False)
     k2 = nn.Parameter(torch.Tensor([k2]), requires_grad=False)
     R1 = nn.Parameter(torch.Tensor([R1]), requires_grad=False)
     R2 = nn.Parameter(torch.Tensor([R2]), requires_grad=False)
     C = nn.Parameter(torch.Tensor([C]), requires_grad=False)
-
+    torch.autograd.set_detect_anomaly(True)
     network = nn.Sequential(
         Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
         MN_neuron_sp(
@@ -164,7 +164,7 @@ def main(args):
         ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
     )
     pbar = trange(nb_epochs)
-    parameter_rec = {'a': [], 'A1':[], 'A2':[],'w1':[],'w1_rec':[],'w2':[]}
+    parameter_rec = {'a': [], 'A1':[], 'A2':[],'b':[], 'G':[], 'k1':[], 'k2':[],'R1':[], 'R2':[],'w1':[],'w1_rec':[],'w2':[]}
     for e in pbar:
         local_loss = []
         accs = []  # accs: mean training accuracies for each batch
@@ -263,7 +263,12 @@ def main(args):
 
                 parameter_rec['A1'].append(A1.clone().detach().cpu().numpy())
                 parameter_rec['A2'].append(A2.clone().detach().cpu().numpy())
-
+                parameter_rec['b'].append(b.clone().detach().cpu().numpy())
+                parameter_rec['G'].append(G.clone().detach().cpu().numpy())
+                parameter_rec['k1'].append(k1.clone().detach().cpu().numpy())
+                parameter_rec['k2'].append(k2.clone().detach().cpu().numpy())
+                parameter_rec['R1'].append(R1.clone().detach().cpu().numpy())
+                parameter_rec['R2'].append(R2.clone().detach().cpu().numpy())
                 parameter_rec['w1'].append(network[-2].weight.cpu().numpy())
                 parameter_rec['w1_rec'].append(network[-2].weight_rec.clone().detach().cpu().numpy())
                 parameter_rec['w2'].append(network[-1].weight.clone().detach().cpu().numpy())
@@ -284,13 +289,24 @@ def main(args):
                 fig10,axis10 = plt.subplots(nrows = 1, ncols = 1)
                 fig11,axis11 = plt.subplots(nrows = 1, ncols = 1)
                 fig12,axis12 = plt.subplots(nrows = 1, ncols = 1)
+                fig13,axis13 = plt.subplots(nrows = 1, ncols = 1)
+                fig14,axis14 = plt.subplots(nrows = 1, ncols = 1)
+                fig15,axis15 = plt.subplots(nrows = 1, ncols = 1)
+                fig16,axis16 = plt.subplots(nrows = 1, ncols = 1)
+                fig17,axis17 = plt.subplots(nrows = 1, ncols = 1)
+                fig18,axis18 = plt.subplots(nrows = 1, ncols = 1)
                 axis7.plot(np.array(parameter_rec['a']))
                 axis8.plot(np.array(parameter_rec['A1']))    		
                 axis9.plot(np.array(parameter_rec['A2']))
                 axis10.plot(np.array(parameter_rec['w1'])[:,:,0])
                 axis11.plot(np.array(parameter_rec['w1_rec'])[:,:,0])
                 axis12.plot(np.array(parameter_rec['w2'])[:,:,0])
-
+                axis13.plot(np.array(parameter_rec['b']))
+                axis14.plot(np.array(parameter_rec['G']))
+                axis15.plot(np.array(parameter_rec['k1']))
+                axis16.plot(np.array(parameter_rec['k2']))
+                axis17.plot(np.array(parameter_rec['R1']))
+                axis18.plot(np.array(parameter_rec['R2']))
                 ###########################################
                 ##                Logging                ##
                 ###########################################
@@ -311,6 +327,13 @@ def main(args):
                 writer.add_figure("w1", fig10, global_step=e)
                 writer.add_figure("w1_rec", fig11, global_step=e)
                 writer.add_figure("w2", fig12, global_step=e)
+                writer.add_figure("b", fig13, global_step=e)
+                writer.add_figure("G", fig14, global_step=e)
+                writer.add_figure("k1", fig15, global_step=e)
+                writer.add_figure("k2", fig16, global_step=e)
+                writer.add_figure("R1", fig17, global_step=e)
+                writer.add_figure("R2", fig18, global_step=e)
+
         pbar.set_postfix_str(
             "Train accuracy: "
             + str(np.round(accs_hist[0][-1] * 100, 2))
