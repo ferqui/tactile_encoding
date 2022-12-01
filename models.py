@@ -68,7 +68,7 @@ class Encoder(nn.Module):
 class MN_neuron_IT(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
-    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50,k1=200,k2 = 20, gain = 1, train=True):
+    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50,k1=200,k2 = 20, gain = 1, train=True,dt = 1/1000):
         super(MN_neuron_IT, self).__init__()
 
         # One-to-one synapse
@@ -92,7 +92,7 @@ class MN_neuron_IT(nn.Module):
         self.k1 = 200  # units of 1/s
         self.k2 = 20  # units of 1/s
 
-        self.dt = 1 / 1000
+        self.dt = dt
 
         # self.a = nn.Parameter(torch.tensor(a), requires_grad=True)
         one2N_matrix = torch.ones(1,self.fanout,self.channels, 1) # shape: 1 (single neuron) x fanout x channels x 1)

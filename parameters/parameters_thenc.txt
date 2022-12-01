@@ -1,6 +1,6 @@
 scale 5
 time_bin_size 1
-nb_input_copies 32
+nb_input_copies 1
 tau_mem 0.02
 tau_ratio 2
 fwd_weight_scale 1
@@ -10,7 +10,7 @@ reg_neurons 0.000001
 learningRate 0.01
 nb_epochs 300
 n_param_values 10
-batch_size 100
+batch_size 1000
 rank_NMF 10
 min_range -1000
 max_range 1000
