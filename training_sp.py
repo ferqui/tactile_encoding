@@ -95,10 +95,10 @@ def main(args):
     a = nn.Parameter(torch.Tensor([a]), requires_grad=True)
     print('a',a)
 
-    A1 = nn.Parameter(torch.Tensor([A1]), requires_grad=False)
-    A2 = nn.Parameter(torch.Tensor([A2]), requires_grad=False)
-    b = nn.Parameter(torch.Tensor([b]), requires_grad=True)
-    G = nn.Parameter(torch.Tensor([G]), requires_grad=True)
+    A1 = nn.Parameter(torch.Tensor([A1]), requires_grad=True)
+    A2 = nn.Parameter(torch.Tensor([A2]), requires_grad=True)
+    b = nn.Parameter(torch.Tensor([b]), requires_grad=False)
+    G = nn.Parameter(torch.Tensor([G]), requires_grad=False)
     k1 = nn.Parameter(torch.Tensor([k1]), requires_grad=False)
     k2 = nn.Parameter(torch.Tensor([k2]), requires_grad=False)
     R1 = nn.Parameter(torch.Tensor([R1]), requires_grad=False)
@@ -143,8 +143,13 @@ def main(args):
     ##               Training                ##
     ###########################################
     batch_size = 128
-
-    optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
+    my_list = ['2.', '3.']
+    weight_params = [kv[1] for kv in
+                     filter(lambda kv: any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
+    neuron_params = [kv[1] for kv in
+                     filter(lambda kv: not any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
+    optimizer = torch.optim.Adamax([{'params': weight_params},{'params': neuron_params,'lr': 0.05}], lr=0.005, betas=(0.9, 0.995))
+    # optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
 
     # The log softmax function across output units
     log_softmax_fn = nn.LogSoftmax(dim=1)
@@ -155,7 +160,7 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="")  # For logging purpose
+        writer = SummaryWriter(comment="training_with_lr_aA1A2")  # For logging purpose
 
     dl_train = DataLoader(
         ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
