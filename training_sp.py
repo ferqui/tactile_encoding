@@ -54,7 +54,7 @@ def main(args):
     nb_outputs = len(np.unique(labels))
 
     # Learning parameters
-    nb_epochs = 150
+    nb_epochs = 300
 
     # Neuron parameters
     tau_mem = args.tau_mem  # ms
@@ -82,8 +82,11 @@ def main(args):
     # nn.init.normal_(
     #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
+    # a = -40
     a = 5
+    # A1 = 1.1
     A1 = 0
+    # A2 = -1
     A2 = 0
     b = 10
     G = 50
@@ -144,13 +147,21 @@ def main(args):
     ###########################################
     batch_size = 128
     my_list = ['2.', '3.']
+    custom_lr = {'a': 1.1,'A1':0.1,'A2':0.011}
     weight_params = [kv[1] for kv in
                      filter(lambda kv: any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
+    param_list = [{'params':weight_params}]
+    for param in custom_lr:
+        custom_param = [kv[1] for kv in
+                         filter(lambda kv: any([ele for ele in [param] if (ele in kv[0])]),
+                                network.named_parameters())]
+        param_list.append({'params':custom_param,'lr' : custom_lr[param]})
     neuron_params = [kv[1] for kv in
                      filter(lambda kv: not any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
-    optimizer = torch.optim.Adamax([{'params': weight_params},{'params': neuron_params,'lr': 0.05}], lr=0.005, betas=(0.9, 0.995))
+    optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
     # optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
-
+    optimizer = torch.optim.Adamax([{'params': weight_params}, {'params': neuron_params, 'lr': 0.05}], lr=0.005,
+                                   betas=(0.9, 0.995))
     # The log softmax function across output units
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
@@ -160,13 +171,13 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="training_with_lr_aA1A2")  # For logging purpose
+        writer = SummaryWriter(comment="training_hetero_aA1A2_0.05")  # For logging purpose
 
     dl_train = DataLoader(
-        ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        ds_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
     )
     dl_test = DataLoader(
-        ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        ds_test, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
     )
     pbar = trange(nb_epochs)
     parameter_rec = {'a': [], 'A1':[], 'A2':[],'b':[], 'G':[], 'k1':[], 'k2':[],'R1':[], 'R2':[],'w1':[],'w1_rec':[],'w2':[]}
@@ -264,54 +275,18 @@ def main(args):
             ttc_hist.append(test_ttc)
 
             if args.log:
-                parameter_rec['a'].append(a.clone().detach().cpu().numpy())
-
-                parameter_rec['A1'].append(A1.clone().detach().cpu().numpy())
-                parameter_rec['A2'].append(A2.clone().detach().cpu().numpy())
-                parameter_rec['b'].append(b.clone().detach().cpu().numpy())
-                parameter_rec['G'].append(G.clone().detach().cpu().numpy())
-                parameter_rec['k1'].append(k1.clone().detach().cpu().numpy())
-                parameter_rec['k2'].append(k2.clone().detach().cpu().numpy())
-                parameter_rec['R1'].append(R1.clone().detach().cpu().numpy())
-                parameter_rec['R2'].append(R2.clone().detach().cpu().numpy())
-                parameter_rec['w1'].append(network[-2].weight.cpu().numpy())
-                parameter_rec['w1_rec'].append(network[-2].weight_rec.clone().detach().cpu().numpy())
-                parameter_rec['w2'].append(network[-1].weight.clone().detach().cpu().numpy())
                 ###########################################
                 ##               Plotting                ##
                 ###########################################
 
-                fig1 = plot_spikes(mn_spk.cpu())
-                fig2 = plot_spikes(lif1_spk.cpu())
-                fig3 = plot_spikes(lif2_spk.cpu())
+                # fig1 = plot_spikes(mn_spk.cpu())
+                # fig2 = plot_spikes(lif1_spk.cpu())
+                # fig3 = plot_spikes(lif2_spk.cpu())
+                #
+                # fig4 = plot_voltages(mn_mem.cpu())
+                # fig5 = plot_voltages(lif1_mem.cpu())
+                # fig6 = plot_voltages(lif2_mem.cpu())
 
-                fig4 = plot_voltages(mn_mem.cpu())
-                fig5 = plot_voltages(lif1_mem.cpu())
-                fig6 = plot_voltages(lif2_mem.cpu())
-                fig7,axis7 = plt.subplots(nrows = 1, ncols = 1)
-                fig8,axis8 = plt.subplots(nrows = 1, ncols = 1)
-                fig9,axis9 = plt.subplots(nrows = 1, ncols = 1)
-                fig10,axis10 = plt.subplots(nrows = 1, ncols = 1)
-                fig11,axis11 = plt.subplots(nrows = 1, ncols = 1)
-                fig12,axis12 = plt.subplots(nrows = 1, ncols = 1)
-                fig13,axis13 = plt.subplots(nrows = 1, ncols = 1)
-                fig14,axis14 = plt.subplots(nrows = 1, ncols = 1)
-                fig15,axis15 = plt.subplots(nrows = 1, ncols = 1)
-                fig16,axis16 = plt.subplots(nrows = 1, ncols = 1)
-                fig17,axis17 = plt.subplots(nrows = 1, ncols = 1)
-                fig18,axis18 = plt.subplots(nrows = 1, ncols = 1)
-                axis7.plot(np.array(parameter_rec['a']))
-                axis8.plot(np.array(parameter_rec['A1']))    		
-                axis9.plot(np.array(parameter_rec['A2']))
-                axis10.plot(np.array(parameter_rec['w1'])[:,:,0])
-                axis11.plot(np.array(parameter_rec['w1_rec'])[:,:,0])
-                axis12.plot(np.array(parameter_rec['w2'])[:,:,0])
-                axis13.plot(np.array(parameter_rec['b']))
-                axis14.plot(np.array(parameter_rec['G']))
-                axis15.plot(np.array(parameter_rec['k1']))
-                axis16.plot(np.array(parameter_rec['k2']))
-                axis17.plot(np.array(parameter_rec['R1']))
-                axis18.plot(np.array(parameter_rec['R2']))
                 ###########################################
                 ##                Logging                ##
                 ###########################################
@@ -320,24 +295,24 @@ def main(args):
                 writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
                 #writer.add_scalar("a", a, global_step=e)
                 writer.add_scalar("Loss", mean_loss, global_step=e)
-                writer.add_figure("MN spikes", fig1, global_step=e)
-                writer.add_figure("LIF1 spikes", fig2, global_step=e)
-                writer.add_figure("LIF2 spikes", fig3, global_step=e)
-                writer.add_figure("MN voltage", fig4, global_step=e)
-                writer.add_figure("LIF1 voltage", fig5, global_step=e)
-                writer.add_figure("LIF2 voltage", fig6, global_step=e)
-                writer.add_figure("a", fig7, global_step=e)
-                writer.add_figure("A1", fig8, global_step=e)
-                writer.add_figure("A2", fig9, global_step=e)
-                writer.add_figure("w1", fig10, global_step=e)
-                writer.add_figure("w1_rec", fig11, global_step=e)
-                writer.add_figure("w2", fig12, global_step=e)
-                writer.add_figure("b", fig13, global_step=e)
-                writer.add_figure("G", fig14, global_step=e)
-                writer.add_figure("k1", fig15, global_step=e)
-                writer.add_figure("k2", fig16, global_step=e)
-                writer.add_figure("R1", fig17, global_step=e)
-                writer.add_figure("R2", fig18, global_step=e)
+                writer.add_scalar("a",a,global_step=e)
+                # writer.add_figure("MN spikes", fig1, global_step=e)
+                # writer.add_figure("LIF1 spikes", fig2, global_step=e)
+                # writer.add_figure("LIF2 spikes", fig3, global_step=e)
+                # writer.add_figure("MN voltage", fig4, global_step=e)
+                # writer.add_figure("LIF1 voltage", fig5, global_step=e)
+                # writer.add_figure("LIF2 voltage", fig6, global_step=e)
+                writer.add_scalar("A1", A1, global_step=e)
+                writer.add_scalar("A2", A2, global_step=e)
+                writer.add_histogram("w1", network[-2].weight, global_step=e)
+                writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
+                writer.add_histogram("w2", network[-1].weight, global_step=e)
+                writer.add_scalar("b", b, global_step=e)
+                writer.add_scalar("G", G, global_step=e)
+                writer.add_scalar("k1", k1, global_step=e)
+                writer.add_scalar("k2", k2, global_step=e)
+                writer.add_scalar("R1", R1, global_step=e)
+                writer.add_scalar("R2", R2, global_step=e)
 
         pbar.set_postfix_str(
             "Train accuracy: "
