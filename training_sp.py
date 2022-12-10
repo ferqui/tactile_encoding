@@ -83,11 +83,11 @@ def main(args):
     #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
 
     # a = -40
-    a = 5
+    a_ini = 5
     # A1 = 1.1
-    A1 = 0
+    A1_ini = 0
     # A2 = -1
-    A2 = 0
+    A2_ini = 0
     b = 10
     G = 50
     k1 = 200
@@ -95,11 +95,21 @@ def main(args):
     R1 = 0
     R2 = 1
     C = 1
-    a = nn.Parameter(torch.Tensor([a]), requires_grad=True)
-    print('a',a)
-
-    A1 = nn.Parameter(torch.Tensor([A1]), requires_grad=True)
-    A2 = nn.Parameter(torch.Tensor([A2]), requires_grad=True)
+    if args.shared_params:
+        a = nn.Parameter(torch.Tensor([a_ini]), requires_grad=True)
+    else:
+        a = nn.Parameter(torch.Tensor(nb_inputs), requires_grad=True)
+        a.data.uniform_(a_ini*0.9,a_ini*1.1)
+    if args.shared_params:
+        A1 = nn.Parameter(torch.Tensor([A1_ini]), requires_grad=True)
+    else:
+        A1 = nn.Parameter(torch.Tensor(nb_inputs), requires_grad=True)
+        A1.data.uniform_(A1_ini*0.9,A1_ini*1.1)
+    if args.shared_params:
+        A2 = nn.Parameter(torch.Tensor([A2_ini]), requires_grad=True)
+    else:
+        A2 = nn.Parameter(torch.Tensor(nb_inputs), requires_grad=True)
+        A2.data.uniform_(A2_ini * 0.9, A2_ini * 1.1)
     b = nn.Parameter(torch.Tensor([b]), requires_grad=False)
     G = nn.Parameter(torch.Tensor([G]), requires_grad=False)
     k1 = nn.Parameter(torch.Tensor([k1]), requires_grad=False)
@@ -295,15 +305,23 @@ def main(args):
                 writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
                 #writer.add_scalar("a", a, global_step=e)
                 writer.add_scalar("Loss", mean_loss, global_step=e)
-                writer.add_scalar("a",a,global_step=e)
+                if args.shared_params:
+                    writer.add_scalar("a",a,global_step=e)
+                    writer.add_scalar("A1", A1, global_step=e)
+                    writer.add_scalar("A2", A2, global_step=e)
+
+                else:
+                    writer.add_histogram("a",a, global_step= e)
+                    writer.add_histogram("A1",A1, global_step= e)
+                    writer.add_histogram("A2",A2, global_step= e)
+
+
                 # writer.add_figure("MN spikes", fig1, global_step=e)
                 # writer.add_figure("LIF1 spikes", fig2, global_step=e)
                 # writer.add_figure("LIF2 spikes", fig3, global_step=e)
                 # writer.add_figure("MN voltage", fig4, global_step=e)
                 # writer.add_figure("LIF1 voltage", fig5, global_step=e)
                 # writer.add_figure("LIF2 voltage", fig6, global_step=e)
-                writer.add_scalar("A1", A1, global_step=e)
-                writer.add_scalar("A2", A2, global_step=e)
                 writer.add_histogram("w1", network[-2].weight, global_step=e)
                 writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
                 writer.add_histogram("w2", network[-1].weight, global_step=e)
@@ -374,6 +392,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reg_neurons", type=float, default=0.000001, help="reg_neurons"
     )
+    parser.add_argument("--shared_params",action="store_true", help="Train a single shared params set between neurons")
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
