@@ -37749,3 +37749,8 @@ Epoch 32/100 done. Train accuracy: 14.64%, Test accuracy: 10.77%, Loss: 3.31533.
 Epoch 33/100 done. Train accuracy: 15.12%, Test accuracy: 11.65%, Loss: 3.27563.
 Epoch 34/100 done. Train accuracy: 15.89%, Test accuracy: 11.00%, Loss: 3.24089.
 Epoch 35/100 done. Train accuracy: 15.98%, Test accuracy: 11.03%, Loss: 3.23087.
+Epoch 36/100 done. Train accuracy: 16.29%, Test accuracy: 10.97%, Loss: 3.23051.
+Epoch 37/100 done. Train accuracy: 16.51%, Test accuracy: 11.33%, Loss: 3.21492.
+Epoch 38/100 done. Train accuracy: 15.82%, Test accuracy: 11.72%, Loss: 3.21909.
+Epoch 39/100 done. Train accuracy: 15.98%, Test accuracy: 11.18%, Loss: 3.19156.
+Epoch 40/100 done. Train accuracy: 17.06%, Test accuracy: 11.79%, Loss: 3.17401.
