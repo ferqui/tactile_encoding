@@ -43,7 +43,7 @@ lr = 0.0001
 
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
-P = 10  # number of individuals in populations
+P = 25  # number of individuals in populations
 # set the number of epochs you want to train the network
 epochs = 100  # default = 300
 save_fig = True  # set True to save the plots
@@ -889,13 +889,15 @@ x_train_test, x_validation, y_train_test, y_validation = train_test_split(
 logging.info("Finished data prepartion.\n")
 # linear decrease
 
-def calc_sigma(sigma_start, sigma_stop, generations, x):
-    sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
-    return sigma
+# def calc_sigma(sigma_start, sigma_stop, generations, x):
+#     sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
+#     return sigma
 
+def calc_sigma(generations, x):
+    return 1-(1/(1+np.exp(-x+(generations/2))))
 
 logging.info("Starting optimization.")
-# TODO inlcude a first split to have the validation set
+
 # TODO define another end criterion (saturation in accuracy for n runs?)
 # iterate over generataions
 for generation in range(generations):
@@ -992,7 +994,8 @@ for generation in range(generations):
     if generation < generations-1:
         # calc sigma to reduce searchspace over generations
         # start at 100% and end at 1% of search space
-        sigma = calc_sigma(1.0, 0.01, generations, generation)
+        # sigma = calc_sigma(1.0, 0.01, generations, generation)
+        sigma = calc_sigma(generations, generation)
 
         # create next generation
         best_individual_dict = population_list[best_individual]
