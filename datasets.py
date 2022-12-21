@@ -58,6 +58,82 @@ def load_analog_data(file_name, upsample_fac, specify_letters = []):
 
     return ds_train, ds_test, labels, selected_chans, data_steps
 
+letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+           'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+dtype = torch.float
+
+def load_and_extract_events(params, file_name, ratios=[0.8, 0, 0.2], taxels=None, letter_written=letters):
+    if np.sum(ratios) != 1:
+        raise ValueError('Check the correct ratios are used: got sum > 1')
+
+    # max_time = int(54*25) #ms
+    max_time = int(350 * 10)  # ms
+    time_bin_size = int(params['time_bin_size'])  # ms
+    global time
+    time = range(0, max_time, time_bin_size)
+    # Increase max_time to make sure no timestep is cut due to fractional amount of steps
+    global time_step
+    time_step = time_bin_size * 0.001
+    data_steps = len(time)
+
+    """
+    infile = open(file_name, 'rb')
+    data_dict = pickle.load(infile)
+    infile.close()
+    # Extract data
+    data = []
+    labels = []
+    bins = 1000  # [ms] 
+    nchan = len(data_dict[1]['events']) # number of channels/sensors
+    """
+    dataset = pd.read_pickle(file_name)
+    data_dict = dataset.copy()
+    data = []
+    labels = []
+    bins = 1000  # [ms]
+    nchan = len(data_dict['events'][1])  # number of channels/sensors
+    for i, sample in enumerate(data_dict['events']):
+        dat = (sample[:])
+        events_array = np.zeros([nchan, round((max_time / time_bin_size) + 0.5), 2])
+        for taxel in range(len(dat)):
+            for event_type in range(len(dat[taxel])):
+                if dat[taxel][event_type]:
+                    indx = bins * (np.array(dat[taxel][event_type]))
+                    indx = np.array((indx / time_bin_size).round(), dtype=int)
+                    events_array[taxel, indx, event_type] = 1
+        if taxels != None:
+            events_array = np.reshape(np.transpose(events_array, (1, 0, 2))[:, taxels, :], (events_array.shape[1], -1))
+            selected_chans = 2 * len(taxels)
+        else:
+            events_array = np.reshape(np.transpose(events_array, (1, 0, 2)), (events_array.shape[1], -1))
+            selected_chans = 2 * nchan
+        data.append(events_array)
+        labels.append(letter_written.index(data_dict['letter'][i]))
+
+    data = torch.tensor(data, dtype=dtype)
+    labels = torch.tensor(labels, dtype=torch.long)
+
+    train, val, test = ratios
+
+    if val > 0:
+        split_1 = 1 - train
+        split_2 = 1 - val / (val + test)
+        x_train, x_valtest, y_train, y_valtest = train_test_split(data, labels, test_size=split_1, shuffle=True,
+                                                                  stratify=labels, random_state=42)
+        x_val, x_test, y_val, y_test = train_test_split(x_valtest, y_valtest, test_size=split_2, shuffle=True,
+                                                        stratify=y_valtest, random_state=42)
+        ds_train = TensorDataset(x_train, y_train)
+        ds_val = TensorDataset(x_val, y_val)
+        ds_test = TensorDataset(x_test, y_test)
+    else:
+        x_train, x_test, y_train, y_test = train_test_split(data, labels, test_size=test, shuffle=True, stratify=labels,
+                                                            random_state=42)
+        ds_train = TensorDataset(x_train, y_train)
+        ds_val = []
+        ds_test = TensorDataset(x_test, y_test)
+
+    return ds_train, ds_val, ds_test, labels, selected_chans, data_steps
+
 def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False, specify_letters = []):
     '''
     Load the tactile Braille data.
