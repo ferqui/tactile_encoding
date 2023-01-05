@@ -36,8 +36,8 @@ def main(args):
     ###########################################
     upsample_fac = 1
     dt = (1 / 100.0) / upsample_fac
-    file_name = "data/data_braille_letters_all.pkl"
-    data, labels, _, _, _, _ = load_data(file_name, upsample_fac)
+    # file_name = "data/data_braille_letters_all.pkl"
+    data, labels, _, _, _, _ = load_data(args.data_path, upsample_fac)
     nb_channels = data.shape[-1]
 
     x_train, x_test, y_train, y_test = train_test_split(
@@ -134,7 +134,7 @@ def main(args):
     else:
         for param in dict_param:
             dict_param[param]['param'] = nn.Parameter(torch.Tensor(nb_inputs), requires_grad= dict_param[param]['train'])
-            dict_param[param]['param'].data.uniform_(torch.Tensor([dict_param[param]['ini']] * 0.9), torch.Tensor([dict_param[param]['ini']] * 1.1))
+            dict_param[param]['param'].data.uniform_(dict_param[param]['ini'] * 0.9, dict_param[param]['ini'] * 1.1)
     # torch.autograd.set_detect_anomaly(True)
     network = nn.Sequential(
         Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
@@ -202,7 +202,7 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="training_hetero_aA1A2_0.05")  # For logging purpose
+        writer = SummaryWriter(comment="MN_training")  # For logging purpose
         # hparams_sim = {}
         # for param in dict_param:
         #     for element in dict_param[param]:
@@ -353,6 +353,7 @@ def main(args):
     if args.log:
         args_dict = args.__dict__
         args_dict.pop("log")
+        args_dict.pop("data_path")
         for param in dict_param:
             for element in dict_param[param]:
                 if (element in ['ini','train','custom_lr']) & (dict_param[param][element] != None):
@@ -398,6 +399,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fwd_weight_scale", type=float, default=1, help="fwd_weight_scale."
     )
+
+    parser.add_argument("--data_path",type=str,default="data/data_braille_letters_all.pkl",help='The path where the '
+                                                                                                'dataset can be found')
+
     parser.add_argument(
         "--weight_scale_factor", type=float, default=0.01, help="weight_scale_factor"
     )
