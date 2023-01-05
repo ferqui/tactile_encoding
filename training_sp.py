@@ -124,6 +124,7 @@ def main(args):
          'custom_lr': None
          }
     }
+
     C = 1
     print(dict_param)
 
@@ -188,8 +189,6 @@ def main(args):
                          filter(lambda kv: any([ele for ele in [param] if (ele in kv[0])]),
                                 network.named_parameters())]
         param_list.append({'params':custom_param,'lr' : dict_param[param]['custom_lr']})
-    neuron_params = [kv[1] for kv in
-                     filter(lambda kv: not any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
     optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
     # optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
     # optimizer = torch.optim.Adamax([{'params': weight_params}, {'params': neuron_params, 'lr': 0.05}], lr=0.005,
@@ -204,7 +203,12 @@ def main(args):
 
     if args.log:
         writer = SummaryWriter(comment="training_hetero_aA1A2_0.05")  # For logging purpose
-
+        # hparams_sim = {}
+        # for param in dict_param:
+        #     for element in dict_param[param]:
+        #         if (element in ['ini','train','custom_lr']) & (dict_param[param][element] != None):
+        #             hparams_sim["hparams/"+param+"/"+element] = dict_param[param][element]
+        # writer.add_hparams(hparams_sim,hparams_sim)
     dl_train = DataLoader(
         ds_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
     )
@@ -349,6 +353,10 @@ def main(args):
     if args.log:
         args_dict = args.__dict__
         args_dict.pop("log")
+        for param in dict_param:
+            for element in dict_param[param]:
+                if (element in ['ini','train','custom_lr']) & (dict_param[param][element] != None):
+                    args_dict[param+"_"+element] = dict_param[param][element]
         writer.add_hparams(
             args_dict,
             {
