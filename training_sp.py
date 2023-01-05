@@ -70,58 +70,88 @@ def main(args):
     ##                Network                ##
     ###########################################
 
-    # a = torch.empty((nb_inputs,))
-    # nn.init.normal_(
-    #     a, mean=MNparams_dict[INIT_MODE][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
-
-    # A1 = torch.empty((nb_inputs,))
-    # nn.init.normal_(
-    #     A1, mean=MNparams_dict[INIT_MODE][1], std=fwd_weight_scale / np.sqrt(nb_inputs))
-
-    # A2 = torch.empty((nb_inputs,))
-    # nn.init.normal_(
-    #     A2, mean=MNparams_dict[INIT_MODE][2], std=fwd_weight_scale / np.sqrt(nb_inputs))
-
-    # a = -40
-    a_ini = 5
-    # A1 = 1.1
-    A1_ini = 0
-    # A2 = -1
-    A2_ini = 0
-    b = 10
-    G = 50
-    k1 = 200
-    k2 = 20
-    R1 = 0
-    R2 = 1
+    dict_param = {
+        'a':{
+             'ini':5,
+             'train':True,
+             'custom_lr':1.1
+             },
+        'A1':
+            {'ini': 0,
+             'train': True,
+             'custom_lr': 0.1
+             },
+        'A2':
+            {
+            'ini': 0,
+             'train': True,
+             'custom_lr': 0.011
+             },
+        'b':
+            {
+             'ini':10,
+             'train':True,
+             'custom_lr':0.005
+             },
+        'G':
+          {
+         'ini': 50,
+         'train': True,
+         'custom_lr': 0.005
+         },
+        'k1':
+        {
+         'ini': 200,
+         'train': False,
+         'custom_lr': None
+        },
+        'k2':
+        {
+         'ini': 20,
+         'train': False,
+         'custom_lr': None
+        },
+        'R1':
+        {
+         'ini': 0,
+         'train': False,
+         'custom_lr': None
+         },
+        'R2':
+        {
+         'ini': 1,
+         'train': False,
+         'custom_lr': None
+         }
+    }
     C = 1
+    print(dict_param)
+
     if args.shared_params:
-        a = nn.Parameter(torch.Tensor([a_ini]), requires_grad=True)
+        for param in dict_param:
+            dict_param[param]['param'] = nn.Parameter(torch.Tensor([dict_param[param]['ini']]), requires_grad=dict_param[param]['train'])
     else:
-        a = nn.Parameter(torch.Tensor(nb_inputs), requires_grad=True)
-        a.data.uniform_(a_ini*0.9,a_ini*1.1)
-    if args.shared_params:
-        A1 = nn.Parameter(torch.Tensor([A1_ini]), requires_grad=True)
-    else:
-        A1 = nn.Parameter(torch.Tensor(nb_inputs), requires_grad=True)
-        A1.data.uniform_(A1_ini*0.9,A1_ini*1.1)
-    if args.shared_params:
-        A2 = nn.Parameter(torch.Tensor([A2_ini]), requires_grad=True)
-    else:
-        A2 = nn.Parameter(torch.Tensor(nb_inputs), requires_grad=True)
-        A2.data.uniform_(A2_ini * 0.9, A2_ini * 1.1)
-    b = nn.Parameter(torch.Tensor([b]), requires_grad=False)
-    G = nn.Parameter(torch.Tensor([G]), requires_grad=False)
-    k1 = nn.Parameter(torch.Tensor([k1]), requires_grad=False)
-    k2 = nn.Parameter(torch.Tensor([k2]), requires_grad=False)
-    R1 = nn.Parameter(torch.Tensor([R1]), requires_grad=False)
-    R2 = nn.Parameter(torch.Tensor([R2]), requires_grad=False)
-    C = nn.Parameter(torch.Tensor([C]), requires_grad=False)
-    torch.autograd.set_detect_anomaly(True)
+        for param in dict_param:
+            dict_param[param]['param'] = nn.Parameter(torch.Tensor(nb_inputs), requires_grad= dict_param[param]['train'])
+            dict_param[param]['param'].data.uniform_(torch.Tensor([dict_param[param]['ini']] * 0.9), torch.Tensor([dict_param[param]['ini']] * 1.1))
+    # torch.autograd.set_detect_anomaly(True)
     network = nn.Sequential(
         Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
         MN_neuron_sp(
-            nb_inputs, firing_mode_dict[args.firing_mode], dt=dt, train=args.train, a = a, A1 = A1, A2 = A2,  b=b, G=G, k1=k1, k2=k2, R1=R1, R2=R2, C = C
+            nb_inputs,
+            firing_mode_dict[args.firing_mode],
+            dt=dt,
+            train=args.train,
+            a = dict_param['a']['param'],
+            A1 = dict_param['A1']['param'],
+            A2 = dict_param['A2']['param'],
+            b=dict_param['b']['param'],
+            G=dict_param['G']['param'],
+            k1=dict_param['k1']['param'],
+            k2=dict_param['k2']['param'],
+            R1=dict_param['R1']['param'],
+            R2=dict_param['R2']['param'],
+            C = C
         ),
         LIF_neuron(
             nb_inputs,
@@ -143,36 +173,28 @@ def main(args):
         ),
     ).to(device)
     print(network)
-    a.to(device)
-    A1.to(device)
-    A2.to(device)
-    b.to(device)
-    G.to(device)
-    k1.to(device)
-    k2.to(device)
-    R1.to(device)
-    R2.to(device)
+    for param in dict_param:
+        dict_param[param]['param'].to(device)
     ###########################################
     ##               Training                ##
     ###########################################
     batch_size = 128
     my_list = ['2.', '3.']
-    custom_lr = {'a': 1.1,'A1':0.1,'A2':0.011}
     weight_params = [kv[1] for kv in
                      filter(lambda kv: any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
     param_list = [{'params':weight_params}]
-    for param in custom_lr:
+    for param in dict_param:
         custom_param = [kv[1] for kv in
                          filter(lambda kv: any([ele for ele in [param] if (ele in kv[0])]),
                                 network.named_parameters())]
-        param_list.append({'params':custom_param,'lr' : custom_lr[param]})
+        param_list.append({'params':custom_param,'lr' : dict_param[param]['custom_lr']})
     neuron_params = [kv[1] for kv in
                      filter(lambda kv: not any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
     optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
     # optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
-    optimizer = torch.optim.Adamax([{'params': weight_params}, {'params': neuron_params, 'lr': 0.05}], lr=0.005,
-                                   betas=(0.9, 0.995))
-    # The log softmax function across output units
+    # optimizer = torch.optim.Adamax([{'params': weight_params}, {'params': neuron_params, 'lr': 0.05}], lr=0.005,
+    #                                betas=(0.9, 0.995))
+    # # The log softmax function across output units
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
@@ -190,7 +212,6 @@ def main(args):
         ds_test, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
     )
     pbar = trange(nb_epochs)
-    parameter_rec = {'a': [], 'A1':[], 'A2':[],'b':[], 'G':[], 'k1':[], 'k2':[],'R1':[], 'R2':[],'w1':[],'w1_rec':[],'w2':[]}
     for e in pbar:
         local_loss = []
         accs = []  # accs: mean training accuracies for each batch
@@ -306,31 +327,15 @@ def main(args):
                 #writer.add_scalar("a", a, global_step=e)
                 writer.add_scalar("Loss", mean_loss, global_step=e)
                 if args.shared_params:
-                    writer.add_scalar("a",a,global_step=e)
-                    writer.add_scalar("A1", A1, global_step=e)
-                    writer.add_scalar("A2", A2, global_step=e)
-
+                    for param in dict_param:
+                        writer.add_scalar(param,dict_param[param]['param'],global_step=e)
                 else:
-                    writer.add_histogram("a",a, global_step= e)
-                    writer.add_histogram("A1",A1, global_step= e)
-                    writer.add_histogram("A2",A2, global_step= e)
+                    for param in dict_param:
+                        writer.add_histogram(param, dict_param[param]['param'], global_step=e)
 
-
-                # writer.add_figure("MN spikes", fig1, global_step=e)
-                # writer.add_figure("LIF1 spikes", fig2, global_step=e)
-                # writer.add_figure("LIF2 spikes", fig3, global_step=e)
-                # writer.add_figure("MN voltage", fig4, global_step=e)
-                # writer.add_figure("LIF1 voltage", fig5, global_step=e)
-                # writer.add_figure("LIF2 voltage", fig6, global_step=e)
                 writer.add_histogram("w1", network[-2].weight, global_step=e)
                 writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
                 writer.add_histogram("w2", network[-1].weight, global_step=e)
-                writer.add_scalar("b", b, global_step=e)
-                writer.add_scalar("G", G, global_step=e)
-                writer.add_scalar("k1", k1, global_step=e)
-                writer.add_scalar("k2", k2, global_step=e)
-                writer.add_scalar("R1", R1, global_step=e)
-                writer.add_scalar("R2", R2, global_step=e)
 
         pbar.set_postfix_str(
             "Train accuracy: "
