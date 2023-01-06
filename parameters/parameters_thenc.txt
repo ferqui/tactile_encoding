@@ -1,4 +1,4 @@
-scale 10
+scale 5
 time_bin_size 1
 nb_input_copies 1
 tau_mem 0.02
