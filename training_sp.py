@@ -10,12 +10,19 @@ from tqdm import trange
 import numpy as np
 
 from datasets import load_data
+
 from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron_sp
 from auxiliary import compute_classification_accuracy, plot_spikes, plot_voltages
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import TensorDataset, DataLoader
+
+parameters_thenc = {}
+with open("parameters/parameters_thenc.txt") as f:
+    for line in f:
+        (key, val) = line.split()
+        parameters_thenc[key] = val
 
 firing_mode_dict = {
     "FA": {"a": 5, "A1": 0, "A2": 0},
@@ -26,6 +33,7 @@ firing_mode_dict = {
 
 def main(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
     if args.seed >= 0:
         torch.manual_seed(args.seed)
@@ -50,11 +58,11 @@ def main(args):
     # Network parameters
     nb_input_copies = args.expansion
     nb_inputs = nb_channels * nb_input_copies
-    nb_hidden = 450
+    nb_hidden = args.nb_hidden
     nb_outputs = len(np.unique(labels))
 
     # Learning parameters
-    nb_epochs = 300
+    nb_epochs = args.nb_epochs
 
     # Neuron parameters
     tau_mem = args.tau_mem  # ms
@@ -62,7 +70,6 @@ def main(args):
     alpha = float(np.exp(-dt / tau_syn))
     beta = float(np.exp(-dt / tau_mem))
 
-    encoder_weight_scale = 1.0
     fwd_weight_scale = args.fwd_weight_scale
     rec_weight_scale = args.weight_scale_factor * fwd_weight_scale
 
@@ -179,7 +186,7 @@ def main(args):
     ###########################################
     ##               Training                ##
     ###########################################
-    batch_size = 128
+    batch_size = args.batch_size
     my_list = ['2.', '3.']
     weight_params = [kv[1] for kv in
                      filter(lambda kv: any([ele for ele in my_list if (ele in kv[0])]), network.named_parameters())]
@@ -382,33 +389,45 @@ if __name__ == "__main__":
         choices=["FA", "SA", "MIX"],
         help="Choose between different firing modes",
     )
-    parser.add_argument("--norm", type=float, default=10.0, help="Data normalization")
+    parser.add_argument("--norm", type=float, default=parameters_thenc['scale'], help="Data normalization")
     parser.add_argument(
         "--upsample", type=float, default=1.0, help="Data upsample (default 100Hz)"
     )
     parser.add_argument(
         "--expansion",
         type=int,
-        default=1,
+        default=parameters_thenc['nb_input_copies'],
         help="Number of channel expansion (default: 1 (no expansion)).",
     )
     parser.add_argument(
-        "--tau_mem", type=float, default=0.02, help="Membrane time constant."
+        "--tau_mem", type=float, default=parameters_thenc['tau_mem'], help="Membrane time constant."
     )
-    parser.add_argument("--tau_ratio", type=float, default=2, help="Tau ratio.")
+    parser.add_argument("--tau_ratio", type=float, default=parameters_thenc['tau_ratio'], help="Tau ratio.")
     parser.add_argument(
-        "--fwd_weight_scale", type=float, default=1, help="fwd_weight_scale."
+        "--fwd_weight_scale", type=float, default=parameters_thenc['fwd_weight_scale'], help="fwd_weight_scale."
     )
 
     parser.add_argument("--data_path",type=str,default="data/data_braille_letters_all.pkl",help='The path where the '
                                                                                                 'dataset can be found')
 
     parser.add_argument(
-        "--weight_scale_factor", type=float, default=0.01, help="weight_scale_factor"
+        "--weight_scale_factor", type=float, default=parameters_thenc['weight_scale_factor'], help="weight_scale_factor"
     )
-    parser.add_argument("--reg_spikes", type=float, default=0.004, help="reg_spikes")
+    parser.add_argument("--reg_spikes", type=float, default=parameters_thenc['reg_spikes'], help="reg_spikes")
     parser.add_argument(
-        "--reg_neurons", type=float, default=0.000001, help="reg_neurons"
+        "--reg_neurons", type=float, default=parameters_thenc['reg_neurons'], help="reg_neurons"
+    )
+
+    parser.add_argument(
+        "--nb_epochs", type=int, default=parameters_thenc['nb_epochs'], help="number of epochs"
+    )
+
+    parser.add_argument(
+        "--batch_size", type=int, default=parameters_thenc['batch_size'], help="batch_size"
+    )
+
+    parser.add_argument(
+        "--nb_hidden", type=int, default=parameters_thenc['nb_hidden'], help="number of hidden neurons"
     )
     parser.add_argument("--shared_params",action="store_true", help="Train a single shared params set between neurons")
 
