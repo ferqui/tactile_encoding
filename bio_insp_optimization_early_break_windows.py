@@ -38,13 +38,13 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 128
+    batch_size = 512 # 128
     global lr
     lr = 0.0001
 
     # Init evolutionary algorithm
-    generations = 500  # number of generations to calculate
-    P = 50  # number of individuals in populations
+    generations = 50  # number of generations to calculate
+    P = 200  # number of individuals in populations
     # set the number of epochs you want to train the network
     epochs = 300  # default = 300
     save_fig = True  # set True to save the plots
@@ -332,16 +332,17 @@ def main():
                     else:
                         trace_counter += 1
                     if e >= patience:
-                        # stop traning if acc starts to drop of or test loss increasing
                         if np.mean(delta_test_acc_trace) < 0.0:
-                            logging.info('Breaking the training early, test acc dropped.')
+                            logging.info(f'\nBreaking the training early at episode {e}, test acc dropped.')
+                            break
+                        elif abs(np.mean(delta_test_acc_trace)) < 1.0:
+                            logging.info(f'\nBreaking the training early at episode {e}, test acc static.')
                             break
                         elif np.mean(delta_test_loss_trace) < 0.0:
-                            logging.info('Breaking the training early, test loss increasing.')
+                            logging.info(f'\nBreaking the training early at episode {e}, test loss increasing.')
                             break
-                        # stop training if mean delta test loss s static
-                        if abs(np.mean(delta_test_loss_trace)) < 1E-3:
-                            logging.info('Breaking the training early, test loss static.')
+                        elif abs(np.mean(delta_test_loss_trace)) < 1.0:
+                            logging.info(f'\nBreaking the training early at episode {e}, test loss static.')
                             break
 
             logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Test accuracy (loss): {:.2f}% ({:.5f}).".format(
@@ -939,7 +940,7 @@ def main():
 
 
     logging.info("________________________________________")
-    logging.info(f"Optimization settings\nIndividuals: {P}\nGenerations: {generations}\nEarly break: {True}\nPatence: {15}")
+    logging.info(f"Optimization settings\nIndividuals: {P}\nGenerations: {generations}\nEarly break: {True}\nPatience: {10}")
     logging.info("________________________________________")
     logging.info("Starting optimization.")
     # TODO inlcude a first split to have the validation set
@@ -988,7 +989,7 @@ def main():
             # calculate fitness
             # initialize and train network
             _, acc_hist, best_layers = build_and_train(
-                data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=15)
+                data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=10)
 
             # create validation set
             input = x_validation
