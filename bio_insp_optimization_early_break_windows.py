@@ -29,6 +29,7 @@ from sklearn.metrics import confusion_matrix
 
 from datasets import load_data
 
+
 def main():
     # Settings for the SNN
     global use_trainable_out
@@ -38,7 +39,7 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 512 # 128
+    batch_size = 512  # 128
     global lr
     lr = 0.0001
 
@@ -50,7 +51,7 @@ def main():
     save_fig = True  # set True to save the plots
 
     letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-            'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+               'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
     # create folder to safe results and plots
     path = './results'
@@ -102,7 +103,7 @@ def main():
 
         gpu_sel = 1
         gpu_av = [torch.cuda.is_available()
-                for ii in range(torch.cuda.device_count())]
+                  for ii in range(torch.cuda.device_count())]
         logging.info("Detected {} GPUs. The load will be shared.".format(
             torch.cuda.device_count()))
         for gpu in range(len(gpu_av)):
@@ -120,13 +121,13 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-            logging.info("Single GPU detected. Setting up the simulation there.")
+            logging.info(
+                "Single GPU detected. Setting up the simulation there.")
             device = torch.device("cuda:0")
             # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
         else:
             device = torch.device("cpu")
             logging.warning("No GPU detected. Running on CPU.")
-
 
     def run_snn(inputs, layers):
 
@@ -139,7 +140,8 @@ def main():
         else:
             w1, w2, v1 = layers
         if use_dropout:
-            dropout = nn.Dropout(p=0.25)  # using dropout on (n in %)/100 of spikes
+            # using dropout on (n in %)/100 of spikes
+            dropout = nn.Dropout(p=0.25)
         if use_trainable_tc:
             alpha1, beta1 = torch.abs(alpha1), torch.abs(beta1)
             alpha2, beta2 = torch.abs(alpha2), torch.abs(beta2)
@@ -182,7 +184,6 @@ def main():
 
         return s_out_rec, other_recs, layers_update
 
-
     def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, dataset_test=None, break_early=False, patience=None):
 
         if (opt_parameters != None) & (layers != None):
@@ -191,7 +192,8 @@ def main():
         elif (opt_parameters != None) & (layers == None):
             parameters = opt_parameters
             if use_trainable_out and use_trainable_tc:
-                layers = [w1, w2, v1, alpha1, beta1, alpha2, out_scale, out_offset]
+                layers = [w1, w2, v1, alpha1, beta1,
+                          alpha2, out_scale, out_offset]
             elif use_trainable_out:
                 layers = [w1, w2, v1, out_scale, out_offset]
             elif use_trainable_tc:
@@ -201,7 +203,7 @@ def main():
         elif (opt_parameters == None) & (layers != None):
             if use_trainable_out and use_trainable_tc:
                 layers = [w1, w2, v1, alpha1, beta1, alpha2,
-                        beta2, out_scale, out_offset]
+                          beta2, out_scale, out_offset]
             elif use_trainable_out:
                 layers = [w1, w2, v1, out_scale, out_offset]
             elif use_trainable_tc:
@@ -212,9 +214,9 @@ def main():
         elif (opt_parameters == None) & (layers == None):
             if use_trainable_out and use_trainable_tc:
                 parameters = [w1, w2, v1, alpha1, beta1, alpha2,
-                            beta2, out_scale, out_offset]
+                              beta2, out_scale, out_offset]
                 layers = [w1, w2, v1, alpha1, beta1, alpha2,
-                        beta2, out_scale, out_offset]
+                          beta2, out_scale, out_offset]
             elif use_trainable_out:
                 parameters = [w1, w2, v1, out_scale, out_offset]
                 layers = [w1, w2, v1, out_scale, out_offset]
@@ -235,20 +237,15 @@ def main():
         #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
         # windows only works wth num_workers=0
         generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                            num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
-
-        # set up for early break
-        if break_early:
-            delta_test_acc_trace = np.zeros(patience)
-            delta_test_loss_trace = np.zeros(patience)
-            trace_counter = 0
+                               num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
 
         # The optimization loop
         loss_hist = [[], []]
         accs_hist = [[], []]
         for e in range(nb_epochs):
             # learning rate decreases over epochs
-            optimizer = torch.optim.Adamax(parameters, lr=lr, betas=(0.9, 0.995))
+            optimizer = torch.optim.Adamax(
+                parameters, lr=lr, betas=(0.9, 0.995))
             # if e > nb_epochs*25:
             #     lr = lr * 0.98
             local_loss = []
@@ -322,34 +319,50 @@ def main():
                     for ii in layers_update:
                         best_acc_layers.append(ii.detach().clone())
 
-            # update trace for early break
-            if break_early:
-                if e >= 1:
-                    delta_test_acc_trace[trace_counter] = test_acc - accs_hist[1][-2] # if positive improvement
-                    delta_test_loss_trace[trace_counter] = loss_hist[1][-2] - test_loss # if positive improvement
-                    if trace_counter == patience-1:
-                        trace_counter = 0
-                    else:
-                        trace_counter += 1
-                    if e >= patience:
-                        if np.mean(delta_test_acc_trace) < 0.0:
-                            logging.info(f'\nBreaking the training early at episode {e}, test acc dropped.')
-                            break
-                        elif abs(np.mean(delta_test_acc_trace)) < 1.0:
-                            logging.info(f'\nBreaking the training early at episode {e}, test acc static.')
-                            break
-                        elif np.mean(delta_test_loss_trace) < 0.0:
-                            logging.info(f'\nBreaking the training early at episode {e}, test loss increasing.')
-                            break
-                        elif abs(np.mean(delta_test_loss_trace)) < 1.0:
-                            logging.info(f'\nBreaking the training early at episode {e}, test loss static.')
-                            break
-
             logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Test accuracy (loss): {:.2f}% ({:.5f}).".format(
                 e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
 
-        return loss_hist, accs_hist, best_acc_layers
+            # check for early break
+            if break_early:
+                if e >= patience-1:
+                    # mean acc drops
+                    if np.mean(np.diff(accs_hist[1][-patience:]))*100 < -1.0:
+                        logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                            np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
+                        logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                            np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                        logging.info(
+                            f'\nBreaking the training early at episode {e+1}, test acc dropped.')
+                        break
+                    # mean acc static
+                    elif abs(np.mean(np.diff(accs_hist[1][-patience:])))*100 < 1.0:
+                        logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                            np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
+                        logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                            np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                        logging.info(
+                            f'\nBreaking the training early at episode {e+1}, test acc static.')
+                        break
+                    # mean loss increases
+                    elif np.mean(np.diff(loss_hist[1][-patience:])*-1) < 0.0:
+                        logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                            np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
+                        logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                            np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                        logging.info(
+                            f'\nBreaking the training early at episode {e+1}, test loss increasing.')
+                        break
+                    # mean loss static
+                    elif abs(np.mean(np.diff(loss_hist[1][-patience:])*-1)) < 1.0:
+                        logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                            np.mean(np.diff(loss_hist[1][-patience:])*-1)*100, np.diff(loss_hist[1][-patience:])*-1*100))
+                        logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                            np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                        logging.info(
+                            f'\nBreaking the training early at episode {e+1}, test loss static.')
+                        break
 
+        return loss_hist, accs_hist, best_acc_layers
 
     def build_and_train(data_steps, ds_train, ds_test, epochs=epochs, break_early=False, patience=None):
 
@@ -420,7 +433,7 @@ def main():
 
         if use_trainable_out and use_trainable_tc:
             opt_parameters = [w1, w2, v1, alpha1, beta1,
-                            alpha2, beta2, out_scale, out_offset]
+                              alpha2, beta2, out_scale, out_offset]
         elif use_trainable_tc:
             opt_parameters = [w1, w2, v1, alpha1, beta1, alpha2, beta2]
         elif use_trainable_out:
@@ -457,14 +470,13 @@ def main():
             "------------------------------------------------------------------------------------\n")
         return loss_hist, accs_hist, best_layers
 
-
     def compute_classification_accuracy(dataset, layers=None):
         """ Computes classification accuracy on supplied data in batches. """
 
         # generator = DataLoader(dataset, batch_size=batch_size,
         #                     shuffle=False, num_workers=4, pin_memory=True)
         generator = DataLoader(dataset, batch_size=batch_size,
-                            shuffle=False, num_workers=0, pin_memory=True)
+                               shuffle=False, num_workers=0, pin_memory=True)
         accs = []
         losss = []
         # The log softmax function across output units
@@ -477,7 +489,7 @@ def main():
             if layers == None:
                 if use_trainable_out and use_trainable_tc:
                     layers = [w1, w2, v1, alpha1, beta1, alpha2,
-                            beta2, out_scale, out_offset]
+                              beta2, out_scale, out_offset]
                 elif use_trainable_out:
                     layers = [w1, w2, v1, out_scale, out_offset]
                 elif use_trainable_tc:
@@ -503,7 +515,6 @@ def main():
 
         return np.mean(accs), np.mean(losss)
 
-
     def ConfusionMatrix(dataset, save, layers=None, labels=letters):
 
         g = torch.Generator()
@@ -511,7 +522,7 @@ def main():
         # generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
         #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
         generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                            num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+                               num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
         accs = []
         trues = []
         preds = []
@@ -521,7 +532,7 @@ def main():
             if layers == None:
                 if use_trainable_out and use_trainable_tc:
                     layers = [w1, w2, v1, alpha1, beta1, alpha2,
-                            beta2, out_scale, out_offset]
+                              beta2, out_scale, out_offset]
                 elif use_trainable_out:
                     layers = [w1, w2, v1, out_scale, out_offset]
                 elif use_trainable_tc:
@@ -544,18 +555,18 @@ def main():
             preds.extend(am.detach().cpu().numpy())
 
         logging.info("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
-                                                                                * 100, np.std(accs)*100))
+                                                                                 * 100, np.std(accs)*100))
 
         cm = confusion_matrix(trues, preds, normalize='true')
         cm_df = pd.DataFrame(cm, index=[ii for ii in labels], columns=[
-                            jj for jj in labels])
+            jj for jj in labels])
         plt.figure("cm", figsize=(12, 9))
         sn.heatmap(cm_df,
-                annot=True,
-                fmt='.1g',
-                cbar=False,
-                square=False,
-                cmap="YlGnBu")
+                   annot=True,
+                   fmt='.1g',
+                   cbar=False,
+                   square=False,
+                   cmap="YlGnBu")
         plt.xlabel('\nPredicted')
         plt.ylabel('True\n')
         plt.xticks(rotation=0)
@@ -573,7 +584,6 @@ def main():
         else:
             plt.show()
 
-
     def NetworkActivity(dataset, save, layers=None, labels=letters):
 
         g = torch.Generator()
@@ -581,7 +591,7 @@ def main():
         # generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
         #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
         generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                            num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+                               num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
 
         accs = []
         trues = []
@@ -592,7 +602,7 @@ def main():
             if layers == None:
                 if use_trainable_out and use_trainable_tc:
                     layers = [w1, w2, v1, alpha1, beta1, alpha2,
-                            beta2, out_scale, out_offset]
+                              beta2, out_scale, out_offset]
                 elif use_trainable_out:
                     layers = [w1, w2, v1, out_scale, out_offset]
                 elif use_trainable_tc:
@@ -615,7 +625,7 @@ def main():
         for i in range(nb_plt):
             plt.subplot(gs[i])
             plt.imshow(spk_rec[i].detach().cpu().numpy().T,
-                    cmap=plt.cm.gray_r, origin="lower")
+                       cmap=plt.cm.gray_r, origin="lower")
             if i == 0:
                 plt.xlabel("Time")
                 plt.ylabel("Units")
@@ -638,7 +648,7 @@ def main():
         for i in range(nb_plt):
             plt.subplot(gs[i])
             plt.imshow(spks_out[i].detach().cpu().numpy().T,
-                    cmap=plt.cm.gray_r, origin="lower")
+                       cmap=plt.cm.gray_r, origin="lower")
             if i == 0:
                 plt.xlabel("Time")
                 plt.ylabel("Units")
@@ -656,7 +666,6 @@ def main():
             plt.close()
         else:
             plt.show()
-
 
     class SurrGradSpike(torch.autograd.Function):
         """
@@ -695,9 +704,7 @@ def main():
             grad = grad_input/(SurrGradSpike.scale*torch.abs(input)+1.0)**2
             return grad
 
-
     spike_fn = SurrGradSpike.apply
-
 
     class feedforward_layer:
         '''
@@ -706,16 +713,17 @@ def main():
         def create_layer(nb_inputs, nb_outputs, scale):
             ff_layer = torch.empty(
                 (nb_inputs, nb_outputs),  device=device, dtype=torch.float, requires_grad=True)
-            torch.nn.init.normal_(ff_layer, mean=0.0, std=scale/np.sqrt(nb_inputs))
+            torch.nn.init.normal_(ff_layer, mean=0.0,
+                                  std=scale/np.sqrt(nb_inputs))
             return ff_layer
 
         def compute_activity(nb_input, nb_neurons, input_activity, nb_steps):
             syn = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             out = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem_rec = []
             spk_rec = []
 
@@ -741,11 +749,11 @@ def main():
 
         def compute_activity_tc(nb_input, nb_neurons, input_activity, alpha, beta, nb_steps):
             syn = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             out = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem_rec = []
             spk_rec = []
 
@@ -769,7 +777,6 @@ def main():
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
 
-
     class recurrent_layer:
         '''
         class to initialize and compute spiking recurrent layer
@@ -778,28 +785,29 @@ def main():
             ff_layer = torch.empty(
                 (nb_inputs, nb_outputs),  device=device, dtype=torch.float, requires_grad=True)
             torch.nn.init.normal_(ff_layer, mean=0.0,
-                                std=fwd_scale/np.sqrt(nb_inputs))
+                                  std=fwd_scale/np.sqrt(nb_inputs))
 
             rec_layer = torch.empty(
                 (nb_outputs, nb_outputs),  device=device, dtype=torch.float, requires_grad=True)
             torch.nn.init.normal_(rec_layer, mean=0.0,
-                                std=rec_scale/np.sqrt(nb_inputs))
+                                  std=rec_scale/np.sqrt(nb_inputs))
             return ff_layer,  rec_layer
 
         def compute_activity(nb_input, nb_neurons, input_activity, layer, nb_steps):
             syn = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             out = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem_rec = []
             spk_rec = []
 
             # Compute recurrent layer activity
             for t in range(nb_steps):
                 # input activity plus last step output activity
-                h1 = input_activity[:, t] + torch.einsum("ab,bc->ac", (out, layer))
+                h1 = input_activity[:, t] + \
+                    torch.einsum("ab,bc->ac", (out, layer))
                 mthr = mem-1.0
                 out = spike_fn(mthr)
                 rst = out.detach()  # We do not want to backprop through the reset
@@ -820,18 +828,19 @@ def main():
 
         def compute_activity_tc(nb_input, nb_neurons, input_activity, layer, alpha, beta, nb_steps):
             syn = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             out = torch.zeros((nb_input, nb_neurons),
-                            device=device, dtype=torch.float)
+                              device=device, dtype=torch.float)
             mem_rec = []
             spk_rec = []
 
             # Compute recurrent layer activity
             for t in range(nb_steps):
                 # input activity plus last step output activity
-                h1 = input_activity[:, t] + torch.einsum("ab,bc->ac", (out, layer))
+                h1 = input_activity[:, t] + \
+                    torch.einsum("ab,bc->ac", (out, layer))
                 mthr = mem-1.0
                 out = spike_fn(mthr)
                 rst = out.detach()  # We do not want to backprop through the reset
@@ -850,7 +859,6 @@ def main():
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
 
-
     class trainable_time_constants:
         def create_time_constants(nb_neurons, alpha_mean, beta_mean, trainable):
             alpha = torch.empty((nb_neurons),  device=device,
@@ -859,11 +867,10 @@ def main():
                 alpha, mean=alpha_mean, std=alpha_mean/10)
 
             beta = torch.empty((nb_neurons),  device=device,
-                            dtype=torch.float, requires_grad=trainable)
+                               dtype=torch.float, requires_grad=trainable)
             torch.nn.init.normal_(
                 beta, mean=beta_mean, std=beta_mean/10)
             return alpha, beta
-
 
     # Init neuron model
     neuron_model = 'mn_neuron'  # iz_neuon, lif_neuron
@@ -917,6 +924,8 @@ def main():
                     np.diff((param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]))))
         population_list.append(individual)
 
+    patience = 10
+
     sampling_freq = 100.0  # Hz
     upsample_fac = 1.0  # 10.0
     frequ = sampling_freq * upsample_fac
@@ -938,9 +947,9 @@ def main():
         sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
         return sigma
 
-
     logging.info("________________________________________")
-    logging.info(f"Optimization settings\nIndividuals: {P}\nGenerations: {generations}\nEarly break: {True}\nPatience: {10}")
+    logging.info(
+        f"Optimization settings\nIndividuals: {P}\nGenerations: {generations}\nEarly break: {True}\nPatience: {patience}")
     logging.info("________________________________________")
     logging.info("Starting optimization.")
     # TODO inlcude a first split to have the validation set
@@ -989,7 +998,7 @@ def main():
             # calculate fitness
             # initialize and train network
             _, acc_hist, best_layers = build_and_train(
-                data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=10)
+                data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=patience)
 
             # create validation set
             input = x_validation
@@ -1004,9 +1013,9 @@ def main():
             output_s = torch.as_tensor(output_s, dtype=torch.float)
             ds_validation = TensorDataset(output_s, y_validation)
             test_acc, _ = compute_classification_accuracy(
-                    ds_validation,
-                    layers=best_layers
-                )
+                ds_validation,
+                layers=best_layers
+            )
             individual['fitness'] = max(acc_hist[1])*100
             individual['validation'] = test_acc
             if max(acc_hist[1]) > highest_fitness:
@@ -1016,7 +1025,8 @@ def main():
                 very_best_layer = best_layers
             elif max(acc_hist[1]) == highest_fitness:
                 # TODO use spike count second metric
-                logging.warning("Find a second metric to deside which is better")
+                logging.warning(
+                    "Find a second metric to deside which is better")
 
         # best individual
         logging.info("*******************************************")
@@ -1025,7 +1035,8 @@ def main():
 
         # TODO do not keep all data in memory, but just load, append, and dump
         # save record for postprocessing
-        record.append(population_list)  # check if slicing ([:]) is still needed
+        # check if slicing ([:]) is still needed
+        record.append(population_list)
         record.append(best_individual)
         # TODO create pandas df to dump
         with open(file_storage_path, 'wb') as f:
