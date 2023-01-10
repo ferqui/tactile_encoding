@@ -304,7 +304,7 @@ def main():
                     layers=layers_update
                 )
                 accs_hist[1].append(test_acc)  # only safe best test
-                loss_hist[1].append(test_loss)  # only safe best test
+                loss_hist[1].append(test_loss)  # only safe loss of best test
 
             if dataset_test is None:
                 # save best training

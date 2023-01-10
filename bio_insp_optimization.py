@@ -43,9 +43,12 @@ lr = 0.0001
 
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
-P = 25  # number of individuals in populations
+P = 100  # number of individuals in populations
+# init early break
+early_break = True
+patience = 10
 # set the number of epochs you want to train the network
-epochs = 100  # default = 300
+epochs = 300  # default = 300
 save_fig = True  # set True to save the plots
 
 letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
@@ -93,7 +96,7 @@ logging.getLogger().addHandler(logging.FileHandler(
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.INFO)
 
-logging.info("Data storage initialized.\n")
+logging.info(f"Data storage initialized. Will write to experiment_{idx_file_storage}.log.\n")
 
 # check for available GPU and distribute work
 if torch.cuda.device_count() > 1:
@@ -138,6 +141,7 @@ def run_snn(inputs, layers):
     else:
         w1, w2, v1 = layers
     if use_dropout:
+        # using dropout on (n in %)/100 of spikes bins
         dropout = nn.Dropout(p=0.25)  # using dropout on (n in %)/100 of spikes
     if use_trainable_tc:
         alpha1, beta1 = torch.abs(alpha1), torch.abs(beta1)
@@ -147,8 +151,7 @@ def run_snn(inputs, layers):
 
     h1 = torch.einsum(
         "abc,cd->abd", (inputs.tile((nb_input_copies,)), w1))
-    # h1 = torch.einsum(
-    #     "abc,cd->abd", (inputs, w1))
+
     if use_dropout:
         h1 = dropout(h1)
     if use_trainable_tc:
@@ -171,8 +174,6 @@ def run_snn(inputs, layers):
 
     if use_trainable_out:
         # trainable output spike scaling
-        # mean_firing_rate = torch.div(torch.sum(s_out_rec,1), s_out_rec.shape[1]) # mean firing rate
-        # s_out_rec = mean_firing_rate*layers[5] + layers[6]
         s_out_rec = torch.sum(s_out_rec, 1)*out_scale + \
             out_offset  # sum spikes
 
@@ -182,7 +183,7 @@ def run_snn(inputs, layers):
     return s_out_rec, other_recs, layers_update
 
 
-def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, dataset_test=None):
+def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, dataset_test=None, break_early=False, patience=None):
 
     if (opt_parameters != None) & (layers != None):
         parameters = opt_parameters  # The paramters we want to optimize
@@ -233,10 +234,8 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
     generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
                            num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
 
-    # torch.autograd.set_detect_anomaly(True)
-
     # The optimization loop
-    loss_hist = []
+    loss_hist = [[], []]
     accs_hist = [[], []]
     for e in range(nb_epochs):
         # learning rate decreases over epochs
@@ -286,7 +285,7 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
             accs.append(tmp)
 
         mean_loss = np.mean(local_loss)
-        loss_hist.append(mean_loss)
+        loss_hist[0].append(mean_loss)
 
         # mean_accs: mean training accuracy of current epoch (average over all batches)
         mean_accs = np.mean(accs)
@@ -294,11 +293,12 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
 
         # Calculate test accuracy in each epoch
         if dataset_test is not None:
-            test_acc = compute_classification_accuracy(
+            test_acc, test_loss = compute_classification_accuracy(
                 dataset_test,
                 layers=layers_update
             )
             accs_hist[1].append(test_acc)  # only safe best test
+            loss_hist[1].append(test_loss)  # only safe loss of best test
 
         if dataset_test is None:
             # save best training
@@ -313,13 +313,53 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
                 for ii in layers_update:
                     best_acc_layers.append(ii.detach().clone())
 
-        logging.info("Epoch {}/{} done. Train accuracy: {:.2f}%, Test accuracy: {:.2f}%, Loss: {:.5f}.".format(
-            e + 1, nb_epochs, accs_hist[0][-1]*100, accs_hist[1][-1]*100, loss_hist[-1]))
+        logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Test accuracy (loss): {:.2f}% ({:.5f}).".format(
+                e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
+
+        # check for early break
+        if break_early:
+            if e >= patience-1:
+                # mean acc drops
+                if np.mean(np.diff(accs_hist[1][-patience:]))*100 < -1.0:
+                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
+                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                    logging.info(
+                        f'\nBreaking the training early at episode {e+1}, test acc dropped.')
+                    break
+                # mean acc static
+                elif abs(np.mean(np.diff(accs_hist[1][-patience:])))*100 < 1.0:
+                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
+                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                    logging.info(
+                        f'\nBreaking the training early at episode {e+1}, test acc static.')
+                    break
+                # mean loss increases
+                elif np.mean(np.diff(loss_hist[1][-patience:])*-1) < 0.0:
+                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
+                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                    logging.info(
+                        f'\nBreaking the training early at episode {e+1}, test loss increasing.')
+                    break
+                # mean loss static
+                elif abs(np.mean(np.diff(loss_hist[1][-patience:])*-1)) < 1.0:
+                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        np.mean(np.diff(loss_hist[1][-patience:])*-1)*100, np.diff(loss_hist[1][-patience:])*-1*100))
+                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                    logging.info(
+                        f'\nBreaking the training early at episode {e+1}, test loss static.')
+                    break
 
     return loss_hist, accs_hist, best_acc_layers
 
 
-def build_and_train(data_steps, ds_train, ds_test, epochs=epochs):
+def build_and_train(data_steps, ds_train, ds_test, epochs=epochs, break_early=False, patience=None):
 
     global nb_input_copies
     # Num of spiking neurons used to encode each channel
@@ -398,7 +438,7 @@ def build_and_train(data_steps, ds_train, ds_test, epochs=epochs):
 
     # a fixed learning rate is already defined within the train function, that's why here it is omitted
     loss_hist, accs_hist, best_layers = train(
-        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test)
+        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test, break_early=False, patience=None)
 
     # best training and test at best training
     acc_best_train = np.max(accs_hist[0])  # returns max value
@@ -432,6 +472,10 @@ def compute_classification_accuracy(dataset, layers=None):
     generator = DataLoader(dataset, batch_size=batch_size,
                            shuffle=False, num_workers=4, pin_memory=True)
     accs = []
+    losss = []
+    # The log softmax function across output units
+    log_softmax_fn = nn.LogSoftmax(dim=1)
+    loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
     for x_local, y_local in generator:
         x_local, y_local = x_local.to(
@@ -455,11 +499,15 @@ def compute_classification_accuracy(dataset, layers=None):
         else:
             m = torch.sum(spks_out, 1)  # sum over time
         _, am = torch.max(m, 1)     # argmax over output units
+        # compute test loss
+        log_p_y = log_softmax_fn(m)
+        loss_val = loss_fn(log_p_y, y_local).detach().cpu().numpy()
+        losss.append(loss_val)
         # compare to labels
         tmp = np.mean((y_local == am).detach().cpu().numpy())
         accs.append(tmp)
 
-    return np.mean(accs)
+    return np.mean(accs), np.mean(losss)
 
 
 def ConfusionMatrix(dataset, save, layers=None, labels=letters):
@@ -889,13 +937,20 @@ x_train_test, x_validation, y_train_test, y_validation = train_test_split(
 logging.info("Finished data prepartion.\n")
 # linear decrease
 
-# def calc_sigma(sigma_start, sigma_stop, generations, x):
-#     sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
-#     return sigma
 
-def calc_sigma(generations, x):
+def calc_sigma_linear(sigma_start, sigma_stop, generations, x):
+    sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
+    return sigma
+
+
+def calc_sigma_sigmoid(generations, x):
     return 1-(1/(1+np.exp(-x+(generations/2))))
 
+
+logging.info("________________________________________")
+logging.info(
+    f"Optimization settings\nIndividuals: {P}\nGenerations: {generations}\nEarly break: {True}\nPatience: {patience}")
+logging.info("________________________________________")
 logging.info("Starting optimization.")
 
 # TODO define another end criterion (saturation in accuracy for n runs?)
@@ -942,8 +997,8 @@ for generation in range(generations):
 
         # calculate fitness
         # initialize and train network
-        loss_hist, acc_hist, best_layers = build_and_train(
-            data_steps, ds_train, ds_test, epochs=epochs)
+        _, acc_hist, best_layers = build_and_train(
+            data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=patience)
 
         # create validation set
         input = x_validation
@@ -957,10 +1012,10 @@ for generation in range(generations):
         # calculate validation
         output_s = torch.as_tensor(output_s, dtype=torch.float)
         ds_validation = TensorDataset(output_s, y_validation)
-        test_acc = compute_classification_accuracy(
-                ds_validation,
-                layers=best_layers
-            )
+        test_acc, _ = compute_classification_accuracy(
+            ds_validation,
+            layers=best_layers
+        )
         individual['fitness'] = max(acc_hist[1])*100
         individual['validation'] = test_acc
         if max(acc_hist[1]) > highest_fitness:
@@ -979,7 +1034,7 @@ for generation in range(generations):
 
     # TODO do not keep all data in memory, but just load, append, and dump
     # save record for postprocessing
-    record.append(population_list)  # check if slicing ([:]) is still needed
+    record.append(population_list)
     record.append(best_individual)
     # TODO create pandas df to dump
     with open(file_storage_path, 'wb') as f:
@@ -995,7 +1050,7 @@ for generation in range(generations):
         # calc sigma to reduce searchspace over generations
         # start at 100% and end at 1% of search space
         # sigma = calc_sigma(1.0, 0.01, generations, generation)
-        sigma = calc_sigma(generations, generation)
+        sigma = calc_sigma_sigmoid(generations, generation)
 
         # create next generation
         best_individual_dict = population_list[best_individual]
