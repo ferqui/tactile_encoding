@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset #, DataLoader
 
-def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False):
+def load_data(file_name="./data/data_braille_letters_all.pkl", upsample_fac=1.0, norm_val=1, filtering=False):
     '''
     Load the tactile Braille data.
     '''
