@@ -136,11 +136,13 @@ def get_input_step_current(dt_sec=0.001, stim_length_sec=0.1, amplitudes=np.aran
     n_time_bins = int(np.floor(stim_length_sec / dt_sec))
     n_neurons = len(amplitudes) * n_trials
     stim = []
+    list_mean_current = [] #list with mean current value (same dimension as the last dimension of input_current)
     for a in amplitudes:
         for n in range(n_trials):
             # stim.append(torch.tensor([a] * n_time_bins))
             I_gwn = a + sig * np.random.randn(n_time_bins) / np.sqrt(n_time_bins / 1000.)
             stim.append(torch.tensor(I_gwn))
+            list_mean_current.append(a)
 
     input_current = torch.stack(stim, dim=1)
     input_current = torch.reshape(input_current, (n_time_bins, n_neurons))
@@ -148,9 +150,9 @@ def get_input_step_current(dt_sec=0.001, stim_length_sec=0.1, amplitudes=np.aran
 
     assert input_current.shape[0] == 1
     assert input_current.shape[1] == n_time_bins
-    assert input_current.shape[2] == len(amplitudes) * n_trials
+    assert input_current.shape[2] == len(amplitudes) * n_trials # thid dim: n_trials = n_neurons (all stimulated ad once)
 
-    return input_current
+    return input_current, list_mean_current
 
 
 def pca_isi(dict_spk_rec, class_labels, fig_folder=None):
@@ -196,7 +198,7 @@ def pca_isi(dict_spk_rec, class_labels, fig_folder=None):
     return X_pca
 
 
-def plot_outputs(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
+def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder=None):
     dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
     dict_isi = dict.fromkeys(mem_rec.keys(), [])
 
@@ -210,7 +212,7 @@ def plot_outputs(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
             vmem = np.array(tmp[:, a])
             dict_mem_rec[key]['time'].extend(list(np.arange(len(vmem))))
             dict_mem_rec[key]['vmem'].extend(list(vmem*1e3)) # from V to mV
-            dict_mem_rec[key]['Ie'].extend([a] * len(vmem))
+            dict_mem_rec[key]['Ie'].extend([list_mean_current[a]] * len(vmem))
 
             t_spike_in_dt = np.arange(len(vmem))
             idx_spike = np.where(np.array(dict_spk_rec[key][0][:, a]).astype(int))[0]
@@ -222,7 +224,7 @@ def plot_outputs(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
                 dict_isi[key][a]['time'] = []
                 dict_isi[key][a]['isi'] = []
 
-    palette = sns.cubehelix_palette(n_colors=n_current_values)
+    palette = sns.cubehelix_palette(n_colors=len(np.unique(list_mean_current)))
     fig, axs = plt.subplots(3, len(dict_spk_rec.keys()), sharex=True)
     for i, neuron_type in enumerate(dict_spk_rec.keys()):
         axs[0, i].imshow(np.transpose(dict_spk_rec[neuron_type][0]), cmap='Greys',
@@ -234,7 +236,7 @@ def plot_outputs(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
 
         for a in range(mem_rec[neuron_type][0].shape[1]):
             axs[1, i].plot(dict_isi[neuron_type][a]['time'], dict_isi[neuron_type][a]['isi'], 'o', markersize=2,
-                           color=palette[a])
+                           color=palette[list(np.unique(list_mean_current)).index(list_mean_current[a])])
 
     axs[1, 0].set_ylabel('ISI (ms)')
     axs[2, 0].set_ylabel('Vmem (mV)')
@@ -249,7 +251,7 @@ def plot_outputs(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
     plt.show()
 
 
-def plot_vmem(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
+def plot_vmem(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder=None):
     dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
 
     for key in mem_rec.keys():
@@ -260,9 +262,9 @@ def plot_vmem(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
             vmem = np.array(tmp[:, a])
             dict_mem_rec[key]['time'].extend(list(np.arange(len(vmem))))
             dict_mem_rec[key]['vmem'].extend(list(vmem * 1e3))  # from V to mV
-            dict_mem_rec[key]['Ie'].extend([a] * len(vmem))
+            dict_mem_rec[key]['Ie'].extend([list_mean_current[a]] * len(vmem))
 
-    palette = sns.cubehelix_palette(n_colors=n_current_values)
+    palette = sns.cubehelix_palette(n_colors=len(np.unique(list_mean_current)))
     fig, axs = plt.subplots(1, len(dict_spk_rec.keys()), sharex=True)
     for i, neuron_type in enumerate(dict_spk_rec.keys()):
         sns.lineplot(data=pd.DataFrame(dict_mem_rec[neuron_type]), x='time', y='vmem', hue='Ie',

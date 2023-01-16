@@ -43,7 +43,7 @@ def main(args):
     for MN_class_type in list_classes:
         neurons = MN_neuron(len(amplitudes)*n_repetitions, MNclass_to_param[MN_class_type], dt=args.dt, train=False)
 
-        x_local = get_input_step_current(dt_sec=args.dt, stim_length_sec=args.stim_length_sec, amplitudes=amplitudes,
+        x_local, list_mean_current = get_input_step_current(dt_sec=args.dt, stim_length_sec=args.stim_length_sec, amplitudes=amplitudes,
                                          n_trials=n_repetitions, sig=sigma)
 
         neurons.reset()
@@ -58,8 +58,8 @@ def main(args):
         dict_spk_rec[MN_class_type] = torch.stack(spk_rec, dim=1) # shape: batch_size, time_steps, neurons (i.e., current amplitudes)
         dict_mem_rec[MN_class_type] = torch.stack(mem_rec, dim=1)
 
-    plot_outputs(dict_spk_rec, dict_mem_rec, fig_folder=fig_folder)
-    plot_vmem(dict_spk_rec, dict_mem_rec, xlim=(0,30), fig_folder=fig_folder)
+    plot_outputs(dict_spk_rec, dict_mem_rec, list_mean_current, fig_folder=fig_folder)
+    plot_vmem(dict_spk_rec, dict_mem_rec, list_mean_current, xlim=(0,30), fig_folder=fig_folder)
 
     X_pca_isi = pca_isi(dict_spk_rec, class_labels, fig_folder=fig_folder)
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument('--MNclasses_to_test', type=list, default=['A', 'C'], help="learning rate")
     parser.add_argument('--nb_inputs', type=int, default=10)
     parser.add_argument('--n_repetitions', type=int, default=10)
-    parser.add_argument('--sigma', type=float, default=0.1, help='sigma gaussian distrubution of I current')
+    parser.add_argument('--sigma', type=float, default=0.1, help='sigma gaussian distribution of I current')
     parser.add_argument('--stim_length_sec', type=float, default=0.2)
     parser.add_argument('--selected_input_channel', type=int, default=0)
     parser.add_argument('--dt', type=float, default=0.001)
