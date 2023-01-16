@@ -60,7 +60,7 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
     plt.ylim(0.0, 1.1)
     plt.xlabel('Number of Components')
     plt.ylabel('Cumulative variance (%)')
-    # fig.savefig(fig_folder.joinpath('cum_variance.pdf'), format='pdf')
+    fig.savefig(fig_folder.joinpath('cum_variance.pdf'), format='pdf')
 
     # Plot variance explained
     plt.figure()
@@ -99,6 +99,7 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
     ax.set_xlabel("PC1", fontsize=14)
     ax.set_ylabel("PC2", fontsize=14)
     ax.legend()
+    fig.savefig(fig_folder.joinpath('PCA_2D.pdf'), format='pdf')
 
     # 3D:
     if X_pca.shape[1] >= 3:
@@ -117,7 +118,7 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
         ax.view_init(100, -50)
         ax.legend()
         plt.show()
-        # fig.savefig(fig_folder.joinpath('PCA_3D.pdf'), format='pdf')
+        fig.savefig(fig_folder.joinpath('PCA_3D.pdf'), format='pdf')
 
     return X_pca, cum_variance  # Return principal components
 
@@ -152,7 +153,7 @@ def get_input_step_current(dt_sec=0.001, stim_length_sec=0.1, amplitudes=np.aran
     return input_current
 
 
-def pca_isi(dict_spk_rec, class_labels):
+def pca_isi(dict_spk_rec, class_labels, fig_folder=None):
     class_types = dict_spk_rec.keys()
     feature_to_col_id = ['n_spikes', 'std_isi', 'entropy_isi']
     n_features = len(feature_to_col_id)  # n_statistics_isi
@@ -190,12 +191,12 @@ def pca_isi(dict_spk_rec, class_labels):
     X = torch.cat(list_statistics_isi, dim=0)
     Y = np.array(list_labels)
 
-    X_pca, cum_variance = get_pca(X, Y, class_labels)
+    X_pca, cum_variance = get_pca(X, Y, class_labels, fig_folder=fig_folder)
 
     return X_pca
 
 
-def plot_outputs(dict_spk_rec, mem_rec, dt):
+def plot_outputs(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
     dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
     dict_isi = dict.fromkeys(mem_rec.keys(), [])
 
@@ -208,7 +209,7 @@ def plot_outputs(dict_spk_rec, mem_rec, dt):
             dict_isi[key][a] = {'time': [], 'isi': []}
             vmem = np.array(tmp[:, a])
             dict_mem_rec[key]['time'].extend(list(np.arange(len(vmem))))
-            dict_mem_rec[key]['vmem'].extend(list(vmem))
+            dict_mem_rec[key]['vmem'].extend(list(vmem*1e3)) # from V to mV
             dict_mem_rec[key]['Ie'].extend([a] * len(vmem))
 
             t_spike_in_dt = np.arange(len(vmem))
@@ -236,11 +237,44 @@ def plot_outputs(dict_spk_rec, mem_rec, dt):
                            color=palette[a])
 
     axs[1, 0].set_ylabel('ISI (ms)')
-    axs[2, 0].set_ylabel('Vmem')
-    axs[0, 0].set_ylabel('Ie')
+    axs[2, 0].set_ylabel('Vmem (mV)')
+    axs[0, 0].set_ylabel('Ie (V/s)')
     axs[2, 1].set_ylabel('')
+    if xlim:
+        axs[0,0].set_xlim(xlim)
+
     fig.align_ylabels(axs[:])
     fig.set_size_inches(20, 9)
+    fig.savefig(fig_folder.joinpath('Output_MN.pdf'), format='pdf')
     plt.show()
 
-    return fig
+
+def plot_vmem(dict_spk_rec, mem_rec, xlim=None, fig_folder=None):
+    dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
+
+    for key in mem_rec.keys():
+        n_current_values = mem_rec[key][0].shape[1]
+        dict_mem_rec[key] = {'time': [], 'vmem': [], 'Ie': []}
+        tmp = mem_rec[key][0]
+        for a in range(tmp.shape[1]):
+            vmem = np.array(tmp[:, a])
+            dict_mem_rec[key]['time'].extend(list(np.arange(len(vmem))))
+            dict_mem_rec[key]['vmem'].extend(list(vmem * 1e3))  # from V to mV
+            dict_mem_rec[key]['Ie'].extend([a] * len(vmem))
+
+    palette = sns.cubehelix_palette(n_colors=n_current_values)
+    fig, axs = plt.subplots(1, len(dict_spk_rec.keys()), sharex=True)
+    for i, neuron_type in enumerate(dict_spk_rec.keys()):
+        sns.lineplot(data=pd.DataFrame(dict_mem_rec[neuron_type]), x='time', y='vmem', hue='Ie',
+                     ax=axs[i], palette=palette)
+        axs[i].set_xlabel('Time (ms)')
+        axs[i].set_title('MN type: ' + neuron_type)
+
+    axs[0].set_ylabel('Vmem (mV)')
+    if xlim:
+        axs[0].set_xlim(xlim)
+
+    fig.align_ylabels(axs[:])
+    fig.set_size_inches(15, 6)
+    fig.savefig(fig_folder.joinpath('Vmem.pdf'), format='pdf')
+    plt.show()
