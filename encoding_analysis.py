@@ -8,16 +8,17 @@ import argparse
 import seaborn as sns
 matplotlib.pyplot.ioff()  # turn off interactive mode
 import numpy as np
+import pickle
 import os
 from training import MN_neuron
-from utils_encoding import get_input_step_current, plot_outputs, pca_isi, plot_vmem
+from utils_encoding import get_input_step_current, plot_outputs, pca_isi, plot_vmem, prepare_output_data
 torch.manual_seed(0)
-
+np.random.seed(19)
 ##########################################################
 # Settings/Path:
 Current_PATH = os.getcwd()
-fig_folder = Path('./figures')
-fig_folder.mkdir(parents=True, exist_ok=True)
+output_folder = Path('./results')
+output_folder.mkdir(parents=True, exist_ok=True)
 
 MNclass_to_param = {
     'A': {'a': 0, 'A1': 0, 'A2': 0},
@@ -29,11 +30,23 @@ inv_class_labels = {v: k for k, v in class_labels.items()}
 ############################################################
 
 def main(args):
-    #exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
 
+    # Prepare path:
+    exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
+
+    exp_folder = output_folder.joinpath(exp_id)
+    exp_folder.mkdir(parents=True, exist_ok=True)
+
+    fig_folder = exp_folder.joinpath('figures')
+    fig_folder.mkdir(parents=True, exist_ok=True)
+
+    output_data = prepare_output_data(args)
+
+    # Input arguments:
     list_classes = args.MNclasses_to_test
     nb_inputs = args.nb_inputs
-    amplitudes = np.arange(1, nb_inputs + 1)
+    # Linearly map the number of inputs to a range of input current amplitudes.
+    amplitudes = np.arange(1, nb_inputs + 1) * args.gain + args.offset
     n_repetitions = args.n_repetitions
     sigma = args.sigma
 
@@ -65,13 +78,19 @@ def main(args):
 
     print('End')
 
+    # ******************************************** Store data **********************************************************
+    with open(exp_folder.joinpath('output_data.pickle'), 'wb') as f:
+        pickle.dump(output_data, f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('TODO')
     parser.add_argument('--MNclasses_to_test', type=list, default=['A', 'C'], help="learning rate")
     parser.add_argument('--nb_inputs', type=int, default=10)
+    # NOTE: The number of input neurons = number of different input current amplitudes
+    parser.add_argument('--gain', type=int, default=1)
+    parser.add_argument('--offset', type=int, default=0)
     parser.add_argument('--n_repetitions', type=int, default=10)
-    parser.add_argument('--sigma', type=float, default=0.1, help='sigma gaussian distribution of I current')
+    parser.add_argument('--sigma', type=float, default=0.5, help='sigma gaussian distribution of I current')
     parser.add_argument('--stim_length_sec', type=float, default=0.2)
     parser.add_argument('--selected_input_channel', type=int, default=0)
     parser.add_argument('--dt', type=float, default=0.001)

@@ -8,6 +8,18 @@ from sklearn.decomposition import PCA
 import seaborn as sns
 import pandas as pd
 
+def prepare_output_data(args):
+    """
+    Prepare output file which stores parameters and results.
+    Return dictionary with hyperparameters.
+    """
+
+    out_dict = {'parameters': {}}
+
+    for item in args._get_kwargs():
+        out_dict['parameters'][item[0]] = item[1]
+
+    return out_dict
 
 def my_GWN(pars, mu, sig, myseed=False):
     """
@@ -202,13 +214,19 @@ def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder
     dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
     dict_isi = dict.fromkeys(mem_rec.keys(), [])
 
+    n_trials_with_output_spikes = {}
     for key in mem_rec.keys():
         n_current_values = mem_rec[key][0].shape[1]
         dict_mem_rec[key] = {'time': [], 'vmem': [], 'Ie': []}
         tmp = mem_rec[key][0]
-        dict_isi[key] = {}
+        dict_isi[key] = {'time': [], 'isi': [], 'Ie': []}
+
+        n_trials_with_output_spikes[key] = np.zeros(len(np.unique(list_mean_current)))
+        amplitude_previous_step = -1
+        # this takes into account the fact that in some experiments, across trials the value a does not change
         for a in range(tmp.shape[1]):
-            dict_isi[key][a] = {'time': [], 'isi': []}
+            current_amplitude = list_mean_current[a]
+            idx_current_amplitude = list(np.unique(list_mean_current)).index(current_amplitude)
             vmem = np.array(tmp[:, a])
             dict_mem_rec[key]['time'].extend(list(np.arange(len(vmem))))
             dict_mem_rec[key]['vmem'].extend(list(vmem*1e3)) # from V to mV
@@ -216,27 +234,37 @@ def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder
 
             t_spike_in_dt = np.arange(len(vmem))
             idx_spike = np.where(np.array(dict_spk_rec[key][0][:, a]).astype(int))[0]
-            if len(t_spike_in_dt):
+            if len(idx_spike)>=2:
+                n_trials_with_output_spikes[key][idx_current_amplitude] +=1
                 t_spike_in_dt = t_spike_in_dt[idx_spike]
-                dict_isi[key][a]['time'] = t_spike_in_dt[:-1]
-                dict_isi[key][a]['isi'] = np.diff(t_spike_in_dt)
+                dict_isi[key]['time'].extend(t_spike_in_dt[:-1])
+                dict_isi[key]['isi'].extend(np.diff(t_spike_in_dt))
+                dict_isi[key]['Ie'].extend([list_mean_current[a]] * (len(t_spike_in_dt)-1))
             else:
-                dict_isi[key][a]['time'] = []
-                dict_isi[key][a]['isi'] = []
+                dict_isi[key]['time'].extend([])
+                dict_isi[key]['isi'].extend([])
+                dict_isi[key]['Ie'].extend([])
 
-    palette = sns.cubehelix_palette(n_colors=len(np.unique(list_mean_current)))
+            amplitude_previous_step = list_mean_current[a]
+
+    palette_vmem = sns.cubehelix_palette(n_colors=len(np.unique(list_mean_current)))
+
     fig, axs = plt.subplots(3, len(dict_spk_rec.keys()), sharex=True)
     for i, neuron_type in enumerate(dict_spk_rec.keys()):
+        n_tot_diff_amplitudes_with_spikes = len(np.where(n_trials_with_output_spikes[neuron_type]>0)[0])
+        palette_isi = sns.cubehelix_palette(n_colors=n_tot_diff_amplitudes_with_spikes)
         axs[0, i].imshow(np.transpose(dict_spk_rec[neuron_type][0]), cmap='Greys',
                          interpolation='none', aspect='auto')
         sns.lineplot(data=pd.DataFrame(dict_mem_rec[neuron_type]), x='time', y='vmem', hue='Ie',
-                     ax=axs[2, i], palette=palette)
+                     ax=axs[2, i], palette=palette_vmem)
         axs[2, i].set_xlabel('Time (ms)')
         axs[0, i].set_title('MN type: ' + neuron_type)
 
-        for a in range(mem_rec[neuron_type][0].shape[1]):
-            axs[1, i].plot(dict_isi[neuron_type][a]['time'], dict_isi[neuron_type][a]['isi'], 'o', markersize=2,
-                           color=palette[list(np.unique(list_mean_current)).index(list_mean_current[a])])
+        sns.lineplot(data=pd.DataFrame(dict_isi[neuron_type]), x='time', y='isi', hue='Ie',
+                     ax=axs[1, i], palette=palette_isi)
+        # for a in range(mem_rec[neuron_type][0].shape[1]):
+        #     axs[1, i].plot(dict_isi[neuron_type][a]['time'], dict_isi[neuron_type][a]['isi'], 'o', markersize=2,
+        #                    color=palette[list(np.unique(list_mean_current)).index(list_mean_current[a])])
 
     axs[1, 0].set_ylabel('ISI (ms)')
     axs[2, 0].set_ylabel('Vmem (mV)')
