@@ -116,9 +116,11 @@ def main(args):
     cm = confusion_matrix(truth, pred, labels=['A', 'C'])
     print('\nConfusion Matrix: \n', confusion_matrix(truth, pred))
     cm_display = ConfusionMatrixDisplay(confusion_matrix=cm,
-                                        display_labels=['A', 'C']
+                                           display_labels=['A', 'C']
                                         )
     cm_display.plot()
+    fig = plt.gcf()
+    fig.savefig(fig_folder.joinpath('Confusion Matrix.pdf'), format='pdf')
     plt.show()
 
     print('Hello')
@@ -130,12 +132,12 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('TODO')
     parser.add_argument('--MNclasses_to_test', type=list, default=['A', 'C'], help="learning rate")
-    parser.add_argument('--nb_inputs', type=int, default=5)
+    parser.add_argument('--nb_inputs', type=int, default=10)
     parser.add_argument('--n_repetitions', type=int, default=200)
-    parser.add_argument('--sigma', type=float, default=0.5, help='sigma gaussian distribution of I current')
+    parser.add_argument('--sigma', type=float, default=0, help='sigma gaussian distribution of I current')
     # NOTE: The number of input neurons = number of different input current amplitudes
     parser.add_argument('--gain', type=int, default=1)
-    parser.add_argument('--offset', type=int, default=8)
+    parser.add_argument('--offset', type=int, default=1)
     parser.add_argument('--stim_length_sec', type=float, default=0.2)
     parser.add_argument('--selected_input_channel', type=int, default=0)
     parser.add_argument('--exp_variance', default=.95)
