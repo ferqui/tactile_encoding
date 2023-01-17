@@ -75,6 +75,14 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
     scaler.fit(X)
     X_scaled = scaler.transform(X)
 
+    fig = plt.figure()
+    plt.imshow(X, cmap='Greys', interpolation=None)
+    plt.title('Input')
+    plt.xlabel('Time (ms)')
+    plt.ylabel('Trials')
+    plt.show()
+    fig.savefig(fig_folder.joinpath('Input_rasterplot.pdf'), format='pdf')
+
     # Keep as many components needed to explain 95% of the variance:
     pca = PCA(n_components=exp_variance)
     pca.fit(X_scaled)
@@ -241,33 +249,6 @@ def pca_isi(dict_spk_rec, class_labels, fig_folder=None):
     X_pca, cum_variance = get_pca(X, Y, class_labels, fig_folder=fig_folder)
 
     return X_pca
-
-def mahalanobis(x=None, data=None, cov=None):
-    """Compute the Mahalanobis Distance between each row of x and the data
-    x    : vector or matrix of data with, say, p columns.
-    data : ndarray of the distribution from which Mahalanobis distance of each observation of x is to be computed.
-    cov  : covariance matrix (p x p) of the distribution. If None, will be computed from data.
-    """
-    x_minus_mu = x - np.mean(data)
-    if not cov:
-        cov = np.cov(data.values.T)
-    inv_covmat = scipy.linalg.inv(cov)
-    left_term = np.dot(x_minus_mu, inv_covmat)
-    mahal = np.dot(left_term, x_minus_mu.T)
-    return mahal.diagonal()
-
-class MahalanobisBinaryClassifier():
-    def __init__(self, xtrain, ytrain):
-        self.xtrain_A = xtrain.loc[ytrain == 'A', :]
-        self.xtrain_C = xtrain.loc[ytrain == 'C', :]
-
-    def predict_proba(self, xtest):
-        self.class_id_to_name = {0: 'A', 1: 'C'}
-        A_C_dists = [(a,c) for a, c in zip(mahalanobis(xtest, self.xtrain_A), mahalanobis(xtest, self.xtrain_C))]
-        return np.array([(1-c/(a+c), 1-a/(a+c)) for a,c in A_C_dists])
-
-    def predict(self, xtest):
-        return np.array([self.class_id_to_name[np.argmax(row)] for row in self.predict_proba(xtest)])
 
 def pca_timebins(dict_spk_rec, class_labels, exp_variance=.95, fig_folder=None):
     """
