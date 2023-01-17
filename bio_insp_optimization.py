@@ -313,44 +313,49 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
                 for ii in layers_update:
                     best_acc_layers.append(ii.detach().clone())
 
-        logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Test accuracy (loss): {:.2f}% ({:.5f}).".format(
+        logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.3f}), Test accuracy (loss): {:.2f}% ({:.3f}).".format(
                 e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
 
         # check for early break
         if break_early:
+            print(patience)
             if e >= patience-1:
+                logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:])), np.diff(accs_hist[1][-patience:])))
+                logging.info("\nmean(delta_test_loss): {:.2f}\ndelta_test_loss: {}" .format(
+                    np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                 # mean acc drops
-                if np.mean(np.diff(accs_hist[1][-patience:]))*100 < -1.0:
-                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
-                        np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                if np.mean(np.diff(accs_hist[1][-patience:])) < 0.0:
+                    logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:])), np.diff(accs_hist[1][-patience:])))
+                    logging.info("\nmean(delta_test_loss): {:.2f}\ndelta_test_loss: {}" .format(
                         np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                     logging.info(
                         f'\nBreaking the training early at episode {e+1}, test acc dropped.')
                     break
                 # mean acc static
-                elif abs(np.mean(np.diff(accs_hist[1][-patience:])))*100 < 1.0:
-                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
-                        np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                elif abs(np.mean(np.diff(accs_hist[1][-patience:]))) < 0.01:
+                    logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:])), np.diff(accs_hist[1][-patience:])))
+                    logging.info("\nmean(delta_test_loss): {:.2f}\ndelta_test_loss: {}" .format(
                         np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                     logging.info(
                         f'\nBreaking the training early at episode {e+1}, test acc static.')
                     break
                 # mean loss increases
                 elif np.mean(np.diff(loss_hist[1][-patience:])*-1) < 0.0:
-                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
-                        np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                    logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
+                        np.mean(np.diff(accs_hist[1][-patience:])), np.diff(accs_hist[1][-patience:])))
+                    logging.info("\nmean(delta_test_loss): {:.2f}\ndelta_test_loss: {}" .format(
                         np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                     logging.info(
                         f'\nBreaking the training early at episode {e+1}, test loss increasing.')
                     break
                 # mean loss static
                 elif abs(np.mean(np.diff(loss_hist[1][-patience:])*-1)) < 1.0:
-                    logging.info("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
-                        np.mean(np.diff(loss_hist[1][-patience:])*-1)*100, np.diff(loss_hist[1][-patience:])*-1*100))
-                    logging.info("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                    logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
+                        np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
+                    logging.info("\nmean(delta_test_loss): {:.2f}\ndelta_test_loss: {}" .format(
                         np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                     logging.info(
                         f'\nBreaking the training early at episode {e+1}, test loss static.')
