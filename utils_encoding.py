@@ -76,7 +76,7 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
     X_scaled = scaler.transform(X)
 
     fig = plt.figure()
-    plt.imshow(X, cmap='Greys', interpolation=None)
+    plt.imshow(X, cmap='Greys', interpolation=None, aspect='auto')
     plt.title('Input')
     plt.xlabel('Time (ms)')
     plt.ylabel('Trials')
