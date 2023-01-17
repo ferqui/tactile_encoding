@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import scipy
 from scipy.stats import entropy
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -55,16 +56,41 @@ def my_GWN(pars, mu, sig, myseed=False):
 
 
 def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
+    """
+    Args:
+        X: Training data, where n_samples (dim 0) is the number of samples and n_features (dime 1) is the number of features.
+        Y: labels/classes
+        class_labels: map between class integers and class type (or name) as string
+        exp_variance: if None, all components are kept, if >1 N=exp_variance components are kept, if in [0,1], select
+        the number of compoents such that the amount of variance explained by those components is equal to exp_variance
+        fig_folder: Path to output folder with figures
+
+    Returns:
+        X_pca: transformed input samples as described in the PCA space
+        cum_variance: cumulative variance vs. PCs
+    """
+
     # Standardize dataset:
     scaler = StandardScaler()
     scaler.fit(X)
     X_scaled = scaler.transform(X)
 
     # Keep as many components needed to explain 95% of the variance:
-    pca = PCA()
+    pca = PCA(n_components=exp_variance)
     pca.fit(X_scaled)
     X_pca = pca.transform(X_scaled)
     cum_variance = np.cumsum(pca.explained_variance_ratio_)
+
+    if exp_variance:
+        # Get number of PCA components needed to explain 95% of variance
+        min_num_comp = np.where(cum_variance > exp_variance)[0][0]
+        print('Number of components to explain {}% of vairance = {}'.format(exp_variance, min_num_comp))
+        try:
+            assert (cum_variance[-1] >= exp_variance)
+            # check that last retained component is needed to preserve the expected variance
+        except:
+            print('Check PCA variance')
+            raise ValueError
 
     # Plot cumulative variance
     fig = plt.figure()
@@ -72,6 +98,10 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
     plt.ylim(0.0, 1.1)
     plt.xlabel('Number of Components')
     plt.ylabel('Cumulative variance (%)')
+    if exp_variance:
+        plt.axhline(y=0.95, color='r', linestyle='-')
+        plt.axvline(x=min_num_comp, color='grey', linestyle='-.')
+        plt.text(.5, 0.98, '95% cut-off threshold', color='red', fontsize=16)
     fig.savefig(fig_folder.joinpath('cum_variance.pdf'), format='pdf')
 
     # Plot variance explained
@@ -168,6 +198,9 @@ def get_input_step_current(dt_sec=0.001, stim_length_sec=0.1, amplitudes=np.aran
 
 
 def pca_isi(dict_spk_rec, class_labels, fig_folder=None):
+    """
+    Run PCA decomposition using the statistics of the ISI metric as input features.
+    """
     class_types = dict_spk_rec.keys()
     feature_to_col_id = ['n_spikes', 'std_isi', 'entropy_isi']
     n_features = len(feature_to_col_id)  # n_statistics_isi
@@ -209,6 +242,54 @@ def pca_isi(dict_spk_rec, class_labels, fig_folder=None):
 
     return X_pca
 
+def mahalanobis(x=None, data=None, cov=None):
+    """Compute the Mahalanobis Distance between each row of x and the data
+    x    : vector or matrix of data with, say, p columns.
+    data : ndarray of the distribution from which Mahalanobis distance of each observation of x is to be computed.
+    cov  : covariance matrix (p x p) of the distribution. If None, will be computed from data.
+    """
+    x_minus_mu = x - np.mean(data)
+    if not cov:
+        cov = np.cov(data.values.T)
+    inv_covmat = scipy.linalg.inv(cov)
+    left_term = np.dot(x_minus_mu, inv_covmat)
+    mahal = np.dot(left_term, x_minus_mu.T)
+    return mahal.diagonal()
+
+class MahalanobisBinaryClassifier():
+    def __init__(self, xtrain, ytrain):
+        self.xtrain_A = xtrain.loc[ytrain == 'A', :]
+        self.xtrain_C = xtrain.loc[ytrain == 'C', :]
+
+    def predict_proba(self, xtest):
+        self.class_id_to_name = {0: 'A', 1: 'C'}
+        A_C_dists = [(a,c) for a, c in zip(mahalanobis(xtest, self.xtrain_A), mahalanobis(xtest, self.xtrain_C))]
+        return np.array([(1-c/(a+c), 1-a/(a+c)) for a,c in A_C_dists])
+
+    def predict(self, xtest):
+        return np.array([self.class_id_to_name[np.argmax(row)] for row in self.predict_proba(xtest)])
+
+def pca_timebins(dict_spk_rec, class_labels, exp_variance=.95, fig_folder=None):
+    """
+    Run PCA decomposition using the sequence of time bins as set of features.
+    """
+    class_types = dict_spk_rec.keys()
+    list_labels = []
+    list_spike_events = []
+    for cc in class_types:
+
+        # Reduce batch (first) dimension:
+        spike_events = dict_spk_rec[cc][0] # timestamps x n_neurons (=n trials)
+        list_spike_events.append(spike_events)
+        list_labels.extend([cc]*spike_events.shape[1])
+
+    X = torch.cat(list_spike_events, dim=1) # along the dimension of trials
+    X = torch.transpose(X, 0, 1)
+    Y = np.array(list_labels)
+
+    X_pca, cum_variance = get_pca(X, Y, class_labels, exp_variance=exp_variance, fig_folder=fig_folder)
+
+    return X_pca, Y
 
 def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder=None):
     dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
