@@ -16,7 +16,7 @@ from utils_encoding import get_input_step_current, plot_outputs, pca_isi, plot_v
 from sklearn.covariance import MinCovDet
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
-from utils_encoding import MahalanobisBinaryClassifier
+from classifiers import MahalanobisClassifier
 
 torch.manual_seed(0)
 np.random.seed(19)
@@ -57,6 +57,7 @@ def main(args):
     n_repetitions = args.n_repetitions
     sigma = args.sigma
     n_trials = args.n_repetitions * args.nb_inputs * len(list_classes)
+    exp_variance = args.exp_variance
 
     # each neuron receives a different input amplitude
     dict_spk_rec = dict.fromkeys(list_classes, [])
@@ -88,7 +89,7 @@ def main(args):
     # X_pca_isi = pca_isi(dict_spk_rec, class_labels, fig_folder=fig_folder)
 
     # PCA over time bins:
-    X_pca_timebins, Y_labels = pca_timebins(dict_spk_rec, class_labels, exp_variance=.95, fig_folder=fig_folder)
+    X_pca_timebins, Y_labels = pca_timebins(dict_spk_rec, class_labels, exp_variance=exp_variance, fig_folder=fig_folder)
     assert (X_pca_timebins.shape[0] == n_trials)
     assert (len(Y_labels) == n_trials)
     # second dimension = n features kept to explain exp_variance
@@ -100,18 +101,16 @@ def main(args):
     # Split dataset into test and train
     X_pca_timebins = pd.DataFrame(X_pca_timebins)
     x_train, x_test, y_train, y_test = train_test_split(X_pca_timebins, Y_labels, test_size = 0.2, random_state = 42)
-    print('Samples from class A:', len(np.where(y_train=='A')[0]))
-    print('Samples from class C:', len(np.where(y_train=='C')[0]))
 
+    # MahalanobisClassifier
+    clf = MahalanobisClassifier(x_train, y_train)
 
-    clf = MahalanobisBinaryClassifier(x_train, y_train)
-    pred_probs = clf.predict_proba(x_test)
-    pred_class = clf.predict(x_test)
+    # Predicting
+    pred_probs = clf.predict_probability(x_test)
+    unique_labels = np.unique(Y_labels)
+    pred_class = clf.predict_class(x_test, unique_labels)
 
-    # Pred and Truth
     pred_actuals = pd.DataFrame([(pred, act) for pred, act in zip(pred_class, y_test)], columns=['pred', 'true'])
-    print(pred_actuals[:5])
-
     truth = pred_actuals.loc[:, 'true']
     pred = pred_actuals.loc[:, 'pred']
     print('\nConfusion Matrix: \n', confusion_matrix(truth, pred))
@@ -127,13 +126,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('TODO')
     parser.add_argument('--MNclasses_to_test', type=list, default=['A', 'C'], help="learning rate")
     parser.add_argument('--nb_inputs', type=int, default=1)
+    parser.add_argument('--n_repetitions', type=int, default=100)
+    parser.add_argument('--sigma', type=float, default=0.5, help='sigma gaussian distribution of I current')
     # NOTE: The number of input neurons = number of different input current amplitudes
     parser.add_argument('--gain', type=int, default=1)
-    parser.add_argument('--offset', type=int, default=5)
-    parser.add_argument('--n_repetitions', type=int, default=20)
-    parser.add_argument('--sigma', type=float, default=0, help='sigma gaussian distribution of I current')
+    parser.add_argument('--offset', type=int, default=8)
     parser.add_argument('--stim_length_sec', type=float, default=0.2)
     parser.add_argument('--selected_input_channel', type=int, default=0)
+    parser.add_argument('--exp_variance', default=.95)
     parser.add_argument('--dt', type=float, default=0.001)
 
     args = parser.parse_args()
