@@ -15,7 +15,7 @@ from training import MN_neuron
 from utils_encoding import get_input_step_current, plot_outputs, pca_isi, plot_vmem, prepare_output_data, pca_timebins
 from sklearn.covariance import MinCovDet
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from classifiers import MahalanobisClassifier
 
 torch.manual_seed(0)
@@ -113,7 +113,12 @@ def main(args):
     pred_actuals = pd.DataFrame([(pred, act) for pred, act in zip(pred_class, y_test)], columns=['pred', 'true'])
     truth = pred_actuals.loc[:, 'true']
     pred = pred_actuals.loc[:, 'pred']
+    cm = confusion_matrix(truth, pred, labels=['A', 'C'])
     print('\nConfusion Matrix: \n', confusion_matrix(truth, pred))
+    cm_display = ConfusionMatrixDisplay(confusion_matrix=cm,
+                                        display_labels=['A', 'C']
+                                        )
+    cm_display.plot()
     plt.show()
 
     print('Hello')
@@ -125,8 +130,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('TODO')
     parser.add_argument('--MNclasses_to_test', type=list, default=['A', 'C'], help="learning rate")
-    parser.add_argument('--nb_inputs', type=int, default=1)
-    parser.add_argument('--n_repetitions', type=int, default=100)
+    parser.add_argument('--nb_inputs', type=int, default=5)
+    parser.add_argument('--n_repetitions', type=int, default=200)
     parser.add_argument('--sigma', type=float, default=0.5, help='sigma gaussian distribution of I current')
     # NOTE: The number of input neurons = number of different input current amplitudes
     parser.add_argument('--gain', type=int, default=1)
