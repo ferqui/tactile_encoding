@@ -145,12 +145,12 @@ def main():
         loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
         g = torch.Generator()
-        g.manual_seed(seed)
+        # g.manual_seed(seed)
         # generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
         #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
         # windows only works wth num_workers=0
         generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                               num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+                               num_workers=4, pin_memory=True, generator=g)
 
         # The optimization loop
         loss_hist = [[], []]
@@ -301,8 +301,8 @@ def main():
             global alpha
             global beta
         dt = 1e-3 # ms
-        alpha = torch.as_as_tensor(float(np.exp(-dt/tau_syn)))
-        beta = torch.as_as_tensor(float(np.exp(-dt/tau_mem)))
+        alpha = torch.as_tensor(float(np.exp(-dt/tau_syn)))
+        beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
 
         fwd_weight_scale = 3.0
         rec_weight_scale = 1e-2*fwd_weight_scale
@@ -835,12 +835,12 @@ def main():
     }
 
     if ratios[2] > 0:
-        data_steps = 1000 # np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
-        x_train = torch.as_tensor(x_train, dtype=torch.float)
+        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
+        x_train = torch.as_tensor(np.array(x_train), dtype=torch.float)
         labels_train = torch.as_tensor(value2index(y_train, labels_mapping), dtype=torch.long)
-        x_test = torch.as_tensor(x_test, dtype=torch.float)
+        x_test = torch.as_tensor(np.array(x_test), dtype=torch.float)
         labels_test = torch.as_tensor(value2index(y_test, labels_mapping), dtype=torch.long)
-        x_validation = torch.as_tensor(x_validation, dtype=torch.float)
+        x_validation = torch.as_tensor(np.array(x_validation), dtype=torch.float)
         labels_validation = torch.as_tensor(value2index(y_validation, labels_mapping), dtype=torch.long)
         ds_train = TensorDataset(x_train,labels_train)
         ds_test = TensorDataset(x_test,labels_test)
