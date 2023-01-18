@@ -65,6 +65,7 @@ class Encoder(nn.Module):
     def forward(self, inputs):
         encoder_currents = self.enc_gain * (inputs.tile((self.nb_input_copies,)) + self.enc_bias)
         return encoder_currents
+
 ## MN neuron
 class MN_neuron_IT(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
@@ -185,7 +186,6 @@ class MN_neuron(nn.Module):
             if ii in list(parameters_combination.keys()):
                 eval_string = "self.{}".format(ii) + " = " + str(parameters_combination[ii])
                 exec(eval_string)
-
         one2N_matrix = torch.ones(1, nb_inputs)
 
         self.a = nn.Parameter(one2N_matrix * self.a, requires_grad=train)

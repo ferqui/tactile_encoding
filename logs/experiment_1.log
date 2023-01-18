@@ -1,0 +1,20 @@
+Data storage initialized.
+
+Single GPU detected. Setting up the simulation there.
+Data storage initialized.
+
+Single GPU detected. Setting up the simulation there.
+Start preparing data.
+Finished data prepartion.
+
+________________________________________
+Optimization settings
+Individuals: 200
+Generations: 50
+Early break: True
+Patience: 10
+________________________________________
+Starting optimization.
+Seed set to 555934314
+
+Starting individual 1 of 200 in generation 1 of 50.

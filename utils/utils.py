@@ -1,0 +1,68 @@
+import torch
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+def check_cuda():
+    # check for available GPU and distribute work
+    if torch.cuda.device_count() > 1:
+        torch.cuda.empty_cache()
+
+        gpu_sel = 1
+        gpu_av = [torch.cuda.is_available()
+                for ii in range(torch.cuda.device_count())]
+        print("Detected {} GPUs. The load will be shared.".format(
+            torch.cuda.device_count()))
+        for gpu in range(len(gpu_av)):
+            if True in gpu_av:
+                if gpu_av[gpu_sel]:
+                    device = torch.device("cuda:"+str(gpu))
+                    # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
+                    print("Selected GPUs: {}" .format("cuda:"+str(gpu)))
+                else:
+                    device = torch.device("cuda:"+str(gpu_av.index(True)))
+            else:
+                device = torch.device("cpu")
+                print("No GPU detected. Running on CPU.")
+    else:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+            print("Single GPU detected. Setting up the simulation there.")
+            device = torch.device("cuda:0")
+            # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
+        else:
+            device = torch.device("cpu")
+            print("No GPU detected. Running on CPU.")
+    return device
+
+def train_test_validation_split(data, label, split=[70, 20, 10], seed=None):
+    """
+    Creates a train-test-validation split using the sklearn train_test_split() twice.
+    Function accepts lists, arrays, and tensor.
+    Default split: [70, 20, 10]
+
+    data.shape: [trials, time, sensor]
+    label.shape: [trials] 
+    split: [train, test, validation]
+    """
+    # do some sanity checks first
+    if len(split) != 3:
+        raise ValueError(
+            f"Split dimensions are wrong. Expected 3 , but got {len(split)}. Please provide split in the form [train size, test size, validation size].")
+    if min(split) == 0.0:
+        raise ValueError(
+            "Found entry 0.0. If you want to use only perfrom a two-folded split, use the sklearn train_test_split function only please.")
+    if sum(split) > 99.0:
+        split = [x/100 for x in split]
+    if sum(split) < 0.99:
+        raise ValueError("Please use a split summing up to 1, or 100%.")
+
+    # create train and (test + validation) split
+    x_test_validation, x_train, y_test_validation, y_train = train_test_split(
+        data, label, test_size=split[0], shuffle=True, stratify=label, random_state=seed)
+    # create test and validation split
+    ratio = split[1]/sum(split[1:])
+    x_validation, x_test, y_validation, y_test = train_test_split(
+        x_test_validation, y_test_validation, test_size=ratio, shuffle=True, stratify=y_test_validation, random_state=seed)
+
+    return x_train, y_train, x_test, y_test, x_validation, y_validation
