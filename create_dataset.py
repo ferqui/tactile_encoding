@@ -23,9 +23,17 @@ def main():
     encoded_label = []
     # create training dataset by iterating over neuron params and input currents
     for _, class_name in enumerate(classes):
+        # do some sanity checks
+        if runtime[class_name] is None:
+            print('No runtime given.')
+        if input_currents[class_name] is None:
+            print('No input current given.')
+
         # iterate over changes
         sim_time = runtime[class_name]
         if len(input_currents[class_name]) > 1:
+            if time_points[class_name] is None:
+                print('Missing time points.')
             current = np.zeros((sim_time, 1))
             for counter, actual_current in enumerate(input_currents[class_name]):
                 if counter == 0:
