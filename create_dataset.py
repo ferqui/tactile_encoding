@@ -11,32 +11,25 @@ from utils.models import MN_neuron
 
 def main():
     # import neuron params
-    from ideal_params import class_names, neuron_parameters, input_currents
+    from ideal_params import neuron_parameters, input_currents, time_points
 
+    classes = neuron_parameters.keys()
     # run the enocding and create training data
     max_trials = 1000
     time_steps = 100
     encoded_data = []
     encoded_label = []
     # create training dataset by iterating over neuron params and input currents
-    for counter, params in enumerate(neuron_parameters):
-        # extract class name and get the correct input current
-        class_name = class_names[counter]
-        # build the different input current profiles
-        if class_name == "class1":
-            current = input_currents[class_name]
-            input_current = np.ones((time_steps, 1)) * current
-        elif class_name == "class2":
-            current = input_currents[class_name]
-            input_current = np.ones((time_steps, 1)) * current
+    for _, class_name in enumerate(classes):
+        if len(input_currents[class_name])>0:
+            # iterate over changes
+
+            print('not const current')
         else:
-            current = input_currents[class_name]
-            input_current = np.ones((time_steps, 1)) * current
-        # neuron_parameter = params[1]
-        current = input_currents[class_name]
-        input_current = np.ones((time_steps, 1)) * current
+            # const current
+            input_current = np.ones((time_steps, 1)) * input_currents[class_name]
         # set up MN neuron
-        neurons = MN_neuron(1, params, dt=1E-3, train=False)
+        neurons = MN_neuron(1, neuron_parameters[class_name], dt=1E-3, train=False)
 
         # compute neuron output
         input = torch.as_tensor(input_current)
