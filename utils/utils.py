@@ -109,6 +109,6 @@ def value2key(entry, dictionary):
         
         else:
 
-            key = [list(labels_mapping.keys())[list(labels_mapping.values()).index(e)] for e in entry]
+            key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
         
         return key
