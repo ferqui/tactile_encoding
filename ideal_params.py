@@ -27,19 +27,19 @@ input_currents = {
 
 
 time_points = {
-    "Accommodation": [100, 600, 700, 800, 900], # 1000 ms
-    "Threshold variability": [40, 200, 220, 260, 280], # 400 ms
-    "Rebound spike": [50, 800], # 1000 ms
-    "Integrator": [20, 30, 50, 300, 320, 350, 370], # 400 ms
-    "Input bistability": [100, 500, 600], # 1000 ms
-    "Rebound burst": [100, 600], # 1000 ms
-    "Afterpotentials": [15], # 200 ms
-    "Basal bistability": [10, 100, 110], # 200 ms
-    "Preferred frequency": [10, 20, 30, 400, 410, 450, 460], # 800 ms
-    "Spike latency": [2], # 50 ms
+    "Accommodation": [100, 600, 700, 800, 900],  # 1000 ms
+    "Threshold variability": [40, 200, 220, 260, 280],  # 400 ms
+    "Rebound spike": [50, 800],  # 1000 ms
+    "Integrator": [20, 30, 50, 300, 320, 350, 370],  # 400 ms
+    "Input bistability": [100, 500, 600],  # 1000 ms
+    "Rebound burst": [100, 600],  # 1000 ms
+    "Afterpotentials": [15],  # 200 ms
+    "Basal bistability": [10, 100, 110],  # 200 ms
+    "Preferred frequency": [10, 20, 30, 400, 410, 450, 460],  # 800 ms
+    "Spike latency": [2],  # 50 ms
 }
 
-runtime = { # ms
+runtime = {  # ms
     "Tonic spiking": 200,
     "Class 1": 500,
     "Spike frequency adaptation": 200,

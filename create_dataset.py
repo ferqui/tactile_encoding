@@ -53,12 +53,15 @@ def main():
 
         # compute neuron output
         input = torch.as_tensor(input_current)
+        output_v = []
         output_s = []
         for t in range(input.shape[0]):
             out = neurons(input[t])
             output_s.append(out.cpu().numpy())
+            output_v.append(neurons.state.V.cpu().numpy())
         output_s = np.stack(output_s)
-        encoded_data_original.append(output_s)
+        output_v = np.stack(output_v)
+        encoded_data_original.append([output_s, output_v])
 
         # stack input current trace if input length < 1000ms
         factor = int((max_time/sim_time)+0.5)

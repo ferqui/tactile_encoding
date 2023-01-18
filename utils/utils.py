@@ -28,7 +28,7 @@ def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.3):
             print("Single GPU detected. Setting up the simulation there.")
             device = torch.device("cuda")
             # thr 1: None, thr 2: 0.8, thr 5: 0.5, thr 10: None
-            torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
+            # torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
         else:
             device = torch.device("cpu")
             print("No GPU detected. Running on CPU.")
