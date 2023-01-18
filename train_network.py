@@ -809,10 +809,6 @@ def main():
     
     x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(encoded_data, encoded_label, split=ratios)
 
-    labels_mapping = {'B': "class1",
-                      'H': "class2"}
-
-    """
     labels_mapping = {
         'A': "Tonic spiking",
         'B': "Class 1",
@@ -835,24 +831,26 @@ def main():
         'S': "Preferred frequency",
         'T': "Spike latency",
     }
-    """
 
     if ratios[2] > 0:
         data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
-        labels_train = value2index(y_train, labels_mapping)
-        labels_test = value2key(y_test, labels_mapping)
-        labels_validation = value2key(y_validation, labels_mapping)
         x_train = torch.tensor(x_train, dtype=torch.float)
-        y_train = torch.tensor(labels_train, dtype=torch.long)
-        ds_train = TensorDataset(x_train,y_train)
-        ds_test = TensorDataset(torch.tensor(x_test, dtype=torch.float), torch.tensor(labels_test, dtype=torch.long))
-        ds_val = TensorDataset(torch.tensor(x_validation, dtype=torch.float), torch.tensor(labels_validation, dtype=torch.long))
+        labels_train = torch.tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        x_test = torch.tensor(x_test, dtype=torch.float)
+        labels_test = torch.tensor(value2index(y_test, labels_mapping), dtype=torch.long)
+        x_validation = torch.tensor(x_validation, dtype=torch.float)
+        labels_validation = torch.tensor(value2index(y_validation, labels_mapping), dtype=torch.long)
+        ds_train = TensorDataset(x_train,labels_train)
+        ds_test = TensorDataset(x_test,labels_test)
+        ds_val = TensorDataset(x_validation,labels_validation)
     else:
         data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
-        labels_train = value2key(y_train, labels_mapping)
-        labels_test = value2key(y_test, labels_mapping)
-        ds_train = TensorDataset(torch.tensor(x_train, dtype=torch.float), torch.tensor(labels_train, dtype=torch.long))
-        ds_test = TensorDataset(torch.tensor(x_test, dtype=torch.float), torch.tensor(labels_test, dtype=torch.long))
+        x_train = torch.tensor(x_train, dtype=torch.float)
+        labels_train = torch.tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        x_test = torch.tensor(x_test, dtype=torch.float)
+        labels_test = torch.tensor(value2index(y_test, labels_mapping), dtype=torch.long)
+        ds_train = TensorDataset(x_train,labels_train)
+        ds_test = TensorDataset(x_test,labels_test)
         ds_val = []
 
 

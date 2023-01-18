@@ -108,25 +108,18 @@ def value2key(entry, dictionary):
     
     else:
 
-<<<<<<< HEAD
-            key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
+        key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
         
-        return key
+    return key
 
 
 def value2index(entry, dictionary):
+    if (type(entry) != list) & (type(entry) != np.ndarray):
 
-        if (type(entry) != list) & (type(entry) != np.ndarray):
-
-            idx = list(dictionary.values()).index(entry)
+        idx = list(dictionary.values()).index(entry)
         
-        else:
+    else:
 
-            idx = [list(dictionary.values()).index(e) for e in entry]
+        idx = [list(dictionary.values()).index(e) for e in entry]
         
-        return idx
-=======
-        key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
-    
-    return key
->>>>>>> cd640ceb7f096379637423aec85c8bf9db4be682
+    return idx
