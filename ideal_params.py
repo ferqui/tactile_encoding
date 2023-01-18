@@ -1,37 +1,13 @@
 # set up neuron parameters and input current
-class_names = [
-    "Tonic spiking",
-    "Class 1",
-    "Spike frequency adaptation",
-    "Phasic spiking",
-    "Accommodation",
-    "Threshold variability",
-    "Rebound spike",
-    "Class 2",
-    "Integrator",
-    "Input bistability",
-    "Hyperpolarizing spiking",
-    "Hyperpolarizing bursting",
-    "Tonic bursting",
-    "Phasic bursting",
-    "Rebound burst",
-    "Mixed mode",
-    "Afterpotentials",
-    "Basal bistability",
-    "Preferred frequency",
-    "Spike latency",
-]
-
-
 input_currents = {
     "Tonic spiking": 1.5,
-    "Class 1": 1.000001, # 1 + 1E-6
+    "Class 1": 1.000001,  # 1 + 1E-6
     "Spike frequency adaptation": 2,
     "Phasic spiking": 1.5,
     "Accommodation": [1.5, 0, 0.5, 1, 1.5, 0],
     "Threshold variability": [1.5, 0, -1.5, 0, 1.5, 0],
     "Rebound spike": [0, -3.5, 0],
-    "Class 2": 2.000002, # 2(1 + 1E-6)
+    "Class 2": 2.000002,  # 2(1 + 1E-6)
     "Integrator": [1.5, 0, 1.5, 0, 1.5, 0, 1.5, 0],
     "Input bistability": [1.5, 1.7, 1.5, 1.7],
     "Hyperpolarizing spiking": -1,
@@ -55,150 +31,124 @@ neuron_parameters["Tonic spiking"] = {
     "A2": 0,
 }
 
-class1 = {
+neuron_parameters["Class 1"] = {
     "a": 0,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(class1)
 
 
-spike_frequency_adaptation = {
+neuron_parameters["Spike frequency adaptation"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(spike_frequency_adaptation)
 
-phasic_spiking = {
+neuron_parameters["Phasic spiking"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(phasic_spiking)
 
-accommodation = {
+neuron_parameters["Accommodation"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(accommodation)
 
-threshold_variability = {
+neuron_parameters["Threshold variability"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(threshold_variability)
 
-threshold_variability = {
+neuron_parameters["Rebound spike"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(threshold_variability)
 
-rebound_spike = {
+neuron_parameters["Class 2"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(rebound_spike)
 
-class2 = {
+neuron_parameters["Integrator"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(class2)
 
-integrator = {
+neuron_parameters["Input bistability"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(integrator)
-
-input_bistability = {
-    "a": 5,
-    "A1": 0,
-    "A2": 0,
-}
-neuron_parameters.append(input_bistability)
 
 
-hyperpolarizing_spiking = {
+neuron_parameters["Hyperpolarizing spiking"] = {
     "a": 30,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(hyperpolarizing_spiking)
 
 
-hyperpolarizing_bursting = {
+neuron_parameters["Hyperpolarizing bursting"] = {
     "a": 30,
     "A1": 10,
     "A2": -0.6,
 }
-neuron_parameters.append(hyperpolarizing_bursting)
 
 
-tonic_bursting = {
+neuron_parameters["Tonic bursting"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
 }
-neuron_parameters.append(tonic_bursting)
 
-phasic_bursting = {
+neuron_parameters["Phasic bursting"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
 }
-neuron_parameters.append(phasic_bursting)
 
-rebound_burst = {
+neuron_parameters["Rebound burst"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
 }
-neuron_parameters.append(rebound_burst)
 
 
-mixed_mode = {
+neuron_parameters["Mixed mode"] = {
     "a": 5,
     "A1": 5,
     "A2": -0.3,
 }
-neuron_parameters.append(mixed_mode)
 
-afterpotentials = {
+neuron_parameters["Afterpotentials"] = {
     "a": 5,
     "A1": 5,
     "A2": -0.3,
 }
-neuron_parameters.append(afterpotentials)
 
 
-basal_bistability = {
+neuron_parameters["Basal bistability"] = {
     "a": 0,
     "A1": 8,
     "A2": -0.1,
 }
-neuron_parameters.append(basal_bistability)
 
 
-preferred_frequency = {
+neuron_parameters["Preferred frequency"] = {
     "a": 5,
     "A1": -3,
     "A2": 0.5,
 }
-neuron_parameters.append(preferred_frequency)
 
 
-spike_latency = {
+neuron_parameters["Spike latency"] = {
     "a": 5,
     "A1": -3,
     "A2": 0.5,
 }
-neuron_parameters.append(spike_latency)
