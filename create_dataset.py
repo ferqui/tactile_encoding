@@ -21,10 +21,20 @@ def main():
     encoded_label = []
     # create training dataset by iterating over neuron params and input currents
     for _, class_name in enumerate(classes):
-        if len(input_currents[class_name])>0:
+        if len(input_currents[class_name])>1:
             # iterate over changes
-
-            print('not const current')
+            if class_name == 'Spike latency':
+                max_time = 50
+            elif class_name == 'Basal bistability' or class_name == 'Afterpotentials':
+                max_time = 200
+            elif class_name == 'Threshold variability' or class_name == 'Integrator':
+                max_time = 400
+            elif class_name == 'Preferred frequency':
+                max_time = 800
+            elif class_name == 'Accommodation' or class_name == 'Rebound spike' or class_name == 'Input bistability' or class_name == 'Rebound burst':
+                max_time = 1000
+            else:
+                print('No correct time found')
         else:
             # const current
             input_current = np.ones((time_steps, 1)) * input_currents[class_name]
