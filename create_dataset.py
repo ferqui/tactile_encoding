@@ -1,12 +1,9 @@
 import numpy as np
-import pandas as pd
 import pickle as pkl
 
 import torch
-import torch.nn as nn
 
 from utils.models import MN_neuron
-# from utils.utils import check_cuda, train_test_validation_split
 
 
 def main():
