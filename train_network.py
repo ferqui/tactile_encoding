@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from utils.utils import check_cuda, train_test_validation_split, value2key
+from utils.utils import check_cuda, train_test_validation_split, value2key, value2index
 
 
 def main():
@@ -286,7 +286,7 @@ def main():
 
         # Network parameters
         global nb_inputs
-        nb_inputs = 24*nb_input_copies
+        nb_inputs = 1 # 24*nb_input_copies
         global nb_outputs
         nb_outputs = 20 #len(np.unique(labels))
         global nb_hidden
@@ -300,6 +300,7 @@ def main():
         if not use_trainable_tc:
             global alpha
             global beta
+        dt = 1e-3 # ms
         alpha = torch.as_tensor(float(np.exp(-dt/tau_syn)))
         beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
 
@@ -805,6 +806,7 @@ def main():
     encoded_label = pickle.load(infile)
     infile.close()
 
+    
     x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(encoded_data, encoded_label, split=ratios)
 
     labels_mapping = {
@@ -830,21 +832,26 @@ def main():
         'T': "Spike latency",
     }
 
-    if ratios[1] > 0:
+    if ratios[2] > 0:
         data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
-        labels_train = value2key(y_train, labels_mapping)
-        labels_validation = value2key(y_validation, labels_mapping)
-        labels_test = value2key(y_test, labels_mapping)
+        x_train = torch.tensor(x_train, dtype=torch.float)
+        labels_train = torch.tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        x_test = torch.tensor(x_test, dtype=torch.float)
+        labels_test = torch.tensor(value2index(y_test, labels_mapping), dtype=torch.long)
+        x_validation = torch.tensor(x_validation, dtype=torch.float)
+        labels_validation = torch.tensor(value2index(y_validation, labels_mapping), dtype=torch.long)
         ds_train = TensorDataset(x_train,labels_train)
-        ds_val = TensorDataset(x_validation,labels_validation)
         ds_test = TensorDataset(x_test,labels_test)
+        ds_val = TensorDataset(x_validation,labels_validation)
     else:
         data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
-        labels_train = value2key(y_train, labels_mapping)
-        labels_test = value2key(y_test, labels_mapping)
+        x_train = torch.tensor(x_train, dtype=torch.float)
+        labels_train = torch.tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        x_test = torch.tensor(x_test, dtype=torch.float)
+        labels_test = torch.tensor(value2index(y_test, labels_mapping), dtype=torch.long)
         ds_train = TensorDataset(x_train,labels_train)
-        ds_val = []
         ds_test = TensorDataset(x_test,labels_test)
+        ds_val = []
 
 
 if __name__ == '__main__':
