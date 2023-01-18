@@ -6,11 +6,11 @@ import torch
 import torch.nn as nn
 
 from utils.models import MN_neuron
-from utils.utils import check_cuda, train_test_validation_split
+# from utils.utils import check_cuda, train_test_validation_split
 
 
 def main():
-    device = check_cuda()
+    # device = check_cuda()
     # import neuron params
     from ideal_params import neuron_parameters, input_currents, time_points, runtime
 
@@ -34,14 +34,16 @@ def main():
         if len(input_currents[class_name]) > 1:
             if time_points[class_name] is None:
                 print('Missing time points.')
-            current = np.zeros((sim_time, 1))
+            input_current = np.zeros((sim_time, 1))
             for counter, actual_current in enumerate(input_currents[class_name]):
                 if counter == 0:
-                    current[:time_points[class_name][counter]] = actual_current
+                    input_current[:time_points[class_name][counter]] = actual_current
+
                 elif counter < len(time_points[class_name]):
-                    current[time_points[class_name][counter-1]:time_points[class_name][counter]] = actual_current
+                    input_current[time_points[class_name][counter-1]:time_points[class_name][counter]] = actual_current
+
                 elif counter < len(time_points[class_name]):
-                    current[time_points[class_name]
+                    input_current[time_points[class_name]
                             [counter-1]:] = actual_current
         else:
             # const current
@@ -64,18 +66,19 @@ def main():
         # stack input current trace if input length < 1000ms
         factor = int((max_time/sim_time)+0.5)
         if factor > 1:
-            for clone in range(factor):
-                input_current = np.append(input_current, input_current)
-            input_current = input_current[:max_time]
+            input_current_list = []
+            for _ in range(factor):
+                input_current_list = np.append(input_current_list, input_current)
+            input_current = np.array(input_current_list[:max_time])
             input = torch.as_tensor(input_current)
 
-        # compute new neuron output
-        output_s = []
-        for t in range(input.shape[0]):
-            out = neurons(input[t])
-            output_s.append(out.cpu().numpy())
-        output_s = np.stack(output_s)
-        
+            # compute new neuron output
+            output_s = []
+            for t in range(input.shape[0]):
+                out = neurons(input[t])
+                output_s.append(out.cpu().numpy())
+            output_s = np.stack(output_s)
+            
         # create max_trials trials per class
         for _ in range(max_trials):
             # store neuron output
