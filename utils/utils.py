@@ -102,13 +102,12 @@ def train_test_validation_split(data, label, split=[70, 20, 10], seed=None):
 
 
 def value2key(entry, dictionary):
+    if (type(entry) != list) & (type(entry) != np.ndarray):
 
-        if (type(entry) != list) & (type(entry) != np.ndarray):
+        key = list(dictionary.keys())[list(dictionary.values()).index(entry)]
+    
+    else:
 
-            key = list(dictionary.keys())[list(dictionary.values()).index(entry)]
-        
-        else:
-
-            key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
-        
-        return key
+        key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
+    
+    return key
