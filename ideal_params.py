@@ -47,14 +47,13 @@ input_currents = {
 }
 
 
-neuron_parameters = []
+neuron_parameters = {}
 
-tonic_spiking = {
+neuron_parameters["Tonic spiking"] = {
     "a": 0,
     "A1": 0,
     "A2": 0,
 }
-neuron_parameters.append(tonic_spiking)
 
 class1 = {
     "a": 0,

@@ -10,6 +10,7 @@ from utils.models import MN_neuron
 
 
 def main():
+    # import neuron params
     from ideal_params import class_names, neuron_parameters, input_currents
 
     # run the enocding and create training data
