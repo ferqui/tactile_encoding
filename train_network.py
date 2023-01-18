@@ -29,7 +29,7 @@ def main():
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(gpu_sel=1)
+    device = check_cuda() # gpu_sel=1
 
     if use_seed:
         seed = 42
@@ -301,8 +301,8 @@ def main():
             global alpha
             global beta
         dt = 1e-3 # ms
-        alpha = torch.as_tensor(float(np.exp(-dt/tau_syn)))
-        beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
+        alpha = torch.as_as_tensor(float(np.exp(-dt/tau_syn)))
+        beta = torch.as_as_tensor(float(np.exp(-dt/tau_mem)))
 
         fwd_weight_scale = 3.0
         rec_weight_scale = 1e-2*fwd_weight_scale
@@ -600,7 +600,7 @@ def main():
         @staticmethod
         def forward(ctx, input):
             """
-            In the forward pass we compute a step function of the input Tensor
+            In the forward pass we compute a step function of the input as_tensor
             and return it. ctx is a context object that we use to stash information which 
             we need to later backpropagate our error signals. To achieve this we use the 
             ctx.save_for_backward method.
@@ -613,12 +613,12 @@ def main():
         @staticmethod
         def backward(ctx, grad_output):
             """
-            In the backward pass we receive a Tensor we need to compute the 
+            In the backward pass we receive a as_tensor we need to compute the 
             surrogate gradient of the loss with respect to the input. 
             Here we use the normalized negative part of a fast sigmoid 
             as this was done in Zenke & Ganguli (2018).
             """
-            input, = ctx.saved_tensors
+            input, = ctx.saved_as_tensors
             grad_input = grad_output.clone()
             grad = grad_input/(SurrGradSpike.scale*torch.abs(input)+1.0)**2
             return grad
@@ -662,7 +662,7 @@ def main():
                 mem = new_mem
                 syn = new_syn
 
-            # Now we merge the recorded membrane potentials into a single tensor
+            # Now we merge the recorded membrane potentials into a single as_tensor
             mem_rec = torch.stack(mem_rec, dim=1)
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
@@ -692,7 +692,7 @@ def main():
                 mem = new_mem
                 syn = new_syn
 
-            # Now we merge the recorded membrane potentials into a single tensor
+            # Now we merge the recorded membrane potentials into a single as_tensor
             mem_rec = torch.stack(mem_rec, dim=1)
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
@@ -742,7 +742,7 @@ def main():
                 mem = new_mem
                 syn = new_syn
 
-            # Now we merge the recorded membrane potentials into a single tensor
+            # Now we merge the recorded membrane potentials into a single as_tensor
             mem_rec = torch.stack(mem_rec, dim=1)
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
@@ -775,7 +775,7 @@ def main():
                 mem = new_mem
                 syn = new_syn
 
-            # Now we merge the recorded membrane potentials into a single tensor
+            # Now we merge the recorded membrane potentials into a single as_tensor
             mem_rec = torch.stack(mem_rec, dim=1)
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
@@ -798,11 +798,13 @@ def main():
     # create train test validation split
     ratios = [70, 20, 10]
 
-    infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/data_encoding", 'rb')
+    # infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/data_encoding", 'rb')
+    infile = open("./data_encoding", 'rb')
     encoded_data = pickle.load(infile)
     infile.close()
 
-    infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/label_encoding", 'rb')
+    # infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/label_encoding", 'rb')
+    infile = open("./label_encoding", 'rb')
     encoded_label = pickle.load(infile)
     infile.close()
 
@@ -833,26 +835,29 @@ def main():
     }
 
     if ratios[2] > 0:
-        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
-        x_train = torch.tensor(x_train, dtype=torch.float)
-        labels_train = torch.tensor(value2index(y_train, labels_mapping), dtype=torch.long)
-        x_test = torch.tensor(x_test, dtype=torch.float)
-        labels_test = torch.tensor(value2index(y_test, labels_mapping), dtype=torch.long)
-        x_validation = torch.tensor(x_validation, dtype=torch.float)
-        labels_validation = torch.tensor(value2index(y_validation, labels_mapping), dtype=torch.long)
+        data_steps = 1000 # np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
+        x_train = torch.as_tensor(x_train, dtype=torch.float)
+        labels_train = torch.as_tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        x_test = torch.as_tensor(x_test, dtype=torch.float)
+        labels_test = torch.as_tensor(value2index(y_test, labels_mapping), dtype=torch.long)
+        x_validation = torch.as_tensor(x_validation, dtype=torch.float)
+        labels_validation = torch.as_tensor(value2index(y_validation, labels_mapping), dtype=torch.long)
         ds_train = TensorDataset(x_train,labels_train)
         ds_test = TensorDataset(x_test,labels_test)
         ds_val = TensorDataset(x_validation,labels_validation)
     else:
         data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
-        x_train = torch.tensor(x_train, dtype=torch.float)
-        labels_train = torch.tensor(value2index(y_train, labels_mapping), dtype=torch.long)
-        x_test = torch.tensor(x_test, dtype=torch.float)
-        labels_test = torch.tensor(value2index(y_test, labels_mapping), dtype=torch.long)
+        x_train = torch.as_tensor(x_train, dtype=torch.float)
+        labels_train = torch.as_tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        x_test = torch.as_tensor(x_test, dtype=torch.float)
+        labels_test = torch.as_tensor(value2index(y_test, labels_mapping), dtype=torch.long)
         ds_train = TensorDataset(x_train,labels_train)
         ds_test = TensorDataset(x_test,labels_test)
         ds_val = []
 
+    # tain the network
+    _, acc_hist, best_layers = build_and_train(
+            data_steps, ds_train, ds_test, epochs=300, break_early=True, patience=50)
 
 if __name__ == '__main__':
     main()

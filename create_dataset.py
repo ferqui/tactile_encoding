@@ -64,12 +64,14 @@ def main():
         encoded_data_original.append([output_s, output_v])
 
         # stack input current trace if input length < 1000ms
-        factor = int((max_time/sim_time)+0.5)
+        factor = int((max_time/sim_time)) + 1
         if factor > 1:
             input_current_list = []
             for _ in range(factor):
                 input_current_list = np.append(input_current_list, input_current)
             input_current = np.array(input_current_list[:max_time])
+            if len(input_current) != 1000:
+                print("ERROR")
             input = torch.as_tensor(input_current)
 
             # compute new neuron output
