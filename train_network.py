@@ -1,13 +1,20 @@
 import numpy as np
 import pandas as pd
 
+import os
+import pickle
+import random
+
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset, DataLoader
 
-from utils.utils import check_cuda, train_test_validation_split
+from utils.utils import check_cuda, train_test_validation_split, value2key
+
 
 def main():
+
+    use_seed = False
 
     # Settings for the SNN
     global use_trainable_out
@@ -23,6 +30,16 @@ def main():
 
     # set up CUDA device
     device = check_cuda(gpu_sel=1)
+
+    if use_seed:
+        seed = 42
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        print("Seed set to {}".format(seed))
+    else:
+        seed = None
+
 
     def run_snn(inputs, layers):
 
@@ -79,7 +96,8 @@ def main():
 
         return s_out_rec, other_recs, layers_update
 
-    def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, dataset_test=None, break_early=False, patience=None):
+
+    def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, dataset_val=None, break_early=False, patience=None):
 
         if (opt_parameters != None) & (layers != None):
             parameters = opt_parameters  # The paramters we want to optimize
@@ -193,15 +211,15 @@ def main():
             accs_hist[0].append(mean_accs)
 
             # Calculate test accuracy in each epoch
-            if dataset_test is not None:
+            if dataset_val is not None:
                 test_acc, test_loss = compute_classification_accuracy(
-                    dataset_test,
+                    dataset_val,
                     layers=layers_update
                 )
                 accs_hist[1].append(test_acc)  # only safe best test
                 loss_hist[1].append(test_loss)  # only safe loss of best test
 
-            if dataset_test is None:
+            if dataset_val is None:
                 # save best training
                 if mean_accs >= np.max(accs_hist[0]):
                     best_acc_layers = []
@@ -259,7 +277,8 @@ def main():
 
         return loss_hist, accs_hist, best_acc_layers
 
-    def build_and_train(data_steps, ds_train, ds_test, epochs=300, break_early=False, patience=None):
+
+    def build_and_train(data_steps, ds_train, ds_val, epochs=300, break_early=False, patience=None):
 
         global nb_input_copies
         # Num of spiking neurons used to encode each channel
@@ -269,7 +288,7 @@ def main():
         global nb_inputs
         nb_inputs = 24*nb_input_copies
         global nb_outputs
-        nb_outputs = len(np.unique(labels))
+        nb_outputs = 20 #len(np.unique(labels))
         global nb_hidden
         nb_hidden = 450
         global nb_steps
@@ -338,7 +357,7 @@ def main():
 
         # a fixed learning rate is already defined within the train function, that's why here it is omitted
         loss_hist, accs_hist, best_layers = train(
-            ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test, break_early=break_early, patience=patience)
+            ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_val=ds_val, break_early=break_early, patience=patience)
 
         # best training and test at best training
         acc_best_train = np.max(accs_hist[0])  # returns max value
@@ -364,6 +383,7 @@ def main():
         print(
             "------------------------------------------------------------------------------------\n")
         return loss_hist, accs_hist, best_layers
+
 
     def compute_classification_accuracy(dataset, layers=None):
         """ Computes classification accuracy on supplied data in batches. """
@@ -409,6 +429,7 @@ def main():
             accs.append(tmp)
 
         return np.mean(accs), np.mean(losss)
+
 
     def ConfusionMatrix(dataset, save, layers=None, labels=None):
 
@@ -478,6 +499,7 @@ def main():
             plt.close()
         else:
             plt.show()
+
 
     def NetworkActivity(dataset, save, layers=None, labels=None):
 
@@ -562,6 +584,7 @@ def main():
         else:
             plt.show()
 
+
     class SurrGradSpike(torch.autograd.Function):
         """
         Here we implement our spiking nonlinearity which also implements 
@@ -600,6 +623,7 @@ def main():
             return grad
 
     spike_fn = SurrGradSpike.apply
+
 
     class feedforward_layer:
         '''
@@ -671,6 +695,7 @@ def main():
             mem_rec = torch.stack(mem_rec, dim=1)
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
+
 
     class recurrent_layer:
         '''
@@ -754,6 +779,7 @@ def main():
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
 
+
     class trainable_time_constants:
         def create_time_constants(nb_neurons, alpha_mean, beta_mean, trainable):
             alpha = torch.empty((nb_neurons),  device=device,
@@ -769,7 +795,56 @@ def main():
 
 
     # create train test validation split
-    x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(encoded_data, encoded_label, split=[70, 20, 10])
+    ratios = [70, 20, 10]
+
+    infile = open("./data_encoding", 'rb')
+    encoded_data = pickle.load(infile)
+    infile.close()
+
+    infile = open("./label_encoding", 'rb')
+    encoded_label = pickle.load(infile)
+    infile.close()
+
+    x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(encoded_data, encoded_label, split=ratios)
+
+    labels_mapping = {
+        'A': "Tonic spiking",
+        'B': "Class 1",
+        'C': "Spike frequency adaptation",
+        'D': "Phasic spiking",
+        'E': "Accommodation",
+        'F': "Threshold variability",
+        'G': "Rebound spike",
+        'H': "Class 2",
+        'I': "Integrator",
+        'J': "Input bistability",
+        'K': "Hyperpolarizing spiking",
+        'L': "Hyperpolarizing bursting",
+        'M': "Tonic bursting",
+        'N': "Phasic bursting",
+        'O': "Rebound burst",
+        'P': "Mixed mode",
+        'Q': "Afterpotentials",
+        'R': "Basal bistability",
+        'S': "Preferred frequency",
+        'T': "Spike latency",
+    }
+
+    if ratios[1] > 0:
+        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
+        labels_train = value2key(y_train, labels_mapping)
+        labels_validation = value2key(y_validation, labels_mapping)
+        labels_test = value2key(y_test, labels_mapping)
+        ds_train = TensorDataset(x_train,labels_train)
+        ds_val = TensorDataset(x_validation,labels_validation)
+        ds_test = TensorDataset(x_test,labels_test)
+    else:
+        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
+        labels_train = value2key(y_train, labels_mapping)
+        labels_test = value2key(y_test, labels_mapping)
+        ds_train = TensorDataset(x_train,labels_train)
+        ds_val = []
+        ds_test = TensorDataset(x_test,labels_test)
 
 
 if __name__ == '__main__':

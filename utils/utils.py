@@ -99,3 +99,16 @@ def train_test_validation_split(data, label, split=[70, 20, 10], seed=None):
         x_test_validation, y_test_validation, test_size=ratio, shuffle=True, stratify=y_test_validation, random_state=seed)
 
     return x_train, y_train, x_test, y_test, x_validation, y_validation
+
+
+def value2key(entry, dictionary):
+
+        if (type(entry) != list) & (type(entry) != np.ndarray):
+
+            key = list(dictionary.keys())[list(dictionary.values()).index(entry)]
+        
+        else:
+
+            key = [list(labels_mapping.keys())[list(labels_mapping.values()).index(e)] for e in entry]
+        
+        return key
