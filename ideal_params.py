@@ -39,6 +39,28 @@ time_points = {
     "Spike latency": [2], # 50 ms
 }
 
+runtime = { # ms
+    "Tonic spiking": 200,
+    "Class 1": 500,
+    "Spike frequency adaptation": 200,
+    "Phasic spiking": 500,
+    "Accommodation": 1000,
+    "Threshold variability": 400,
+    "Rebound spike": 1000,
+    "Class 2": 300,
+    "Integrator": 400,
+    "Input bistability": 1000,
+    "Hyperpolarizing spiking": 400,
+    "Hyperpolarizing bursting": 400,
+    "Tonic bursting": 500,
+    "Phasic bursting": 500,
+    "Rebound burst": 1000,
+    "Mixed mode": 500,
+    "Afterpotentials": 200,
+    "Basal bistability": 200,
+    "Preferred frequency": 800,
+    "Spike latency": 50,
+}
 
 neuron_parameters = {}
 

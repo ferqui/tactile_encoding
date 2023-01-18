@@ -102,13 +102,13 @@ def train_test_validation_split(data, label, split=[70, 20, 10], seed=None):
 
 
 def value2key(entry, dictionary):
+    if (type(entry) != list) & (type(entry) != np.ndarray):
 
-        if (type(entry) != list) & (type(entry) != np.ndarray):
+        key = list(dictionary.keys())[list(dictionary.values()).index(entry)]
+    
+    else:
 
-            key = list(dictionary.keys())[list(dictionary.values()).index(entry)]
-        
-        else:
-
+<<<<<<< HEAD
             key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
         
         return key
@@ -125,3 +125,8 @@ def value2index(entry, dictionary):
             idx = [list(dictionary.values()).index(e) for e in entry]
         
         return idx
+=======
+        key = [list(dictionary.keys())[list(dictionary.values()).index(e)] for e in entry]
+    
+    return key
+>>>>>>> cd640ceb7f096379637423aec85c8bf9db4be682
