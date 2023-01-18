@@ -18,6 +18,7 @@ def main():
     max_trials = 1000
     time_steps = 100
     encoded_data_original = []
+    encoded_data = []
     encoded_label = []
     # create training dataset by iterating over neuron params and input currents
     for _, class_name in enumerate(classes):
@@ -64,18 +65,29 @@ def main():
             out = neurons(input[t])
             output_s.append(out.cpu().numpy())
         output_s = np.stack(output_s)
+        encoded_data_original.append(output_s)
 
+        # TODO create 1 sec of input current for all
+
+        # compute new neuron output
+        input = torch.as_tensor(input_current)
+        output_s = []
+        for t in range(input.shape[0]):
+            out = neurons(input[t])
+            output_s.append(out.cpu().numpy())
+        output_s = np.stack(output_s)
+        
         # create max_trials trials per class
         for _ in range(max_trials):
             # store neuron output
-            encoded_data_original.append(output_s)
+            encoded_data.append(output_s)
             encoded_label.append(class_name)
 
-        # TODO create 1 sec of data for all
-    
     # dump neuron output to file
     with open('./data_encoding_original', 'wb') as handle:
         pkl.dump(encoded_data_original, handle, protocol=pkl.HIGHEST_PROTOCOL)
+    with open('./data_encoding', 'wb') as handle:
+        pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
     with open('./label_encoding', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
