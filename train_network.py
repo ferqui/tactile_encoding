@@ -798,11 +798,11 @@ def main():
     # create train test validation split
     ratios = [70, 20, 10]
 
-    infile = open("./data_encoding", 'rb')
+    infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/data_encoding", 'rb')
     encoded_data = pickle.load(infile)
     infile.close()
 
-    infile = open("./label_encoding", 'rb')
+    infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/label_encoding", 'rb')
     encoded_label = pickle.load(infile)
     infile.close()
 
