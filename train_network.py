@@ -3,11 +3,12 @@ import pandas as pd
 
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 
-from utils.models import MN_neuron
 from utils.utils import check_cuda, train_test_validation_split
 
 def main():
+
     # Settings for the SNN
     global use_trainable_out
     use_trainable_out = False
@@ -20,8 +21,8 @@ def main():
     global lr
     lr = 0.0001
 
-    # set u CUDA device
-    device = check_cuda()
+    # set up CUDA device
+    device = check_cuda(gpu_sel=1)
 
     def run_snn(inputs, layers):
 
