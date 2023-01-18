@@ -17,7 +17,7 @@ def main():
     # run the enocding and create training data
     max_trials = 1000
     time_steps = 100
-    encoded_data = []
+    encoded_data_original = []
     encoded_label = []
     # create training dataset by iterating over neuron params and input currents
     for _, class_name in enumerate(classes):
@@ -52,6 +52,7 @@ def main():
             # const current
             input_current = np.ones((time_steps, 1)) * \
                 input_currents[class_name]
+        
         # set up MN neuron
         neurons = MN_neuron(
             1, neuron_parameters[class_name], dt=1E-3, train=False)
@@ -67,12 +68,14 @@ def main():
         # create max_trials trials per class
         for _ in range(max_trials):
             # store neuron output
-            encoded_data.append(output_s)
+            encoded_data_original.append(output_s)
             encoded_label.append(class_name)
 
-    # TODO dump neuron output to file
-    with open('./data_encoding', 'wb') as handle:
-        pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
+        # TODO create 1 sec of data for all
+    
+    # dump neuron output to file
+    with open('./data_encoding_original', 'wb') as handle:
+        pkl.dump(encoded_data_original, handle, protocol=pkl.HIGHEST_PROTOCOL)
     with open('./label_encoding', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
