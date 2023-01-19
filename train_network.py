@@ -867,14 +867,14 @@ def main():
     plt.ylabel("Accuracy (%)")
     plt.legend(["Training","Test"], loc='lower right')
     #if save:
-    #    plt.savefig('../figures/HAR/training-test_acc_subset2_40_{}_{}.pdf'.format(suffix_to_save,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    #    plt.savefig('{pth/to/file}')
     plt.show()
     
     plt.plot(range(1,len(loss_hist)+1),loss_hist, color='tab:red')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     #if save:
-    #    plt.savefig('../figures/HAR/training_loss_subset2_40_{}_{}.pdf'.format(suffix_to_save,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    #    plt.savefig('{pth/to/file}')
     plt.show()
     
     # test the network (on never seen data)
