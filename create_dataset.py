@@ -28,6 +28,7 @@ def main():
 
         # iterate over changes
         sim_time = runtime[class_name]
+        # variable input currents over time
         if len(input_currents[class_name]) > 1:
             if time_points[class_name] is None:
                 print('Missing time points.')
@@ -44,9 +45,11 @@ def main():
                             [counter-1]:] = actual_current
         else:
             # const current
-            input_current = np.ones((sim_time, 1)) * \
+            # input_current_old = np.ones((sim_time, 1)) * \
+            #     input_currents[class_name]
+            input_current = np.ones(sim_time) * \
                 input_currents[class_name]
-        
+            input_current = np.transpose(input_current)
         # set up MN neuron
         neurons = MN_neuron(
             1, neuron_parameters[class_name], dt=1E-3, train=False)
