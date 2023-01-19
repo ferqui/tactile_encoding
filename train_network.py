@@ -33,7 +33,7 @@ def main():
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(gpu_sel=0,gpu_mem_frac=0.5)
+    device = check_cuda(gpu_sel=1,gpu_mem_frac=0.3)
 
     if use_seed:
         seed = 42
@@ -860,7 +860,7 @@ def main():
 
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
-        data_steps, ds_train, ds_val, epochs=300, break_early=True, patience=50)
+        data_steps, ds_train, ds_val, epochs=300)
 
     plt.figure()
     plt.plot(range(1, len(acc_hist[0])+1), 100 *
