@@ -5,11 +5,13 @@ import os
 import pickle
 import random
 
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from utils.utils import check_cuda, train_test_validation_split, value2key, value2index
+from utils.utils import check_cuda, train_test_validation_split, value2index
 
 
 def main():
@@ -29,7 +31,7 @@ def main():
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda() # gpu_sel=1
+    device = check_cuda(share_GPU=False, gpu_sel=1) # gpu_sel=1
 
     if use_seed:
         seed = 42
@@ -210,14 +212,14 @@ def main():
             mean_accs = np.mean(accs)
             accs_hist[0].append(mean_accs)
 
-            # Calculate test accuracy in each epoch
+            # Calculate validation (test) accuracy in each epoch
             if dataset_val is not None:
-                test_acc, test_loss = compute_classification_accuracy(
+                val_acc, val_loss = compute_classification_accuracy(
                     dataset_val,
                     layers=layers_update
                 )
-                accs_hist[1].append(test_acc)  # only safe best test
-                loss_hist[1].append(test_loss)  # only safe loss of best test
+                accs_hist[1].append(val_acc)  # only safe best validation (test)
+                loss_hist[1].append(val_loss)  # only safe loss of best validation (test)
 
             if dataset_val is None:
                 # save best training
@@ -226,13 +228,13 @@ def main():
                     for ii in layers_update:
                         best_acc_layers.append(ii.detach().clone())
             else:
-                # save best test
-                if np.max(test_acc) >= np.max(accs_hist[1]):
+                # save best validation (test)
+                if np.max(val_acc) >= np.max(accs_hist[1]):
                     best_acc_layers = []
                     for ii in layers_update:
                         best_acc_layers.append(ii.detach().clone())
 
-            print("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Test accuracy (loss): {:.2f}% ({:.5f}).".format(
+            print("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Validation accuracy (loss): {:.2f}% ({:.5f}).".format(
                 e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
 
             # check for early break
@@ -240,39 +242,39 @@ def main():
                 if e >= patience-1:
                     # mean acc drops
                     if np.mean(np.diff(accs_hist[1][-patience:]))*100 < -1.0:
-                        print("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                        print("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                         print(
-                            f'\nBreaking the training early at episode {e+1}, test acc dropped.')
+                            f'\nBreaking the training early at episode {e+1}, validation acc dropped.')
                         break
                     # mean acc static
                     elif abs(np.mean(np.diff(accs_hist[1][-patience:])))*100 < 1.0:
-                        print("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                        print("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                         print(
-                            f'\nBreaking the training early at episode {e+1}, test acc static.')
+                            f'\nBreaking the training early at episode {e+1}, validation acc static.')
                         break
                     # mean loss increases
                     elif np.mean(np.diff(loss_hist[1][-patience:])*-1) < 0.0:
-                        print("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                        print("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                         print(
-                            f'\nBreaking the training early at episode {e+1}, test loss increasing.')
+                            f'\nBreaking the training early at episode {e+1}, validation loss increasing.')
                         break
                     # mean loss static
                     elif abs(np.mean(np.diff(loss_hist[1][-patience:])*-1)) < 1.0:
-                        print("\nmean(delta_test_acc): {:.2f} delta_test_acc: {}" .format(
+                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1)*100, np.diff(loss_hist[1][-patience:])*-1*100))
-                        print("\nmean(delta_test_loss): {:.2f} delta_test_loss: {}" .format(
+                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                         print(
-                            f'\nBreaking the training early at episode {e+1}, test loss static.')
+                            f'\nBreaking the training early at episode {e+1}, validation loss static.')
                         break
 
         return loss_hist, accs_hist, best_acc_layers
@@ -360,25 +362,25 @@ def main():
         loss_hist, accs_hist, best_layers = train(
             ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_val=ds_val, break_early=break_early, patience=patience)
 
-        # best training and test at best training
+        # best training and validation (test) at best training
         acc_best_train = np.max(accs_hist[0])  # returns max value
         acc_best_train = acc_best_train*100
         idx_best_train = np.argmax(accs_hist[0])  # returns index of max value
-        acc_test_at_best_train = accs_hist[1][idx_best_train]*100
+        acc_val_at_best_train = accs_hist[1][idx_best_train]*100
 
-        # best test and training at best test
-        acc_best_test = np.max(accs_hist[1])
-        acc_best_test = acc_best_test*100
-        idx_best_test = np.argmax(accs_hist[1])
-        acc_train_at_best_test = accs_hist[0][idx_best_test]*100
+        # best validation (test) and training at best validation (test)
+        acc_best_val = np.max(accs_hist[1])
+        acc_best_val = acc_best_val*100
+        idx_best_val = np.argmax(accs_hist[1])
+        acc_train_at_best_val = accs_hist[0][idx_best_val]*100
 
         print(
             "\n------------------------------------------------------------------------------------")
         print("Final results: ")
-        print("Best training accuracy: {:.2f}% and according test accuracy: {:.2f}% at epoch: {}".format(
-            acc_best_train, acc_test_at_best_train, idx_best_train+1))
-        print("Best test accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
-            acc_best_test, acc_train_at_best_test, idx_best_test+1))
+        print("Best training accuracy: {:.2f}% and according validation accuracy: {:.2f}% at epoch: {}".format(
+            acc_best_train, acc_val_at_best_train, idx_best_train+1))
+        print("Best validation accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
+            acc_best_val, acc_train_at_best_val, idx_best_val+1))
         print(
             "------------------------------------------------------------------------------------")
         print(
@@ -421,7 +423,7 @@ def main():
             else:
                 m = torch.sum(spks_out, 1)  # sum over time
             _, am = torch.max(m, 1)     # argmax over output units
-            # compute test loss
+            # compute validation (test) loss
             log_p_y = log_softmax_fn(m)
             loss_val = loss_fn(log_p_y, y_local).detach().cpu().numpy()
             losss.append(loss_val)
@@ -795,7 +797,7 @@ def main():
             return alpha, beta
 
 
-    # create train test validation split
+    # create train-test-validation split
     ratios = [70, 20, 10]
 
     # infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/data_encoding", 'rb')
@@ -855,9 +857,37 @@ def main():
         ds_test = TensorDataset(x_test,labels_test)
         ds_val = []
 
-    # tain the network
-    _, acc_hist, best_layers = build_and_train(
-            data_steps, ds_train, ds_test, epochs=300, break_early=True, patience=50)
+    # tain the network (with validation)
+    loss_hist, acc_hist, best_layers = build_and_train(
+            data_steps, ds_train, ds_val, epochs=3, break_early=True, patience=50)
+    
+    plt.plot(range(1,len(acc_hist[0])+1),100*np.array(acc_hist[0]), color='blue')
+    plt.plot(range(1,len(acc_hist[1])+1),100*np.array(acc_hist[1]), color='orange')
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy (%)")
+    plt.legend(["Training","Test"], loc='lower right')
+    #if save:
+    #    plt.savefig('../figures/HAR/training-test_acc_subset2_40_{}_{}.pdf'.format(suffix_to_save,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    plt.show()
+    
+    plt.plot(range(1,len(loss_hist)+1),loss_hist, color='tab:red')
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    #if save:
+    #    plt.savefig('../figures/HAR/training_loss_subset2_40_{}_{}.pdf'.format(suffix_to_save,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    plt.show()
+    
+    # test the network (on never seen data)
+    test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
+    print("Test accuracy: {}%".format(np.round(test_acc*100,2)))
+
+    # make some statistics on test results
+    test_runs = 10
+    test_stat = list()
+    for ii in range(test_runs):
+        test_stat.append(compute_classification_accuracy(ds_test, best_layers)[0])
+    print("\nStatistics on test results:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(np.round(np.max(test_stat)*100,2),np.round(np.min(test_stat)*100,2),np.round(np.median(test_stat)*100,2)))
+
 
 if __name__ == '__main__':
     main()
