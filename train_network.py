@@ -26,12 +26,12 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 32  # 128
+    batch_size = 64  # 128
     global lr
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(share_GPU=False, gpu_sel=0) # gpu_sel=1
+    device = check_cuda(share_GPU=False, gpu_sel=0)  # gpu_sel=1
 
     if use_seed:
         seed = 42
@@ -41,7 +41,6 @@ def main():
         print("Seed set to {}".format(seed))
     else:
         seed = None
-
 
     def run_snn(inputs, layers):
 
@@ -97,7 +96,6 @@ def main():
         layers_update = layers
 
         return s_out_rec, other_recs, layers_update
-
 
     def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, dataset_val=None, break_early=False, patience=None):
 
@@ -218,8 +216,10 @@ def main():
                     dataset_val,
                     layers=layers_update
                 )
-                accs_hist[1].append(val_acc)  # only safe best validation (test)
-                loss_hist[1].append(val_loss)  # only safe loss of best validation (test)
+                # only safe best validation (test)
+                accs_hist[1].append(val_acc)
+                # only safe loss of best validation (test)
+                loss_hist[1].append(val_loss)
 
             if dataset_val is None:
                 # save best training
@@ -279,7 +279,6 @@ def main():
 
         return loss_hist, accs_hist, best_acc_layers
 
-
     def build_and_train(data_steps, ds_train, ds_val, epochs=300, break_early=False, patience=None):
 
         global nb_input_copies
@@ -288,9 +287,9 @@ def main():
 
         # Network parameters
         global nb_inputs
-        nb_inputs = 1 # 24*nb_input_copies
+        nb_inputs = 1  # 24*nb_input_copies
         global nb_outputs
-        nb_outputs = 20 #len(np.unique(labels))
+        nb_outputs = 20  # len(np.unique(labels))
         global nb_hidden
         nb_hidden = 450
         global nb_steps
@@ -302,7 +301,7 @@ def main():
         if not use_trainable_tc:
             global alpha
             global beta
-        dt = 1e-3 # ms
+        dt = 1e-3  # ms
         alpha = torch.as_tensor(float(np.exp(-dt/tau_syn)))
         beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
 
@@ -387,7 +386,6 @@ def main():
             "------------------------------------------------------------------------------------\n")
         return loss_hist, accs_hist, best_layers
 
-
     def compute_classification_accuracy(dataset, layers=None):
         """ Computes classification accuracy on supplied data in batches. """
 
@@ -433,7 +431,6 @@ def main():
 
         return np.mean(accs), np.mean(losss)
 
-
     def ConfusionMatrix(dataset, save, layers=None, labels=None):
 
         g = torch.Generator()
@@ -474,7 +471,7 @@ def main():
             preds.extend(am.detach().cpu().numpy())
 
         print("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
-                                                                                 * 100, np.std(accs)*100))
+                                                                          * 100, np.std(accs)*100))
 
         cm = confusion_matrix(trues, preds, normalize='true')
         cm_df = pd.DataFrame(cm, index=[ii for ii in labels], columns=[
@@ -502,7 +499,6 @@ def main():
             plt.close()
         else:
             plt.show()
-
 
     def NetworkActivity(dataset, save, layers=None, labels=None):
 
@@ -587,7 +583,6 @@ def main():
         else:
             plt.show()
 
-
     class SurrGradSpike(torch.autograd.Function):
         """
         Here we implement our spiking nonlinearity which also implements 
@@ -620,13 +615,12 @@ def main():
             Here we use the normalized negative part of a fast sigmoid 
             as this was done in Zenke & Ganguli (2018).
             """
-            input, = ctx.saved_tensors # saved_as_tensors
+            input, = ctx.saved_tensors  # saved_as_tensors
             grad_input = grad_output.clone()
             grad = grad_input/(SurrGradSpike.scale*torch.abs(input)+1.0)**2
             return grad
 
     spike_fn = SurrGradSpike.apply
-
 
     class feedforward_layer:
         '''
@@ -698,7 +692,6 @@ def main():
             mem_rec = torch.stack(mem_rec, dim=1)
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
-
 
     class recurrent_layer:
         '''
@@ -782,7 +775,6 @@ def main():
             spk_rec = torch.stack(spk_rec, dim=1)
             return spk_rec, mem_rec
 
-
     class trainable_time_constants:
         def create_time_constants(nb_neurons, alpha_mean, beta_mean, trainable):
             alpha = torch.empty((nb_neurons),  device=device,
@@ -795,7 +787,6 @@ def main():
             torch.nn.init.normal_(
                 beta, mean=beta_mean, std=beta_mean/10)
             return alpha, beta
-
 
     # create train-test-validation split
     ratios = [70, 20, 10]
@@ -810,8 +801,8 @@ def main():
     encoded_label = pickle.load(infile)
     infile.close()
 
-    
-    x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(encoded_data, encoded_label, split=ratios)
+    x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(
+        encoded_data, encoded_label, split=ratios)
 
     labels_mapping = {
         'A': "Tonic spiking",
@@ -837,58 +828,69 @@ def main():
     }
 
     if ratios[2] > 0:
-        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
+        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [
+                            len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
         x_train = torch.as_tensor(np.array(x_train), dtype=torch.float)
-        labels_train = torch.as_tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        labels_train = torch.as_tensor(value2index(
+            y_train, labels_mapping), dtype=torch.long)
         x_test = torch.as_tensor(np.array(x_test), dtype=torch.float)
-        labels_test = torch.as_tensor(value2index(y_test, labels_mapping), dtype=torch.long)
-        x_validation = torch.as_tensor(np.array(x_validation), dtype=torch.float)
-        labels_validation = torch.as_tensor(value2index(y_validation, labels_mapping), dtype=torch.long)
-        ds_train = TensorDataset(x_train,labels_train)
-        ds_test = TensorDataset(x_test,labels_test)
-        ds_val = TensorDataset(x_validation,labels_validation)
+        labels_test = torch.as_tensor(value2index(
+            y_test, labels_mapping), dtype=torch.long)
+        x_validation = torch.as_tensor(
+            np.array(x_validation), dtype=torch.float)
+        labels_validation = torch.as_tensor(value2index(
+            y_validation, labels_mapping), dtype=torch.long)
+        ds_train = TensorDataset(x_train, labels_train)
+        ds_test = TensorDataset(x_test, labels_test)
+        ds_val = TensorDataset(x_validation, labels_validation)
     else:
-        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
+        data_steps = np.min(np.concatenate(
+            ([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
         x_train = torch.as_tensor(x_train, dtype=torch.float)
-        labels_train = torch.as_tensor(value2index(y_train, labels_mapping), dtype=torch.long)
+        labels_train = torch.as_tensor(value2index(
+            y_train, labels_mapping), dtype=torch.long)
         x_test = torch.as_tensor(x_test, dtype=torch.float)
-        labels_test = torch.as_tensor(value2index(y_test, labels_mapping), dtype=torch.long)
-        ds_train = TensorDataset(x_train,labels_train)
-        ds_test = TensorDataset(x_test,labels_test)
+        labels_test = torch.as_tensor(value2index(
+            y_test, labels_mapping), dtype=torch.long)
+        ds_train = TensorDataset(x_train, labels_train)
+        ds_test = TensorDataset(x_test, labels_test)
         ds_val = []
 
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
-            data_steps, ds_train, ds_val, epochs=3, break_early=True, patience=50)
-    
-    plt.plot(range(1,len(acc_hist[0])+1),100*np.array(acc_hist[0]), color='blue')
-    plt.plot(range(1,len(acc_hist[1])+1),100*np.array(acc_hist[1]), color='orange')
+        data_steps, ds_train, ds_val, epochs=3, break_early=True, patience=50)
+
+    plt.plot(range(1, len(acc_hist[0])+1), 100 *
+             np.array(acc_hist[0]), color='blue')
+    plt.plot(range(1, len(acc_hist[1])+1), 100 *
+             np.array(acc_hist[1]), color='orange')
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy (%)")
-    plt.legend(["Training","Test"], loc='lower right')
-    #if save:
+    plt.legend(["Training", "Test"], loc='lower right')
+    # if save:
     #    plt.savefig('{pth/to/file}')
     plt.show()
-    
-    plt.plot(range(1,len(loss_hist)+1),loss_hist, color='tab:red')
+
+    plt.plot(range(1, len(loss_hist)+1), loss_hist, color='tab:red')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    #if save:
+    # if save:
     #    plt.savefig('{pth/to/file}')
     plt.show()
-    
+
     # test the network (on never seen data)
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
-    print("Test accuracy: {}%".format(np.round(test_acc*100,2)))
+    print("Test accuracy: {}%".format(np.round(test_acc*100, 2)))
 
     # make some statistics on test results
     test_runs = 10
     test_stat = list()
     for ii in range(test_runs):
-        test_stat.append(compute_classification_accuracy(ds_test, best_layers)[0])
-    print("\nStatistics on test results:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(np.round(np.max(test_stat)*100,2),np.round(np.min(test_stat)*100,2),np.round(np.median(test_stat)*100,2)))
+        test_stat.append(compute_classification_accuracy(
+            ds_test, best_layers)[0])
+    print("\nStatistics on test results:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(np.round(
+        np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
 
 
 if __name__ == '__main__':
     main()
-

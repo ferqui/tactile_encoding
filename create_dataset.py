@@ -13,7 +13,7 @@ def main():
 
     classes = neuron_parameters.keys()
     # run the enocding and create training data
-    max_trials = 1000
+    max_trials = 100
     max_time = 1000 # ms
     encoded_data_original = []
     encoded_data = []
