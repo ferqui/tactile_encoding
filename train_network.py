@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import pickle
 import random
+import datetime
 
 import matplotlib.pyplot as plt
 
@@ -17,6 +18,7 @@ from utils.utils import check_cuda, train_test_validation_split, value2index
 def main():
 
     use_seed = False
+    save = True
 
     # Settings for the SNN
     global use_trainable_out
@@ -26,12 +28,12 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 64  # 128
+    batch_size = 128  # 128
     global lr
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(share_GPU=False, gpu_sel=0)  # gpu_sel=1
+    device = check_cuda(gpu_sel=0,gpu_mem_frac=0.5)
 
     if use_seed:
         seed = 42
@@ -789,7 +791,7 @@ def main():
             return alpha, beta
 
     # create train-test-validation split
-    ratios = [70, 20, 10]
+    ratios = [70, 10, 20]
 
     # infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/data_encoding", 'rb')
     infile = open("./data_encoding", 'rb')
@@ -858,24 +860,31 @@ def main():
 
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
-        data_steps, ds_train, ds_val, epochs=3, break_early=True, patience=50)
+        data_steps, ds_train, ds_val, epochs=300, break_early=True, patience=50)
 
+    plt.figure()
     plt.plot(range(1, len(acc_hist[0])+1), 100 *
              np.array(acc_hist[0]), color='blue')
     plt.plot(range(1, len(acc_hist[1])+1), 100 *
              np.array(acc_hist[1]), color='orange')
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy (%)")
-    plt.legend(["Training", "Test"], loc='lower right')
-    # if save:
-    #    plt.savefig('{pth/to/file}')
+    plt.legend(["Training", "Validation"], loc='lower right')
+    if save:
+        plt.savefig("./plots/training/Accuracy_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
     plt.show()
 
-    plt.plot(range(1, len(loss_hist)+1), loss_hist, color='tab:red')
+    plt.figure()
+    #plt.plot(range(1, len(loss_hist)+1), loss_hist, color='tab:red')
+    plt.plot(range(1, len(loss_hist[0])+1), 100 *
+             np.array(loss_hist[0]), color='tab:red')
+    plt.plot(range(1, len(loss_hist[1])+1), 100 *
+             np.array(loss_hist[1]), color='tab:green')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    # if save:
-    #    plt.savefig('{pth/to/file}')
+    plt.legend(["Training", "Validation"], loc='upper right')
+    if save:
+        plt.savefig("./plots/training/Loss_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
     plt.show()
 
     # test the network (on never seen data)

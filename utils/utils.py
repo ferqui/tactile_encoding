@@ -3,10 +3,10 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-def check_cuda(share_GPU=True, gpu_sel=0, gpu_mem_frac=0.5):
+def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.5):
     """Check for available GPU and distribute work (if needed/wanted)"""
 
-    if (torch.cuda.device_count()>=1) & (share_GPU):
+    if (torch.cuda.device_count()>1) & (share_GPU):
         gpu_av = [torch.cuda.is_available() for ii in range(torch.cuda.device_count())]
         print("Detected {} GPUs. The load will be shared.".format(torch.cuda.device_count()))
         for gpu in range(len(gpu_av)):
@@ -18,8 +18,8 @@ def check_cuda(share_GPU=True, gpu_sel=0, gpu_mem_frac=0.5):
                     device = torch.device("cuda:"+str(gpu_av.index(True)))
             else:
                 device = torch.device("cpu")
-                print("No GPU detected. Running on CPU.")
-    elif (torch.cuda.device_count()>=1) & (not share_GPU):
+                print("No available GPU detected. Running on CPU.")
+    elif (torch.cuda.device_count()>1) & (not share_GPU):
         print("Multiple GPUs detected but single GPU selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
         device = torch.device("cuda:"+str(gpu_sel))
         torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
