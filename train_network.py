@@ -26,7 +26,7 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 128  # 128
+    batch_size = 32  # 128
     global lr
     lr = 0.0001
 
@@ -620,7 +620,7 @@ def main():
             Here we use the normalized negative part of a fast sigmoid 
             as this was done in Zenke & Ganguli (2018).
             """
-            input, = ctx.saved_as_tensors
+            input, = ctx.saved_tensors # saved_as_tensors
             grad_input = grad_output.clone()
             grad = grad_input/(SurrGradSpike.scale*torch.abs(input)+1.0)**2
             return grad
