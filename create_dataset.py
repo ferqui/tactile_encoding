@@ -45,11 +45,11 @@ def main():
                             [counter-1]:] = actual_current
         else:
             # const current
-            # input_current_old = np.ones((sim_time, 1)) * \
-            #     input_currents[class_name]
-            input_current = np.ones(sim_time) * \
+            input_current = np.ones((sim_time, 1)) * \
                 input_currents[class_name]
-            input_current = np.transpose(input_current)
+            # input_current = np.ones(sim_time) * \
+            #     input_currents[class_name]
+            # input_current = np.transpose(input_current)
         # set up MN neuron
         neurons = MN_neuron(
             1, neuron_parameters[class_name], dt=1E-3, train=False)
@@ -60,10 +60,10 @@ def main():
         output_s = []
         for t in range(input.shape[0]):
             out = neurons(input[t])
-            output_s.append(out.cpu().numpy())
-            output_v.append(neurons.state.V.cpu().numpy())
-        output_s = np.stack(output_s)
-        output_v = np.stack(output_v)
+            output_s.append(out[0].cpu().numpy()) # [0] is needed for single neuron
+            output_v.append(neurons.state.V[0].cpu().numpy())
+        # output_s = np.stack(output_s)
+        # output_v = np.stack(output_v)
         encoded_data_original.append([output_s, output_v])
 
         # stack input current trace if input length < 1000ms
@@ -81,8 +81,8 @@ def main():
             output_s = []
             for t in range(input.shape[0]):
                 out = neurons(input[t])
-                output_s.append(out.cpu().numpy())
-            output_s = np.stack(output_s)
+                output_s.append(out[0].cpu().numpy())
+            # output_s = np.stack(output_s)
             
         # create max_trials trials per class
         for _ in range(max_trials):
@@ -90,6 +90,7 @@ def main():
             encoded_data.append(output_s)
             encoded_label.append(class_name)
 
+    print(np.array(encoded_data).shape)
     # dump neuron output to file
     with open('./data_encoding_original', 'wb') as handle:
         pkl.dump(encoded_data_original, handle, protocol=pkl.HIGHEST_PROTOCOL)

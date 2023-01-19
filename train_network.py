@@ -26,12 +26,12 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 512  # 128
+    batch_size = 128  # 128
     global lr
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(share_GPU=False, gpu_sel=1) # gpu_sel=1
+    device = check_cuda(share_GPU=False, gpu_sel=0) # gpu_sel=1
 
     if use_seed:
         seed = 42

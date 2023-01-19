@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-def check_cuda(share_GPU=True, gpu_sel=0, gpu_mem_frac=0.3):
+def check_cuda(share_GPU=True, gpu_sel=0, gpu_mem_frac=0.5):
     """Check for available GPU and distribute work (if needed/wanted)"""
 
     if (torch.cuda.device_count()>=1) & (share_GPU):
