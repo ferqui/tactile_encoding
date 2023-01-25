@@ -3,3 +3,4 @@ data/*
 runs
 .idea/
 .venv
+.ipynb_checkpoints

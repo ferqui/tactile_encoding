@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from utils.utils import check_cuda, train_test_validation_split, value2index
+from tactile_encoding.utils.utils import check_cuda, train_test_validation_split, value2index
 
 
 def main():

@@ -3,12 +3,12 @@ import pickle as pkl
 
 import torch
 
-from utils.models import MN_neuron
+from tactile_encoding.utils.models import MN_neuron
 
 
 def original(add_noise=False, temp_jitter=False):
     # import neuron params
-    from ideal_params import neuron_parameters, input_currents, time_points, runtime
+    from tactile_encoding.parameters.ideal_params import neuron_parameters, input_currents, time_points, runtime
 
     classes = neuron_parameters.keys()
 
@@ -68,7 +68,7 @@ def original(add_noise=False, temp_jitter=False):
             output_v.append(neurons.state.V[0].cpu().numpy())
         encoded_data_original.append([output_s, output_v, input_current])
 
-    filename = './data/data_encoding_original'
+    filename = '../data/data_encoding_original'
     if add_noise:
         filename = filename + '_noisy'
     if temp_jitter:
@@ -82,7 +82,7 @@ def original(add_noise=False, temp_jitter=False):
 
 def fix_time(add_noise=False, temp_jitter=False):
     # import neuron params
-    from ideal_params import neuron_parameters, input_currents, time_points, runtime
+    from tactile_encoding.parameters.ideal_params import neuron_parameters, input_currents, time_points, runtime
 
     classes = neuron_parameters.keys()
 
@@ -178,7 +178,7 @@ def fix_time(add_noise=False, temp_jitter=False):
             encoded_data.append([output_s, output_v, input_current])
             encoded_label.append(class_name)
 
-    filename = './data/data_encoding'
+    filename = '../data/data_encoding'
     if add_noise:
         filename = filename + '_noisy'
     if temp_jitter:
@@ -187,7 +187,7 @@ def fix_time(add_noise=False, temp_jitter=False):
     # dump neuron output to file
     with open(filename, 'wb') as handle:
         pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
-    with open('./label_encoding', 'wb') as handle:
+    with open('../data/label_encoding', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
