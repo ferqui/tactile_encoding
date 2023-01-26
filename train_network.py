@@ -13,12 +13,13 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
 from tactile_encoding.utils.utils import check_cuda, train_test_validation_split, value2index
+from tactile_encoding.parameters.ideal_params import input_currents
 
 
 def main():
 
     use_seed = False
-    save = False # to save accuracy and loss plots from training
+    save = False  # to save accuracy and loss plots from training
 
     # Specify what kind of data to use
     original = False
@@ -35,28 +36,30 @@ def main():
     global use_dropout
     use_dropout = False
     global batch_size
-    batch_size = 128  # 128
+    batch_size = 64 # 128
     global lr
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(gpu_sel=1,gpu_mem_frac=0.3)
+    device = check_cuda(gpu_sel=1, gpu_mem_frac=0.8)
+    print(device)
 
     if original:
         if noisy:
-            data_filepath = "../data/data_encoding_original_noisy"
+            data_filepath = "./data/data_encoding_original_noisy.pkl"
             data_specs = "MN encoding original, noisy"
         else:
-            data_filepath = "../data/data_encoding_original"
+            data_filepath = "./data/data_encoding_original.pkl"
             data_specs = "MN encoding original"
     else:
         if noisy:
-            data_filepath = "../data/data_encoding_noisy"
+            data_filepath = "./data/data_encoding_noisy.pkl"
             data_specs = "MN encoding noisy"
+            label_filepath = "./data/label_encoding_noisy.pkl"
         else:
-            data_filepath = "../data/data_encoding"
+            data_filepath = "./data/data_encoding.pkl"
             data_specs = "MN encoding"
-    label_filepath = "../data/label_encoding"
+            label_filepath = "./data/label_encoding.pkl"
 
     if use_seed:
         seed = 42
@@ -181,6 +184,7 @@ def main():
         loss_hist = [[], []]
         accs_hist = [[], []]
         for e in range(nb_epochs):
+            print(f"Starting epoch {e+1} of {nb_epochs} ")
             # learning rate decreases over epochs
             optimizer = torch.optim.Adamax(
                 parameters, lr=lr, betas=(0.9, 0.995))
@@ -201,6 +205,7 @@ def main():
                     m = spks_out
                 else:
                     m = torch.sum(spks_out, 1)  # sum over time
+
                 # cross entropy loss on the active read-out layer
                 log_p_y = log_softmax_fn(m)
 
@@ -813,21 +818,25 @@ def main():
                 beta, mean=beta_mean, std=beta_mean/10)
             return alpha, beta
 
+    print("Setting up data.")
     # create train-test-validation split
     ratios = [70, 10, 20]
 
-    #infile = open("./data_encoding", 'rb')
+    # infile = open("./data_encoding", 'rb')
     infile = open(data_filepath, "rb")
     encoded_data = pickle.load(infile)
     infile.close()
 
-    #infile = open("./label_encoding", 'rb')
-    infile = open(label_filepath, "rb")
-    encoded_label = pickle.load(infile)
-    infile.close()
+    if original:
+        encoded_label = input_currents.keys()
+    else:
+        # infile = open("./label_encoding", 'rb')
+        infile = open(label_filepath, "rb")
+        encoded_label = pickle.load(infile)
+        infile.close()
 
     x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(
-        encoded_data, encoded_label, split=ratios)
+        np.array(encoded_data)[:, 0], encoded_label, split=ratios)
 
     labels_mapping = {
         'A': "Tonic spiking",
@@ -881,6 +890,7 @@ def main():
         ds_test = TensorDataset(x_test, labels_test)
         ds_val = []
 
+    print("Start training.")
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
         data_steps, ds_train, ds_val, epochs=eps)
@@ -895,7 +905,8 @@ def main():
     plt.title(data_specs)
     plt.legend(["Training", "Validation"], loc='lower right')
     if save:
-        plt.savefig("./plots/training/Accuracy_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        plt.savefig(
+            "./plots/training/Accuracy_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
     plt.show()
 
     plt.figure()
@@ -909,12 +920,15 @@ def main():
     plt.title(data_specs)
     plt.legend(["Training", "Validation"], loc='upper right')
     if save:
-        plt.savefig("./plots/training/Loss_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        plt.savefig(
+            "./plots/training/Loss_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
     plt.show()
 
     # test the network (on never seen data)
+    print("Testing the results.")
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
-    print("Test accuracy for {}: {}%".format(np.round(data_specs,test_acc*100, 2)))
+    print("Test accuracy for {}: {}%".format(
+        np.round(data_specs, test_acc*100, 2)))
 
     # make some statistics on test results
     test_runs = 10
@@ -922,7 +936,7 @@ def main():
     for ii in range(test_runs):
         test_stat.append(compute_classification_accuracy(
             ds_test, best_layers)[0])
-    print("\nStatistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs,np.round(
+    print("\nStatistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs, np.round(
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
 
 
