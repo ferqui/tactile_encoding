@@ -928,7 +928,7 @@ def main():
     print("Testing the results.")
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
     print("Test accuracy for {}: {}%".format(
-        np.round(data_specs, test_acc*100, 2)))
+        data_specs, np.round(test_acc*100, 2)))
 
     # make some statistics on test results
     test_runs = 10
