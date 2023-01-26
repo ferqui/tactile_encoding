@@ -171,7 +171,7 @@ def fix_time():
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def fix_time_noisy(add_noise=False, temp_jitter=False):
+def fix_time_noisy(temp_jitter=False):
     # import neuron params
     from tactile_encoding.parameters.ideal_params import neuron_parameters, input_currents, time_points, runtime
 
@@ -227,33 +227,27 @@ def fix_time_noisy(add_noise=False, temp_jitter=False):
             # round down, with first list initialized
             factor = round((max_time/sim_time)+0.5)
             if factor > 1:
-                if add_noise:
+                noise = np.random.normal(
+                    loc=0.0, scale=0.1, size=input_current.size)
+                input_current_list = np.array(
+                    [input_current[x] + noise[x] for x in range(len(input_current))])
+                for _ in range(factor):
                     noise = np.random.normal(
                         loc=0.0, scale=0.1, size=input_current.size)
-                    input_current_list = np.array(
-                        [input_current[x] + noise[x] for x in range(len(input_current))])
-                else:
-                    input_current_list = input_current
-                for _ in range(factor):
-                    if add_noise:
-                        noise = np.random.normal(
-                            loc=0.0, scale=0.1, size=input_current.size)
-                        input_current_list = np.append(input_current_list, np.array(
-                            [input_current[x] + noise[x] for x in range(len(input_current))]), axis=0)
-                    else:
-                        input_current_list = np.append(
-                            input_current_list, input_current, axis=0)
+                    input_current_list = np.append(input_current_list, np.array(
+                        [input_current[x] + noise[x] for x in range(len(input_current))]), axis=0)
 
                 # cut down to fix length
                 input_current = np.array(input_current_list[:max_time])
-                if len(input_current) != 1000:
-                    print("ERROR")
+
             else:
-                if add_noise:
-                    noise = np.random.normal(
-                        loc=0.0, scale=0.1, size=input_current.size)
-                    input_current = np.array(
-                        [input_current[x] + noise[x] for x in range(len(input_current))])
+                noise = np.random.normal(
+                    loc=0.0, scale=0.1, size=input_current.size)
+                input_current = np.array(
+                    [input_current[x] + noise[x] for x in range(len(input_current))])
+
+            if len(input_current) != 1000:
+                    print("ERROR")
 
             input = torch.as_tensor(input_current)
 
@@ -270,9 +264,8 @@ def fix_time_noisy(add_noise=False, temp_jitter=False):
             encoded_data.append([output_s, output_v, input_current])
             encoded_label.append(class_name)
 
-    filename = './data/data_encoding'
-    if add_noise:
-        filename = filename + '_noisy'
+    filename = './data/data_encoding_noisy'
+
     if temp_jitter:
         filename = filename + '_temp_jitter'
 
@@ -286,14 +279,14 @@ def fix_time_noisy(add_noise=False, temp_jitter=False):
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def fix_time_noisy(add_noise=False, temp_jitter=False):
+def fix_time_noisy_test(temp_jitter=False):
     # import neuron params
     from tactile_encoding.parameters.ideal_params import neuron_parameters, input_currents, time_points, runtime
 
     classes = neuron_parameters.keys()
 
     # run the enocding and create training data
-    max_trials = 100
+    max_trials = 2
     max_time = 1000  # ms
     encoded_data = []
     encoded_label = []
@@ -311,64 +304,48 @@ def fix_time_noisy(add_noise=False, temp_jitter=False):
         for _ in range(max_trials):
             # iterate over changes
             sim_time = runtime[class_name]
-            # variable input currents over time
-            if len(input_currents[class_name]) > 1:
-                if time_points[class_name] is None:
-                    print('Missing time points.')
-                input_current = np.zeros((sim_time, 1))
-                # TODO add temp jitter here and keep repeating signal until 1sec reached
-                for counter, actual_current in enumerate(input_currents[class_name]):
-                    if counter == 0:
-                        input_current[:time_points[class_name]
-                                      [counter]] = actual_current
-
-                    elif counter < len(time_points[class_name]):
-                        input_current[time_points[class_name][counter-1]
-                            :time_points[class_name][counter]] = actual_current
-
-                    elif counter < len(time_points[class_name]):
-                        input_current[time_points[class_name]
-                                      [counter-1]:] = actual_current
+            # calc if stacking input is needed
+            if sim_time < max_time:
+                factor = round((max_time/sim_time)+0.5)
             else:
-                # const current
-                input_current = np.ones((sim_time, 1)) * \
-                    input_currents[class_name]
+                factor = 1
+                
+            for rep_counter in range(factor):
+                # variable input current
+                if len(input_currents[class_name]) > 1:
+                    if time_points[class_name] is None:
+                        print('Missing time points.')
+                    input_current = np.zeros((sim_time, 1))
+                    # TODO add temp jitter here and keep repeating signal until 1sec reached
+                    for counter, actual_current in enumerate(input_currents[class_name]):
+                        if counter == 0:
+                            input_current[:time_points[class_name]
+                                        [counter]] = actual_current
+
+                        elif counter < len(time_points[class_name]):
+                            input_current[time_points[class_name][counter-1]
+                                :time_points[class_name][counter]] = actual_current
+
+                        elif counter < len(time_points[class_name]):
+                            input_current[time_points[class_name]
+                                        [counter-1]:] = actual_current
+                # const input current
+                else:
+
+                    input_current = np.ones((max_time, 1)) * \
+                        input_currents[class_name]
+                    noise = np.random.normal(
+                        loc=0.0, scale=0.1, size=input_current.size)
+                    input_current = np.array(
+                        [input_current[x] + noise[x] for x in range(len(input_current))])
+                    break
 
             # set up MN neuron
             neurons = MN_neuron(
                 1, neuron_parameters[class_name], dt=1E-3, train=False)
 
-            # stack input current trace if input length < 1000ms
-            # round down, with first list initialized
-            factor = round((max_time/sim_time)+0.5)
-            if factor > 1:
-                if add_noise:
-                    noise = np.random.normal(
-                        loc=0.0, scale=0.1, size=input_current.size)
-                    input_current_list = np.array(
-                        [input_current[x] + noise[x] for x in range(len(input_current))])
-                else:
-                    input_current_list = input_current
-                for _ in range(factor):
-                    if add_noise:
-                        noise = np.random.normal(
-                            loc=0.0, scale=0.1, size=input_current.size)
-                        input_current_list = np.append(input_current_list, np.array(
-                            [input_current[x] + noise[x] for x in range(len(input_current))]), axis=0)
-                    else:
-                        input_current_list = np.append(
-                            input_current_list, input_current, axis=0)
-
-                # cut down to fix length
-                input_current = np.array(input_current_list[:max_time])
-                if len(input_current) != 1000:
+            if len(input_current) != 1000:
                     print("ERROR")
-            else:
-                if add_noise:
-                    noise = np.random.normal(
-                        loc=0.0, scale=0.1, size=input_current.size)
-                    input_current = np.array(
-                        [input_current[x] + noise[x] for x in range(len(input_current))])
 
             input = torch.as_tensor(input_current)
 
@@ -385,9 +362,8 @@ def fix_time_noisy(add_noise=False, temp_jitter=False):
             encoded_data.append([output_s, output_v, input_current])
             encoded_label.append(class_name)
 
-    filename = './data/data_encoding'
-    if add_noise:
-        filename = filename + '_noisy'
+    filename = './data/data_encoding_noisy'
+
     if temp_jitter:
         filename = filename + '_temp_jitter'
 
@@ -402,6 +378,7 @@ def fix_time_noisy(add_noise=False, temp_jitter=False):
 
 
 if __name__ == '__main__':
+    fix_time_noisy_test()
     # original length
     print('Creating original data.')
     original()
