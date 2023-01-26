@@ -18,7 +18,14 @@ from tactile_encoding.utils.utils import check_cuda, train_test_validation_split
 def main():
 
     use_seed = False
-    save = True
+    save = False # to save accuracy and loss plots from training
+
+    # Specify what kind of data to use
+    original = False
+    noisy = False
+
+    # Set the number of epochs
+    eps = 5
 
     # Settings for the SNN
     global use_trainable_out
@@ -34,6 +41,22 @@ def main():
 
     # set up CUDA device
     device = check_cuda(gpu_sel=1,gpu_mem_frac=0.3)
+
+    if original:
+        if noisy:
+            data_filepath = "../data/data_encoding_original_noisy"
+            data_specs = "MN encoding original, noisy"
+        else:
+            data_filepath = "../data/data_encoding_original"
+            data_specs = "MN encoding original"
+    else:
+        if noisy:
+            data_filepath = "../data/data_encoding_noisy"
+            data_specs = "MN encoding noisy"
+        else:
+            data_filepath = "../data/data_encoding"
+            data_specs = "MN encoding"
+    label_filepath = "../data/label_encoding"
 
     if use_seed:
         seed = 42
@@ -793,13 +816,13 @@ def main():
     # create train-test-validation split
     ratios = [70, 10, 20]
 
-    # infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/data_encoding", 'rb')
-    infile = open("./data_encoding", 'rb')
+    #infile = open("./data_encoding", 'rb')
+    infile = open(data_filepath, "rb")
     encoded_data = pickle.load(infile)
     infile.close()
 
-    # infile = open("/space/fra/telluride2022/nte_encoding/tactile_encoding/label_encoding", 'rb')
-    infile = open("./label_encoding", 'rb')
+    #infile = open("./label_encoding", 'rb')
+    infile = open(label_filepath, "rb")
     encoded_label = pickle.load(infile)
     infile.close()
 
@@ -860,7 +883,7 @@ def main():
 
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
-        data_steps, ds_train, ds_val, epochs=300)
+        data_steps, ds_train, ds_val, epochs=eps)
 
     plt.figure()
     plt.plot(range(1, len(acc_hist[0])+1), 100 *
@@ -869,6 +892,7 @@ def main():
              np.array(acc_hist[1]), color='orange')
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy (%)")
+    plt.title(data_specs)
     plt.legend(["Training", "Validation"], loc='lower right')
     if save:
         plt.savefig("./plots/training/Accuracy_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
@@ -882,6 +906,7 @@ def main():
              np.array(loss_hist[1]), color='tab:green')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
+    plt.title(data_specs)
     plt.legend(["Training", "Validation"], loc='upper right')
     if save:
         plt.savefig("./plots/training/Loss_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
@@ -889,7 +914,7 @@ def main():
 
     # test the network (on never seen data)
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
-    print("Test accuracy: {}%".format(np.round(test_acc*100, 2)))
+    print("Test accuracy for {}: {}%".format(np.round(data_specs,test_acc*100, 2)))
 
     # make some statistics on test results
     test_runs = 10
@@ -897,7 +922,7 @@ def main():
     for ii in range(test_runs):
         test_stat.append(compute_classification_accuracy(
             ds_test, best_layers)[0])
-    print("\nStatistics on test results:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(np.round(
+    print("\nStatistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs,np.round(
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
 
 
