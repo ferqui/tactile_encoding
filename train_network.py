@@ -26,7 +26,7 @@ def main():
     noisy = False
 
     # Set the number of epochs
-    eps = 2
+    eps = 1
 
     # Settings for the SNN
     global use_trainable_out
@@ -461,7 +461,7 @@ def main():
             accs.append(tmp)
 
             if label_probabilities:
-                return np.mean(accs), np.mean(losss), log_p_y
+                return np.mean(accs), np.mean(losss), torch.exp(log_p_y)
             else:
                 return np.mean(accs), np.mean(losss)
 
@@ -940,22 +940,17 @@ def main():
     print("Test accuracy for {}: {}%".format(
         data_specs, np.round(test_acc*100, 2)))
     
-    """
+    
     ### ------- #
-    # NOT YET WORKING
+    # Almost working
     # single-sample inference to check label probbailities
-    sample = 0
-    x_single = np.array(encoded_data)[:, 0][sample]
-    label_single = encoded_label[sample]
-    x_single = torch.as_tensor(x_single, dtype=torch.float)
-    label_single = torch.as_tensor(value2index(
-        label_single, labels_mapping), dtype=torch.long)
-    _, _, lbl_probs = compute_classification_accuracy(TensorDataset(x_single,label_single), best_layers, label_probabilities=True)
-    print("\nSingle-sample inference:")
-    print("\tSample: {} \tPrediction: {} \nLabel probabilities (%): {}".format(encoded_label[sample],list(labels_mapping.keys())[torch.max(lbl_probs,1)[1]], np.round(np.array(lbl_probs)*100,2)))
+    single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0, pin_memory=True)))
+    _, _, lbl_probs = compute_classification_accuracy(TensorDataset(single_sample[0],single_sample[1]), best_layers, label_probabilities=True)
+    print("\nSingle-sample inference (from test set):")
+    print("\tSample: {} \tPrediction: {} \nLabel probabilities (%): {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]], np.round(np.array(lbl_probs.cpu())*100,2)))
     print("\n")
     # ------- ###
-    """
+    
 
     # make some statistics on test results
     test_runs = 10
