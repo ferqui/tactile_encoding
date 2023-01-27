@@ -67,7 +67,7 @@ def original(add_noise=False, temp_jitter=False):
             output_v.append(neurons.state.V[0].cpu().numpy())
         encoded_data_original.append([output_s, output_v, input_current])
 
-    filename = './data/data_encoding_original'
+    filename = '../data/data_encoding_original'
     if add_noise:
         filename = filename + '_noisy'
     if temp_jitter:
@@ -165,9 +165,9 @@ def fix_time():
     encoded_label = np.array(encoded_label)
 
     # dump neuron output to file
-    with open('./data/data_encoding.pkl', 'wb') as handle:
+    with open('../data/data_encoding.pkl', 'wb') as handle:
         pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
-    with open('./data/label_encoding.pkl', 'wb') as handle:
+    with open('../data/label_encoding.pkl', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
@@ -264,7 +264,7 @@ def fix_time_noisy(temp_jitter=False):
             encoded_data.append([output_s, output_v, input_current])
             encoded_label.append(class_name)
 
-    filename = './data/data_encoding_noisy'
+    filename = '../data/data_encoding_noisy'
 
     if temp_jitter:
         filename = filename + '_temp_jitter'
@@ -275,7 +275,7 @@ def fix_time_noisy(temp_jitter=False):
     # dump neuron output to file
     with open(filename, 'wb') as handle:
         pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
-    with open('./data/label_encoding.pkl', 'wb') as handle:
+    with open('../data/label_encoding.pkl', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
@@ -362,7 +362,7 @@ def fix_time_noisy_test(temp_jitter=False):
             encoded_data.append([output_s, output_v, input_current])
             encoded_label.append(class_name)
 
-    filename = './data/data_encoding_noisy'
+    filename = '../data/data_encoding_noisy'
 
     if temp_jitter:
         filename = filename + '_temp_jitter'
@@ -373,12 +373,14 @@ def fix_time_noisy_test(temp_jitter=False):
     # dump neuron output to file
     with open(filename, 'wb') as handle:
         pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
-    with open('./data/label_encoding.pkl', 'wb') as handle:
+    with open('../data/label_encoding.pkl', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
 if __name__ == '__main__':
-    fix_time_noisy_test()
+    
+    #fix_time_noisy_test()
+    
     # original length
     print('Creating original data.')
     original()
@@ -395,7 +397,7 @@ if __name__ == '__main__':
     fix_time()
 
     print('Creating noisy 1000ms data.')
-    fix_time_noisy(add_noise=True, temp_jitter=False)
+    fix_time_noisy(temp_jitter=False)
 
     # TODO implement temporal jitter
     # print('Creating noisy 1000ms data with temporal jitter.')

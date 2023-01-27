@@ -26,7 +26,7 @@ def main():
     noisy = False
 
     # Set the number of epochs
-    eps = 5
+    eps = 2
 
     # Settings for the SNN
     global use_trainable_out
@@ -41,25 +41,24 @@ def main():
     lr = 0.0001
 
     # set up CUDA device
-    device = check_cuda(gpu_sel=1, gpu_mem_frac=0.8)
-    print(device)
+    device = check_cuda(gpu_sel=1, gpu_mem_frac=0.3)
 
     if original:
         if noisy:
-            data_filepath = "./data/data_encoding_original_noisy.pkl"
+            data_filepath = "../data/data_encoding_original_noisy.pkl"
             data_specs = "MN encoding original, noisy"
         else:
-            data_filepath = "./data/data_encoding_original.pkl"
+            data_filepath = "../data/data_encoding_original.pkl"
             data_specs = "MN encoding original"
     else:
         if noisy:
-            data_filepath = "./data/data_encoding_noisy.pkl"
+            data_filepath = "../data/data_encoding_noisy.pkl"
             data_specs = "MN encoding noisy"
-            label_filepath = "./data/label_encoding_noisy.pkl"
+            label_filepath = "../data/label_encoding_noisy.pkl"
         else:
-            data_filepath = "./data/data_encoding.pkl"
+            data_filepath = "../data/data_encoding.pkl"
             data_specs = "MN encoding"
-            label_filepath = "./data/label_encoding.pkl"
+            label_filepath = "../data/label_encoding.pkl"
 
     if use_seed:
         seed = 42
@@ -184,7 +183,9 @@ def main():
         loss_hist = [[], []]
         accs_hist = [[], []]
         for e in range(nb_epochs):
-            print(f"Starting epoch {e+1} of {nb_epochs} ")
+            ### "debug" print:
+            #print(f"Starting epoch {e+1} of {nb_epochs} ")
+            ###
             # learning rate decreases over epochs
             optimizer = torch.optim.Adamax(
                 parameters, lr=lr, betas=(0.9, 0.995))
@@ -416,7 +417,7 @@ def main():
             "------------------------------------------------------------------------------------\n")
         return loss_hist, accs_hist, best_layers
 
-    def compute_classification_accuracy(dataset, layers=None):
+    def compute_classification_accuracy(dataset, layers=None, label_probabilities=False):
         """ Computes classification accuracy on supplied data in batches. """
 
         # generator = DataLoader(dataset, batch_size=batch_size,
@@ -459,7 +460,10 @@ def main():
             tmp = np.mean((y_local == am).detach().cpu().numpy())
             accs.append(tmp)
 
-        return np.mean(accs), np.mean(losss)
+            if label_probabilities:
+                return np.mean(accs), np.mean(losss), log_p_y
+            else:
+                return np.mean(accs), np.mean(losss)
 
     def ConfusionMatrix(dataset, save, layers=None, labels=None):
 
@@ -818,7 +822,9 @@ def main():
                 beta, mean=beta_mean, std=beta_mean/10)
             return alpha, beta
 
-    print("Setting up data.")
+    ### "debug" print:
+    #print("Setting up data.")
+    ###
     # create train-test-validation split
     ratios = [70, 10, 20]
 
@@ -890,7 +896,9 @@ def main():
         ds_test = TensorDataset(x_test, labels_test)
         ds_val = []
 
-    print("Start training.")
+    ### "debug" print:
+    #print("Start training.")
+    ###
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
         data_steps, ds_train, ds_val, epochs=eps)
@@ -925,10 +933,29 @@ def main():
     plt.show()
 
     # test the network (on never seen data)
-    print("Testing the results.")
+    ### "debug" print:
+    #print("Testing the results.")
+    ###
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
     print("Test accuracy for {}: {}%".format(
         data_specs, np.round(test_acc*100, 2)))
+    
+    """
+    ### ------- #
+    # NOT YET WORKING
+    # single-sample inference to check label probbailities
+    sample = 0
+    x_single = np.array(encoded_data)[:, 0][sample]
+    label_single = encoded_label[sample]
+    x_single = torch.as_tensor(x_single, dtype=torch.float)
+    label_single = torch.as_tensor(value2index(
+        label_single, labels_mapping), dtype=torch.long)
+    _, _, lbl_probs = compute_classification_accuracy(TensorDataset(x_single,label_single), best_layers, label_probabilities=True)
+    print("\nSingle-sample inference:")
+    print("\tSample: {} \tPrediction: {} \nLabel probabilities (%): {}".format(encoded_label[sample],list(labels_mapping.keys())[torch.max(lbl_probs,1)[1]], np.round(np.array(lbl_probs)*100,2)))
+    print("\n")
+    # ------- ###
+    """
 
     # make some statistics on test results
     test_runs = 10
