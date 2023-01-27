@@ -19,14 +19,14 @@ from tactile_encoding.parameters.ideal_params import input_currents
 def main():
 
     use_seed = False
-    save = False  # to save accuracy and loss plots from training
+    save = True  # to save accuracy and loss plots from training
 
     # Specify what kind of data to use
     original = False
-    noisy = False
+    noisy = True
 
     # Set the number of epochs
-    eps = 1
+    eps = 10
 
     # Settings for the SNN
     global use_trainable_out
@@ -910,7 +910,7 @@ def main():
              np.array(acc_hist[1]), color='orange')
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy (%)")
-    plt.title(data_specs)
+    plt.title("{} ({} epochs)".format(data_specs,eps))
     plt.legend(["Training", "Validation"], loc='lower right')
     if save:
         plt.savefig(
@@ -925,7 +925,7 @@ def main():
              np.array(loss_hist[1]), color='tab:green')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.title(data_specs)
+    plt.title("{} ({} epochs)".format(data_specs,eps))
     plt.legend(["Training", "Validation"], loc='upper right')
     if save:
         plt.savefig(
