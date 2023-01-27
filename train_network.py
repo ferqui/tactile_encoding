@@ -26,7 +26,7 @@ def main():
     noisy = True
 
     # Set the number of epochs
-    eps = 10
+    eps = 300
 
     # Settings for the SNN
     global use_trainable_out
@@ -417,13 +417,13 @@ def main():
             "------------------------------------------------------------------------------------\n")
         return loss_hist, accs_hist, best_layers
 
-    def compute_classification_accuracy(dataset, layers=None, label_probabilities=False):
+    def compute_classification_accuracy(dataset, layers=None, label_probabilities=False, shuffle=False):
         """ Computes classification accuracy on supplied data in batches. """
 
         # generator = DataLoader(dataset, batch_size=batch_size,
         #                     shuffle=False, num_workers=4, pin_memory=True)
         generator = DataLoader(dataset, batch_size=batch_size,
-                               shuffle=False, num_workers=0, pin_memory=True)
+                               shuffle=shuffle, num_workers=0, pin_memory=True)
         accs = []
         losss = []
         # The log softmax function across output units
@@ -939,17 +939,19 @@ def main():
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
     print("Test accuracy for {}: {}%".format(
         data_specs, np.round(test_acc*100, 2)))
+
+    
+    ##################################################################################
+    ##### THE ADDITION OF A CONFUSION MATRIX (TO BE SAVED) COULD BE A GOOD IDEA! #####
+    ##################################################################################
     
     
-    ### ------- #
-    # Almost working
     # single-sample inference to check label probbailities
     single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0, pin_memory=True)))
     _, _, lbl_probs = compute_classification_accuracy(TensorDataset(single_sample[0],single_sample[1]), best_layers, label_probabilities=True)
     print("\nSingle-sample inference (from test set):")
     print("\tSample: {} \tPrediction: {} \nLabel probabilities (%): {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]], np.round(np.array(lbl_probs.cpu())*100,2)))
     print("\n")
-    # ------- ###
     
 
     # make some statistics on test results
@@ -957,8 +959,8 @@ def main():
     test_stat = list()
     for ii in range(test_runs):
         test_stat.append(compute_classification_accuracy(
-            ds_test, best_layers)[0])
-    print("\nStatistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs, np.round(
+            ds_test, best_layers, shuffle=True)[0])
+    print("Statistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs, np.round(
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
 
 
