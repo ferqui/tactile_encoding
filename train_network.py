@@ -919,9 +919,9 @@ def main():
 
     plt.figure()
     #plt.plot(range(1, len(loss_hist)+1), loss_hist, color='tab:red')
-    plt.plot(range(1, len(loss_hist[0])+1), 100 *
+    plt.plot(range(1, len(loss_hist[0])+1),
              np.array(loss_hist[0]), color='tab:red')
-    plt.plot(range(1, len(loss_hist[1])+1), 100 *
+    plt.plot(range(1, len(loss_hist[1])+1),
              np.array(loss_hist[1]), color='tab:green')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
