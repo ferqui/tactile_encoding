@@ -118,12 +118,8 @@ def main():
         else:
             data_filepath = "./data/data_encoding.pkl"
             data_specs = "MN encoding"
-<<<<<<< HEAD
             label_filepath = "../data/label_encoding.pkl"
     """
-=======
-            label_filepath = "./data/label_encoding.pkl"
->>>>>>> 688955f713e285fdfe39577f04d500624eb289b2
 
     if use_seed:
         seed = 42
