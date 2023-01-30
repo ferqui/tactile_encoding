@@ -97,12 +97,12 @@ def main():
     create_directory(path)
 
     logging.getLogger().addHandler(logging.FileHandler(
-        f'./logs/experiment_{name}_{idx_file_storage}.log')) # TODO change to date and time
+        f'./logs/experiment_{name}_{execution_datetime}.log'))
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 
     logging.info("Experiment started on: {}\n".format(execution_datetime))
-    logging.info("Data storage initialized.\n")
+    #logging.info("Data storage initialized.\n")
     logging.info("{} data used.\n".format(name))
 
 
