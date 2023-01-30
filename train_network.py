@@ -9,6 +9,7 @@ import random
 import datetime
 
 import matplotlib.pyplot as plt
+import seaborn as sn
 
 import torch
 import torch.nn as nn
@@ -84,20 +85,20 @@ def main():
 
     if original:
         if noisy:
-            data_filepath = "../data/data_encoding_original_noisy.pkl"
+            data_filepath = "./data/data_encoding_original_noisy.pkl"
             data_specs = "MN encoding original, noisy"
         else:
-            data_filepath = "../data/data_encoding_original.pkl"
+            data_filepath = "./data/data_encoding_original.pkl"
             data_specs = "MN encoding original"
     else:
         if noisy:
-            data_filepath = "../data/data_encoding_noisy.pkl"
+            data_filepath = "./data/data_encoding_noisy.pkl"
             data_specs = "MN encoding noisy"
-            label_filepath = "../data/label_encoding_noisy.pkl"
+            label_filepath = "./data/label_encoding_noisy.pkl"
         else:
-            data_filepath = "../data/data_encoding.pkl"
+            data_filepath = "./data/data_encoding.pkl"
             data_specs = "MN encoding"
-            label_filepath = "../data/label_encoding.pkl"
+            label_filepath = "./data/label_encoding.pkl"
 
     if use_seed:
         seed = 42
