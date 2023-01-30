@@ -34,6 +34,8 @@ import datetime
 import matplotlib.pyplot as plt
 import seaborn as sn
 
+from sklearn.metrics import confusion_matrix
+
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
@@ -549,8 +551,10 @@ def main():
         g.manual_seed(seed)
         # generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
         #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+        #generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+        #                       num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
         generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                               num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+                               num_workers=0, pin_memory=True, generator=g)
         accs = []
         trues = []
         preds = []
@@ -599,14 +603,18 @@ def main():
         plt.ylabel('True\n')
         plt.xticks(rotation=0)
         if save:
-            path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
+            #path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
             if use_trainable_tc:
-                path_to_save_fig = f'{path_to_save_fig}_train_tc'
+                #path_to_save_fig = f'{path_to_save_fig}_train_tc'
+                path_to_save_fig = f'{path_for_plots}/cm_train_tc'
             if use_trainable_out:
-                path_to_save_fig = f'{path_to_save_fig}_train_out'
+                #path_to_save_fig = f'{path_to_save_fig}_train_out'
+                path_to_save_fig = f'{path_for_plots}/cm_train_out'
             if use_dropout:
-                path_to_save_fig = f'{path_to_save_fig}_dropout'
-            path_to_save_fig = f'{path_to_save_fig}_cm.png'
+                #path_to_save_fig = f'{path_to_save_fig}_dropout'
+                path_to_save_fig = f'{path_for_plots}/cm_dropout'
+            #path_to_save_fig = f'{path_to_save_fig}_cm.png'
+            path_to_save_fig = f'{path_to_save_fig}.png'
             plt.savefig(path_to_save_fig, dpi=300)
             plt.close()
         else:
@@ -1016,9 +1024,8 @@ def main():
         name, np.round(test_acc*100, 2)))
 
     
-    ##################################################################################
-    ##### THE ADDITION OF A CONFUSION MATRIX (TO BE SAVED) COULD BE A GOOD IDEA! #####
-    ##################################################################################
+    # confusion matrix
+    ConfusionMatrix(ds_test, save_fig, best_layers, list(labels_mapping.keys()))
     
     
     # single-sample inference to check label probbailities
