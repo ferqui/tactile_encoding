@@ -100,8 +100,7 @@ def original(add_noise=False, temp_jitter=False):
     if temp_jitter:
         filename = filename + '_temp_jitter'
 
-
-    encoded_data_original = np.array(encoded_data_original)
+    encoded_data_original = np.array(encoded_data_original, dtype=object)
 
     # dump neuron output to file
     with open(f"{filename}.pkl", 'wb') as handle:
@@ -117,6 +116,7 @@ def fix_time_only(max_trials=100, max_time=1000):
     are created by simply copying the current trace
     n times.
     """
+
     # import neuron params
     from tactile_encoding.parameters.ideal_params import neuron_parameters, input_currents, time_points, runtime
 
