@@ -19,17 +19,43 @@ from tactile_encoding.parameters.ideal_params import input_currents
 
 
 def main():
-    save_fig = True
+
+    use_seed = False
+    save_fig = True # to save accuracy and loss plots from training
+
+    # Specify what kind of data to use
+    original = False
+    fixed_length = not original
+    noise = True
+    jitter = True
+
+    # Set the number of epochs
+    eps = 300
+
+    
+    data_filepath = "../data/data_encoding"
+    label_filepath = "../data/label_encoding"
+    name = ""
+    data_features = [original, fixed_length, noise, jitter]
+    data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
+    for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
+        data_filepath += "_{}".format(data_attributes[el])
+        label_filepath += "_{}".format(data_attributes[el])
+        name += "{} ".format(data_attributes[el])
+    data_filepath += ".pkl"
+    label_filepath += ".pkl"
+    name = name[:-1]
 
     path = './results'
     create_directory(path)
 
+    execution_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
     # init datastorage
-    # TODO change to date and time
     file_storage_found = False
-    idx_file_storage = 1
+    idx_file_storage = execution_datetime
     while not file_storage_found:
-        file_storage_path = f'./results/experiment_{idx_file_storage}.pkl'
+        file_storage_path = f'./results/experiment_{name}_{idx_file_storage}.pkl'
         if os.path.isfile(file_storage_path):
             idx_file_storage += 1
         else:
@@ -41,7 +67,7 @@ def main():
 
     # create folder to safe plots later (if not present)
     if save_fig:
-        path_for_plots = f'./plots/experiment_{idx_file_storage}'
+        path_for_plots = f'./plots/experiment_{name}_{idx_file_storage}'
         isExist_record = os.path.exists(path_for_plots)
 
         if not isExist_record:
@@ -51,21 +77,14 @@ def main():
     create_directory(path)
 
     logging.getLogger().addHandler(logging.FileHandler(
-        f'./logs/experiment_{idx_file_storage}.log')) # TODO change to date and time
+        f'./logs/experiment_{name}_{idx_file_storage}.log')) # TODO change to date and time
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 
+    logging.info("Experiment started on: {}\n".format(execution_datetime))
     logging.info("Data storage initialized.\n")
+    logging.info("{} data used.\n".format(name))
 
-    use_seed = False
-    save = True  # to save accuracy and loss plots from training
-
-    # Specify what kind of data to use
-    original = False
-    noisy = True
-
-    # Set the number of epochs
-    eps = 300
 
     # Settings for the SNN
     global use_trainable_out
@@ -82,6 +101,7 @@ def main():
     # set up CUDA device
     device = check_cuda(gpu_sel=1, gpu_mem_frac=0.3)
 
+    """
     if original:
         if noisy:
             data_filepath = "../data/data_encoding_original_noisy.pkl"
@@ -98,6 +118,7 @@ def main():
             data_filepath = "../data/data_encoding.pkl"
             data_specs = "MN encoding"
             label_filepath = "../data/label_encoding.pkl"
+    """
 
     if use_seed:
         seed = 42
@@ -949,26 +970,23 @@ def main():
              np.array(acc_hist[1]), color='orange')
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy (%)")
-    plt.title("{} ({} epochs)".format(data_specs,eps))
+    plt.title("{} ({} epochs)".format(name,eps))
     plt.legend(["Training", "Validation"], loc='lower right')
-    if save:
-        plt.savefig(
-            "./plots/training/Accuracy_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    if save_fig:
+        plt.savefig(path_for_plots + "/accuracy")
     plt.show()
 
     plt.figure()
-    #plt.plot(range(1, len(loss_hist)+1), loss_hist, color='tab:red')
     plt.plot(range(1, len(loss_hist[0])+1),
              np.array(loss_hist[0]), color='tab:red')
     plt.plot(range(1, len(loss_hist[1])+1),
              np.array(loss_hist[1]), color='tab:green')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.title("{} ({} epochs)".format(data_specs,eps))
+    plt.title("{} ({} epochs)".format(name,eps))
     plt.legend(["Training", "Validation"], loc='upper right')
-    if save:
-        plt.savefig(
-            "./plots/training/Loss_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    if save_fig:
+        plt.savefig(path_for_plots + "/loss")
     plt.show()
 
     # test the network (on never seen data)
@@ -977,7 +995,7 @@ def main():
     ###
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
     logging.info("Test accuracy for {}: {}%".format(
-        data_specs, np.round(test_acc*100, 2)))
+        name, np.round(test_acc*100, 2)))
 
     
     ##################################################################################
@@ -999,7 +1017,7 @@ def main():
     for ii in range(test_runs):
         test_stat.append(compute_classification_accuracy(
             ds_test, best_layers, shuffle=True)[0])
-    logging.info("Statistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs, np.round(
+    logging.info("Statistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(name, np.round(
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
 
 
