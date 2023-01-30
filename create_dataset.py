@@ -3,11 +3,10 @@ Creates data according to the paper "A Generalized Linear
 Integrate-and-Fire Neural Model Produces Diverse Spiking Behaviors"
 by Stefan Mihalas and Ernst Niebur.
 
-Istituto Italiano di Tecnologia - IIT
-Event-driven perception in robotics - EDPR
-Genova, Italy
-
-Simon F. Mueller-Cleve
+Muller-Cleve, Simon F.,
+Istituto Italiano di Tecnologia - IIT,
+Event-driven perception in robotics - EDPR,
+Genova, Italy.
 """
 
 

@@ -1,3 +1,26 @@
+"""
+This script uses the data created following the paper "A Generalized
+Linear Integrate-and-Fire Neural Model Produces Diverse Spiking 
+Behaviors" by Stefan Mihalas and Ernst Niebur.
+
+Each input trace has a fix length of 1sec (1ms time step) and can
+contain Gaussian noise on the input current and if dynamic temporal
+jitter on the time of the steps in the input current.
+
+Future comparison to the Braille data after encoding with the most
+optimal parameter reagerding classification performance will help to
+categorize the spiking patterns.
+
+Fra, Vittorio,
+Politecnico di Torino,
+EDA Group,
+Torino, Italy.
+
+Muller-Cleve, Simon F.,
+Istituto Italiano di Tecnologia - IIT,
+Event-driven perception in robotics - EDPR,
+Genova, Italy.
+"""
 import logging
 import sys
 import numpy as np
@@ -21,6 +44,9 @@ from tactile_encoding.parameters.ideal_params import input_currents
 
 def main():
 
+    # Set the number of epochs
+    eps = 300
+
     use_seed = False
     save_fig = True # to save accuracy and loss plots from training
 
@@ -30,12 +56,9 @@ def main():
     noise = True
     jitter = True
 
-    # Set the number of epochs
-    eps = 300
-
-    
-    data_filepath = "../data/data_encoding"
-    label_filepath = "../data/label_encoding"
+    # prepare data selection
+    data_filepath = "./data/data_encoding"
+    label_filepath = "./data/label_encoding"
     name = ""
     data_features = [original, fixed_length, noise, jitter]
     data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
@@ -47,20 +70,14 @@ def main():
     label_filepath += ".pkl"
     name = name[:-1]
 
-    path = './results'
-    create_directory(path)
-
     execution_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # TODO can be used to safe network
+    # path = './results'
+    # create_directory(path)
+
     # init datastorage
-    file_storage_found = False
-    idx_file_storage = execution_datetime
-    while not file_storage_found:
-        file_storage_path = f'./results/experiment_{name}_{idx_file_storage}.pkl'
-        if os.path.isfile(file_storage_path):
-            idx_file_storage += 1
-        else:
-            file_storage_found = True
+    # file_storage_path = f'./results/experiment_{name}_{execution_datetime}.pkl'
 
     if save_fig:
         path = './plots'
@@ -68,7 +85,7 @@ def main():
 
     # create folder to safe plots later (if not present)
     if save_fig:
-        path_for_plots = f'./plots/experiment_{name}_{idx_file_storage}'
+        path_for_plots = f'./plots/experiment_{name}_{execution_datetime}'
         isExist_record = os.path.exists(path_for_plots)
 
         if not isExist_record:
@@ -118,7 +135,7 @@ def main():
         else:
             data_filepath = "./data/data_encoding.pkl"
             data_specs = "MN encoding"
-            label_filepath = "../data/label_encoding.pkl"
+            label_filepath = "./data/label_encoding.pkl"
     """
 
     if use_seed:
