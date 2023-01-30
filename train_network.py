@@ -1,3 +1,5 @@
+import logging
+import sys
 import numpy as np
 import pandas as pd
 
@@ -12,11 +14,48 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from tactile_encoding.utils.utils import check_cuda, train_test_validation_split, value2index
+from tactile_encoding.utils.utils import check_cuda, train_test_validation_split, value2index, create_directory
 from tactile_encoding.parameters.ideal_params import input_currents
 
 
 def main():
+    save_fig = True
+
+    path = './results'
+    create_directory(path)
+
+    # init datastorage
+    # TODO change to date and time
+    file_storage_found = False
+    idx_file_storage = 1
+    while not file_storage_found:
+        file_storage_path = f'./results/experiment_{idx_file_storage}.pkl'
+        if os.path.isfile(file_storage_path):
+            idx_file_storage += 1
+        else:
+            file_storage_found = True
+
+    if save_fig:
+        path = './plots'
+        create_directory(path)
+
+    # create folder to safe plots later (if not present)
+    if save_fig:
+        path_for_plots = f'./plots/experiment_{idx_file_storage}'
+        isExist_record = os.path.exists(path_for_plots)
+
+        if not isExist_record:
+            os.makedirs(path_for_plots)
+
+    path = './logs'
+    create_directory(path)
+
+    logging.getLogger().addHandler(logging.FileHandler(
+        f'./logs/experiment_{idx_file_storage}.log')) # TODO change to date and time
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logging.getLogger().setLevel(logging.INFO)
+
+    logging.info("Data storage initialized.\n")
 
     use_seed = False
     save = True  # to save accuracy and loss plots from training
@@ -65,7 +104,7 @@ def main():
         os.environ['PYTHONHASHSEED'] = str(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
-        print("Seed set to {}".format(seed))
+        logging.info("Seed set to {}".format(seed))
     else:
         seed = None
 
@@ -184,7 +223,7 @@ def main():
         accs_hist = [[], []]
         for e in range(nb_epochs):
             ### "debug" print:
-            #print(f"Starting epoch {e+1} of {nb_epochs} ")
+            #logging.info(f"Starting epoch {e+1} of {nb_epochs} ")
             ###
             # learning rate decreases over epochs
             optimizer = torch.optim.Adamax(
@@ -265,7 +304,7 @@ def main():
                     for ii in layers_update:
                         best_acc_layers.append(ii.detach().clone())
 
-            print("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Validation accuracy (loss): {:.2f}% ({:.5f}).".format(
+            logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Validation accuracy (loss): {:.2f}% ({:.5f}).".format(
                 e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
 
             # check for early break
@@ -273,38 +312,38 @@ def main():
                 if e >= patience-1:
                     # mean acc drops
                     if np.mean(np.diff(accs_hist[1][-patience:]))*100 < -1.0:
-                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
+                        logging.info("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
+                        logging.info("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
-                        print(
+                        logging.info(
                             f'\nBreaking the training early at episode {e+1}, validation acc dropped.')
                         break
                     # mean acc static
                     elif abs(np.mean(np.diff(accs_hist[1][-patience:])))*100 < 1.0:
-                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
+                        logging.info("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
+                        logging.info("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
-                        print(
+                        logging.info(
                             f'\nBreaking the training early at episode {e+1}, validation acc static.')
                         break
                     # mean loss increases
                     elif np.mean(np.diff(loss_hist[1][-patience:])*-1) < 0.0:
-                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
+                        logging.info("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(accs_hist[1][-patience:]))*100, np.diff(accs_hist[1][-patience:])*100))
-                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
+                        logging.info("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
-                        print(
+                        logging.info(
                             f'\nBreaking the training early at episode {e+1}, validation loss increasing.')
                         break
                     # mean loss static
                     elif abs(np.mean(np.diff(loss_hist[1][-patience:])*-1)) < 1.0:
-                        print("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
+                        logging.info("\nmean(delta_val_acc): {:.2f} delta_val_acc: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1)*100, np.diff(loss_hist[1][-patience:])*-1*100))
-                        print("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
+                        logging.info("\nmean(delta_val_loss): {:.2f} delta_val_loss: {}" .format(
                             np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
-                        print(
+                        logging.info(
                             f'\nBreaking the training early at episode {e+1}, validation loss static.')
                         break
 
@@ -404,16 +443,16 @@ def main():
         idx_best_val = np.argmax(accs_hist[1])
         acc_train_at_best_val = accs_hist[0][idx_best_val]*100
 
-        print(
+        logging.info(
             "\n------------------------------------------------------------------------------------")
-        print("Final results: ")
-        print("Best training accuracy: {:.2f}% and according validation accuracy: {:.2f}% at epoch: {}".format(
+        logging.info("Final results: ")
+        logging.info("Best training accuracy: {:.2f}% and according validation accuracy: {:.2f}% at epoch: {}".format(
             acc_best_train, acc_val_at_best_train, idx_best_train+1))
-        print("Best validation accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
+        logging.info("Best validation accuracy: {:.2f}% and according train accuracy: {:.2f}% at epoch: {}".format(
             acc_best_val, acc_train_at_best_val, idx_best_val+1))
-        print(
+        logging.info(
             "------------------------------------------------------------------------------------")
-        print(
+        logging.info(
             "------------------------------------------------------------------------------------\n")
         return loss_hist, accs_hist, best_layers
 
@@ -504,7 +543,7 @@ def main():
             trues.extend(y_local.detach().cpu().numpy())
             preds.extend(am.detach().cpu().numpy())
 
-        print("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
+        logging.info("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
                                                                           * 100, np.std(accs)*100))
 
         cm = confusion_matrix(trues, preds, normalize='true')
@@ -823,7 +862,7 @@ def main():
             return alpha, beta
 
     ### "debug" print:
-    #print("Setting up data.")
+    #logging.info("Setting up data.")
     ###
     # create train-test-validation split
     ratios = [70, 10, 20]
@@ -897,7 +936,7 @@ def main():
         ds_val = []
 
     ### "debug" print:
-    #print("Start training.")
+    #logging.info("Start training.")
     ###
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = build_and_train(
@@ -934,10 +973,10 @@ def main():
 
     # test the network (on never seen data)
     ### "debug" print:
-    #print("Testing the results.")
+    #logging.info("Testing the results.")
     ###
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
-    print("Test accuracy for {}: {}%".format(
+    logging.info("Test accuracy for {}: {}%".format(
         data_specs, np.round(test_acc*100, 2)))
 
     
@@ -949,9 +988,9 @@ def main():
     # single-sample inference to check label probbailities
     single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0, pin_memory=True)))
     _, _, lbl_probs = compute_classification_accuracy(TensorDataset(single_sample[0],single_sample[1]), best_layers, label_probabilities=True)
-    print("\nSingle-sample inference (from test set):")
-    print("\tSample: {} \tPrediction: {} \nLabel probabilities (%): {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]], np.round(np.array(lbl_probs.cpu())*100,2)))
-    print("\n")
+    logging.info("\nSingle-sample inference (from test set):")
+    logging.info("\tSample: {} \tPrediction: {} \nLabel probabilities (%): {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]], np.round(np.array(lbl_probs.cpu())*100,2)))
+    logging.info("\n")
     
 
     # make some statistics on test results
@@ -960,7 +999,7 @@ def main():
     for ii in range(test_runs):
         test_stat.append(compute_classification_accuracy(
             ds_test, best_layers, shuffle=True)[0])
-    print("Statistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs, np.round(
+    logging.info("Statistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(data_specs, np.round(
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
 
 

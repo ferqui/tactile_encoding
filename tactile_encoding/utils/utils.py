@@ -1,6 +1,19 @@
+import os
 import torch
 import numpy as np
 from sklearn.model_selection import train_test_split
+
+
+def create_directory(directory_path):
+    if os.path.exists(directory_path):
+        return None
+    else:
+        try:
+            os.makedirs(directory_path)
+        except:
+            # in case another machine created the path meanwhile! :(
+            return None
+        return directory_path
 
 
 def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.5):
