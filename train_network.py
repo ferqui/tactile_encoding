@@ -545,16 +545,21 @@ def main():
             else:
                 return np.mean(accs), np.mean(losss)
 
-    def ConfusionMatrix(dataset, save, layers=None, labels=None):
-
-        g = torch.Generator()
-        g.manual_seed(seed)
-        # generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-        #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
-        #generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-        #                       num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
-        generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                               num_workers=0, pin_memory=True, generator=g)
+    def ConfusionMatrix(dataset, save, layers=None, labels=None, use_seed=use_seed):
+        
+        if use_seed:
+            g = torch.Generator()
+            g.manual_seed(seed)
+            # generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+            #                     num_workers=4, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+            #generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+            #                       num_workers=0, pin_memory=True, worker_init_fn=seed_worker, generator=g)
+            generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                                num_workers=0, pin_memory=True, generator=g)
+        else:
+            generator = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
+                                num_workers=0, pin_memory=True)
+        
         accs = []
         trues = []
         preds = []
