@@ -51,6 +51,10 @@ def main():
 
     use_seed = False
     save_fig = True # to save accuracy and loss plots from training
+    save_weights = True # to save weights from the best_layers variable
+    pre_trained = False # to generate an additional confusion matrix by loading pre-trained weights
+    if pre_trained:
+        layers_path = ""
 
     # Specify what kind of data to use
     original = False
@@ -1049,6 +1053,20 @@ def main():
             ds_test, best_layers, shuffle=True)[0])
     logging.info("Statistics on test results for {}:\n\tmax: {}%\n\tmin: {}%\n\tmedian: {}%".format(name, np.round(
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
+    
+
+    """
+    # TODO: save weights 
+    # save trained weights
+    if save_weights:
+        torch.save(best_layers, ""+".pt" )
+    
+    # TODO: run with pre-trained loaded weights
+    # load pre-trained weights and run the network (confusion matrix)
+    if pre_trained:
+        pre_trained_layers = load_layers(layers_path, map_location=device)
+        ConfusionMatrix(ds_test, save_fig, pre_trained_layers, list(labels_mapping.keys()))
+    """
 
 
 if __name__ == '__main__':

@@ -136,3 +136,23 @@ def value2index(entry, dictionary):
         idx = [list(dictionary.values()).index(e) for e in entry]
         
     return idx
+
+
+def load_layers(layers, map_location, variable=False, requires_grad=True):
+    
+    if variable: # meaning that the weights are not to be loaded <-- layers is a variable name
+        
+        lays = layers
+        
+        for ii in lays:
+            ii.to(map_location)
+            ii.requires_grad = requires_grad
+    
+    else: # meaning that weights are to be loaded from a file <-- layers is a path
+        
+        lays = torch.load(layers, map_location=map_location)
+        
+        for ii in lays:
+            ii.requires_grad = requires_grad
+        
+    return lays
