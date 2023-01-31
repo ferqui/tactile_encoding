@@ -40,7 +40,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from tactile_encoding.utils.utils import check_cuda, train_test_validation_split, value2index, create_directory
+from tactile_encoding.utils.utils import check_cuda, train_test_validation_split, value2index, create_directory, load_layers
 from tactile_encoding.parameters.ideal_params import input_currents
 
 
@@ -52,9 +52,14 @@ def main():
     use_seed = False
     save_fig = True # to save accuracy and loss plots from training
     save_weights = True # to save weights from the best_layers variable
-    pre_trained = False # to generate an additional confusion matrix by loading pre-trained weights
+    pre_trained = True # to generate an additional confusion matrix by loading pre-trained weights
+    save_and_load = True # to re-load the weights right after the training
     if pre_trained:
-        layers_path = ""
+        if save_and_load:
+            print("Trained weights will be saved, loaded and used at the end of training.\n")
+        else:
+            # Set the path for previously trained weights to be loaded if old ones are needed
+            layers_path = "" + ".pt"
 
     # Specify what kind of data to use
     original = False
@@ -78,9 +83,13 @@ def main():
 
     execution_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # TODO can be used to safe network
-    # path = './results'
-    # create_directory(path)
+
+    if save_weights:
+        path = './results/layers'
+        create_directory(path)
+        save_layers_path = path + "/experiment_{}_{}.pt".format(name,execution_datetime)
+        if save_and_load:
+            layers_path = save_layers_path
 
     # init datastorage
     # file_storage_path = f'./results/experiment_{name}_{execution_datetime}.pkl'
@@ -105,7 +114,12 @@ def main():
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 
-    logging.info("Experiment started on: {}\n".format(execution_datetime))
+    logging.info("Experiment started on: {}-{}-{} {}:{}:{}\n".format(execution_datetime[:4],
+                                                                     execution_datetime[4:6],
+                                                                     execution_datetime[6:8],
+                                                                     execution_datetime[-6:-4],
+                                                                     execution_datetime[-4:-2],
+                                                                     execution_datetime[-2:]))
     #logging.info("Data storage initialized.\n")
     logging.info("{} data used.\n".format(name))
 
@@ -595,7 +609,7 @@ def main():
             trues.extend(y_local.detach().cpu().numpy())
             preds.extend(am.detach().cpu().numpy())
 
-        logging.info("Accuracy from Confusion Matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
+        logging.info("Accuracy from confusion matrix: {:.2f}% +- {:.2f}%".format(np.mean(accs)
                                                                           * 100, np.std(accs)*100))
 
         cm = confusion_matrix(trues, preds, normalize='true')
@@ -613,15 +627,13 @@ def main():
         plt.xticks(rotation=0)
         if save:
             #path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
+            path_to_save_fig = f'{path_for_plots}/cm'
             if use_trainable_tc:
-                #path_to_save_fig = f'{path_to_save_fig}_train_tc'
-                path_to_save_fig = f'{path_for_plots}/cm_train_tc'
+                path_to_save_fig = f'{path_to_save_fig}_train_tc'
             if use_trainable_out:
-                #path_to_save_fig = f'{path_to_save_fig}_train_out'
-                path_to_save_fig = f'{path_for_plots}/cm_train_out'
+                path_to_save_fig = f'{path_to_save_fig}_train_out'
             if use_dropout:
-                #path_to_save_fig = f'{path_to_save_fig}_dropout'
-                path_to_save_fig = f'{path_for_plots}/cm_dropout'
+                path_to_save_fig = f'{path_to_save_fig}_dropout'
             #path_to_save_fig = f'{path_to_save_fig}_cm.png'
             path_to_save_fig = f'{path_to_save_fig}.png'
             plt.savefig(path_to_save_fig, dpi=300)
@@ -1029,7 +1041,7 @@ def main():
     #logging.info("Testing the results.")
     ###
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
-    logging.info("Test accuracy for {}: {}%".format(
+    logging.info("Test accuracy for {}: {}%\n".format(
         name, np.round(test_acc*100, 2)))
 
     
@@ -1055,18 +1067,18 @@ def main():
         np.max(test_stat)*100, 2), np.round(np.min(test_stat)*100, 2), np.round(np.median(test_stat)*100, 2)))
     
 
-    """
-    # TODO: save weights 
     # save trained weights
     if save_weights:
-        torch.save(best_layers, ""+".pt" )
+        torch.save(best_layers, save_layers_path)
     
-    # TODO: run with pre-trained loaded weights
-    # load pre-trained weights and run the network (confusion matrix)
+    # load already trained weights and run the network (confusion matrix)
     if pre_trained:
+        if save_and_load:
+            logging.info("\n### Loading just trained weights ###")
+        else:
+            logging.info("\n### Loading pre-trained weights ###")
         pre_trained_layers = load_layers(layers_path, map_location=device)
-        ConfusionMatrix(ds_test, save_fig, pre_trained_layers, list(labels_mapping.keys()))
-    """
+        ConfusionMatrix(ds_test, False, pre_trained_layers, list(labels_mapping.keys()))
 
 
 if __name__ == '__main__':
