@@ -1,7 +1,12 @@
+"""
+Parameters are organized as following:
+"name", min_val, max_val, step_size, init_val
+# TODO include init_val for GUI!
+"""
 mn_parameter = [
-                ["a", -500, 20, 10],
-                ["A1", -10, 5, 0.01],
-                ["A2", -2, 2, 0.01],
+                ["a", -1500, 0, 10],
+                ["A1", -15, 5, 0.01],
+                ["A2", -1, 8, 0.01],
                 ["b", -40, 40, 1],  # units of 1/s (10)
                 ["G", 0, 200, 10],  # units of 1/s (50)
                 ["k1", 0, 400, 10],  # units of 1/s (200)

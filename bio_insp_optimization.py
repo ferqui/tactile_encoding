@@ -14,10 +14,12 @@ import sys
 import os
 import random
 import pickle
+import datetime
+
 import numpy as np
 import pandas as pd
-
 import seaborn as sn
+
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
@@ -42,6 +44,7 @@ batch_size = 128
 global lr
 lr = 0.0001
 
+datetime_now = {str(datetime.datetime.now())}
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
 P = 100  # number of individuals in populations
@@ -70,18 +73,11 @@ if save_fig:
         os.makedirs(path)
 
 # init datastorage
-file_storage_found = False
-idx_file_storage = 1
-while not file_storage_found:
-    file_storage_path = f'./results/experiment_{idx_file_storage}.pkl'
-    if os.path.isfile(file_storage_path):
-        idx_file_storage += 1
-    else:
-        file_storage_found = True
+file_storage_path = f'./results/experiment_{datetime_now}.pkl'
 
 # create folder to safe plots later (if not present)
 if save_fig:
-    path_for_plots = f'./plots/experiment_{idx_file_storage}'
+    path_for_plots = f'./plots/experiment_{datetime_now}'
     isExist_record = os.path.exists(path_for_plots)
 
     if not isExist_record:
@@ -93,11 +89,11 @@ if not isExist_data:
     os.makedirs('./logs')
 
 logging.getLogger().addHandler(logging.FileHandler(
-    f'./logs/experiment_{idx_file_storage}.log'))
+    f'./logs/experiment_{datetime_now}.log'))
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.INFO)
 
-logging.info(f"Data storage initialized. Will write to experiment_{idx_file_storage}.log.\n")
+logging.info(f"Data storage initialized. Will write to experiment_{datetime_now}.log.\n")
 
 # check for available GPU and distribute work
 if torch.cuda.device_count() > 1:
@@ -934,23 +930,37 @@ dt = 1/frequ
 # preprocess data
 logging.info("Start preparing data.")
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
-    "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=2, filtering=True)
+    "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=1, filtering=True)
 # create validation split
 # split in train-test and validation set
 x_train_test, x_validation, y_train_test, y_validation = train_test_split(
     data_neuron, labels_as_number, test_size=0.10, shuffle=True,
     stratify=labels_as_number)
 logging.info("Finished data prepartion.\n")
-# linear decrease
 
 
-def calc_sigma_linear(sigma_start, sigma_stop, generations, x):
-    sigma = ((sigma_stop-sigma_start)/generations)*x+sigma_start
+def calc_sigma_linear(generations, generation):
+    """
+    Returns a line with negative slope.
+    The function start at 1, hits >=0.5 at generations/2 and approaches 0.01 at generations.
+    """
+
+    sigma_start = 1
+    sigma_stop = 0.01
+    sigma = ((sigma_stop-sigma_start)/generations)*generation+sigma_start
     return sigma
 
 
-def calc_sigma_sigmoid(generations, x):
-    return 1-(1/(1+np.exp(-x+(generations/2))))
+def calc_sigma_sigmoid(generations, generation):
+    """
+    Returns a invert sigmoid function invariant to change of generations.
+    The function start at 1, hits 0.5 at generations/2 and approaches 0 at generations.
+    The lower strecht, the more linear, the higher the closer to step function at generation/2.
+    """
+
+    stretch = 12
+    fac = stretch/generations
+    return (1-(1/(1+np.exp(-(generation*fac)+(stretch/2)))))
 
 
 logging.info("________________________________________")
@@ -1001,7 +1011,7 @@ for generation in range(generations):
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
 
-        # calculate fitness
+        ## calculate fitness
         # initialize and train network
         _, acc_hist, best_layers = build_and_train(
             data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=patience)
