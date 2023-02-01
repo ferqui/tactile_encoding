@@ -44,7 +44,7 @@ batch_size = 128
 global lr
 lr = 0.0001
 
-datetime_now = {str(datetime.datetime.now())}
+datetime_now = str(datetime.datetime.now())
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
 P = 100  # number of individuals in populations
@@ -440,7 +440,7 @@ def build_and_train(data_steps, ds_train, ds_test, epochs=epochs, break_early=Fa
 
     # a fixed learning rate is already defined within the train function, that's why here it is omitted
     loss_hist, accs_hist, best_layers = train(
-        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test, break_early=False, patience=None)
+        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test, break_early=True, patience=None)
 
     # best training and test at best training
     acc_best_train = np.max(accs_hist[0])  # returns max value
