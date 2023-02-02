@@ -1,7 +1,0 @@
-experiment_2.log
-params: a, A1, A2, b, G
-10 Inidividuals, 100 generations
-
-experiment_1.log
-params: a, A1, A2
-50 individuals, 100 generations
