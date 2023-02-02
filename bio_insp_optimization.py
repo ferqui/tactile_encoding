@@ -1,12 +1,12 @@
 """
-The bio inspired optimization is based on the evolution scheme.
+The bio inspired optimization is based on the evolutionary algorithm.
+It will iterate over N generations with M individuals each.
 It goes as follows:
 1. create intial population of size P
 loop:
     2. validate fitness of single individual P_n
-    3. select best x inidividuals and pertubate the genes (neuron parameters) 
-    and include y random individuals to create population of P
-    4. reached stop criterion end
+    3. select best inidividual and pertubate the genes (neuron parameters) 
+    and include 25% random individuals to create population of P
 """
 
 import logging
@@ -30,7 +30,8 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
-from datasets import load_data
+from utils.datasets import load_data
+from utils.utils import check_cuda, create_directory, calc_sigma_sigmoid
 
 # Settings for the SNN
 global use_trainable_out
@@ -47,7 +48,7 @@ lr = 0.0001
 datetime_now = str(datetime.datetime.now())
 # Init evolutionary algorithm
 generations = 100  # number of generations to calculate
-P = 100  # number of individuals in populations
+pop_size = 100  # number of individuals in populations
 # init early break
 early_break = True
 patience = 10
@@ -60,71 +61,29 @@ letters = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
 
 # create folder to safe results and plots
 path = './results'
-isExist_data = os.path.exists(path)
 
-if not isExist_data:
-    os.makedirs(path)
-
-if save_fig:
-    path = './plots'
-    isExist_plots = os.path.exists(path)
-
-    if not isExist_plots:
-        os.makedirs(path)
+create_directory(path)
 
 # init datastorage
 file_storage_path = f'./results/experiment_{datetime_now}.pkl'
-
+file_storage_path_network = f'./results/best_network_{datetime_now}.pt'
 # create folder to safe plots later (if not present)
 if save_fig:
     path_for_plots = f'./plots/experiment_{datetime_now}'
-    isExist_record = os.path.exists(path_for_plots)
+    create_directory(path_for_plots)
 
-    if not isExist_record:
-        os.makedirs(path_for_plots)
-
-isExist_data = os.path.exists('./logs')
-
-if not isExist_data:
-    os.makedirs('./logs')
+create_directory('./logs')
 
 logging.getLogger().addHandler(logging.FileHandler(
     f'./logs/experiment_{datetime_now}.log'))
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.INFO)
 
-logging.info(f"Data storage initialized. Will write to experiment_{datetime_now}.log.\n")
+logging.info(
+    f"Data storage initialized. Will write to experiment_{datetime_now}.log.\n")
 
 # check for available GPU and distribute work
-if torch.cuda.device_count() > 1:
-    torch.cuda.empty_cache()
-
-    gpu_sel = 1
-    gpu_av = [torch.cuda.is_available()
-              for ii in range(torch.cuda.device_count())]
-    logging.info("Detected {} GPUs. The load will be shared.".format(
-        torch.cuda.device_count()))
-    for gpu in range(len(gpu_av)):
-        if True in gpu_av:
-            if gpu_av[gpu_sel]:
-                device = torch.device("cuda:"+str(gpu))
-                # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
-                logging.info("Selected GPUs: {}" .format("cuda:"+str(gpu)))
-            else:
-                device = torch.device("cuda:"+str(gpu_av.index(True)))
-        else:
-            device = torch.device("cpu")
-            logging.warning("No GPU detected. Running on CPU.")
-else:
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-
-        logging.info("Single GPU detected. Setting up the simulation there.")
-        device = torch.device("cuda:0")
-        # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
-    else:
-        device = torch.device("cpu")
-        logging.warning("No GPU detected. Running on CPU.")
+device = check_cuda()
 
 
 def run_snn(inputs, layers):
@@ -311,16 +270,11 @@ def train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=None, d
                     best_acc_layers.append(ii.detach().clone())
 
         logging.info("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.3f}), Test accuracy (loss): {:.2f}% ({:.3f}).".format(
-                e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
+            e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
 
         # check for early break
         if break_early:
-            print(patience)
             if e >= patience-1:
-                logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
-                        np.mean(np.diff(accs_hist[1][-patience:])), np.diff(accs_hist[1][-patience:])))
-                logging.info("\nmean(delta_test_loss): {:.2f}\ndelta_test_loss: {}" .format(
-                    np.mean(np.diff(loss_hist[1][-patience:])*-1), np.diff(loss_hist[1][-patience:])*-1))
                 # mean acc drops
                 if np.mean(np.diff(accs_hist[1][-patience:])) < 0.0:
                     logging.info("\nmean(delta_test_acc): {:.2f}\ndelta_test_acc: {}" .format(
@@ -440,7 +394,7 @@ def build_and_train(data_steps, ds_train, ds_test, epochs=epochs, break_early=Fa
 
     # a fixed learning rate is already defined within the train function, that's why here it is omitted
     loss_hist, accs_hist, best_layers = train(
-        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test, break_early=True, patience=None)
+        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_test=ds_test, break_early=break_early, patience=patience)
 
     # best training and test at best training
     acc_best_train = np.max(accs_hist[0])  # returns max value
@@ -567,7 +521,7 @@ def ConfusionMatrix(dataset, save, layers=None, labels=letters):
     plt.ylabel('True\n')
     plt.xticks(rotation=0)
     if save:
-        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
+        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}'
         if use_trainable_tc:
             path_to_save_fig = f'{path_to_save_fig}_train_tc'
         if use_trainable_out:
@@ -626,7 +580,7 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             plt.ylabel("Units")
         sn.despine()
     if save:
-        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
+        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}'
         if use_trainable_tc:
             path_to_save_fig = f'{path_to_save_fig}_train_tc'
         if use_trainable_out:
@@ -649,7 +603,7 @@ def NetworkActivity(dataset, save, layers=None, labels=letters):
             plt.ylabel("Units")
         sn.despine()
     if save:
-        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
+        path_to_save_fig = f'{path_for_plots}/generation_{generation+1}'
         if use_trainable_tc:
             path_to_save_fig = f'{path_to_save_fig}_train_tc'
         if use_trainable_out:
@@ -876,19 +830,19 @@ neuron_model = 'mn_neuron'  # iz_neuon, lif_neuron
 # Mihilas-Niebur neuron
 if neuron_model == 'mn_neuron':
     from parameters.encoding_parameter import mn_parameter
-    from models import MN_neuron
+    from utils.models import MN_neuron
     neuron = MN_neuron
     parameter = mn_parameter
 # Izhikevich neuron
 elif neuron_model == 'iz_neuron':
     from parameters.encoding_parameter import iz_parameter
-    from models import IZ_neuron
+    from utils.models import IZ_neuron
     neuron = IZ_neuron
     parameter = iz_parameter
 # LIF neuron
 else:
     from parameters.encoding_parameter import lif_parameter
-    from models import LIF_neuron
+    from utils.models import LIF_neuron
     neuron = LIF_neuron
     parameter = lif_parameter
 
@@ -903,7 +857,7 @@ record = []
 population_list = []
 param_width = []
 # create inital populataton of size P
-for counter in range(P):
+for counter in range(pop_size):
     individual = {}
     individual['individual'] = counter+1
     # create inital parameter values
@@ -936,46 +890,20 @@ data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
 x_train_test, x_validation, y_train_test, y_validation = train_test_split(
     data_neuron, labels_as_number, test_size=0.10, shuffle=True,
     stratify=labels_as_number)
-logging.info("Finished data prepartion.\n")
-
-
-def calc_sigma_linear(generations, generation):
-    """
-    Returns a line with negative slope.
-    The function start at 1, hits >=0.5 at generations/2 and approaches 0.01 at generations.
-    """
-
-    sigma_start = 1
-    sigma_stop = 0.01
-    sigma = ((sigma_stop-sigma_start)/generations)*generation+sigma_start
-    return sigma
-
-
-def calc_sigma_sigmoid(generations, generation):
-    """
-    Returns a invert sigmoid function invariant to change of generations.
-    The function start at 1, hits 0.5 at generations/2 and approaches 0 at generations.
-    The lower strecht, the more linear, the higher the closer to step function at generation/2.
-    """
-
-    stretch = 12
-    fac = stretch/generations
-    return (1-(1/(1+np.exp(-(generation*fac)+(stretch/2)))))
-
+logging.info("Finished data preparation.\n")
 
 logging.info("________________________________________")
 logging.info(
-    f"Optimization settings\nIndividuals: {P}\nGenerations: {generations}\nEarly break: {True}\nPatience: {patience}")
+    f"Optimization settings\nIndividuals: {pop_size}\nGenerations: {generations}\nEarly break: {True}\nPatience: {patience}")
 logging.info("________________________________________")
 logging.info("Starting optimization.")
 
-# TODO define another end criterion (saturation in accuracy for n runs?)
+# init
+highest_fitness = 0.0
+best_individual = []
+very_best_layers = []
 # iterate over generataions
 for generation in range(generations):
-    highest_fitness = 0.0
-    best_individual = []
-    very_best_layers = []
-
     # set seed for train-test split (fix seed for one generation to allow comparability)
     global seed
     seed = random.randint(0, 2**32 - 1)
@@ -1011,7 +939,7 @@ for generation in range(generations):
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
 
-        ## calculate fitness
+        # calculate fitness
         # initialize and train network
         _, acc_hist, best_layers = build_and_train(
             data_steps, ds_train, ds_test, epochs=epochs, break_early=True, patience=patience)
@@ -1035,69 +963,68 @@ for generation in range(generations):
         individual['fitness'] = max(acc_hist[1])*100
         individual['validation'] = test_acc
         if max(acc_hist[1]) > highest_fitness:
-            # TODO inlcude std of acc here as second metric
+            logging.info(
+                "*********************************************************")
+            logging.info(
+                f"*Found a new best with individual {identifier+1} in generation {generation+1}.\t*")
+            logging.info(
+                "*********************************************************")
             highest_fitness = max(acc_hist[1])
-            best_individual = identifier
+            best_individual = individual
             very_best_layer = best_layers
+            # plots of the best individual
+            if save_fig:
+                ConfusionMatrix(ds_validation, save_fig, very_best_layer, letters)
+                NetworkActivity(ds_validation, save_fig, very_best_layer, letters)
         elif max(acc_hist[1]) == highest_fitness:
             # TODO use spike count second metric
             logging.warning("Find a second metric to deside which is better")
 
-    # best individual
-    logging.info("*******************************************")
-    logging.info("Best individual: {}" .format(best_individual+1))
-    logging.info("*******************************************")
-
     # TODO do not keep all data in memory, but just load, append, and dump
     # save record for postprocessing
     record.append(population_list)
-    record.append(best_individual)
     # TODO create pandas df to dump
     with open(file_storage_path, 'wb') as f:
         pickle.dump(record, f)
-
-    # plots of the best individual in this generation
-    if save_fig:
-        ConfusionMatrix(ds_test, save_fig, very_best_layer, letters)
-        NetworkActivity(ds_test, save_fig, very_best_layer, letters)
-
-    # do not create a new generation in the last trial
-    if generation < generations-1:
-        # calc sigma to reduce searchspace over generations
-        # start at 100% and end at 1% of search space
-        # sigma = calc_sigma(1.0, 0.01, generations, generation)
-        sigma = calc_sigma_sigmoid(generations, generation)
-
-        # create next generation
-        best_individual_dict = population_list[best_individual]
-        population_list = []
-        for counter in range(P):
-            individual = {}
-            individual['individual'] = counter+1
-            # keep best found individual so far (no perturbation)
-            if counter == 0:
-                for _, param in enumerate(parameter_to_optimize):
-                    individual[param[0]] = best_individual_dict[param[0]]
-            else:
-                # create first 75% from best
-                if counter <= 0.75*P:
-                    for counter, param in enumerate(parameter_to_optimize):
-                        # (mu, sigma, nb_samples)
-                        new_val = np.random.normal(
-                            best_individual_dict[param[0]], param_width[counter]*sigma, 1)
-                        individual[param[0]] = new_val[0]
-                # create remaining 25% random
-                else:
-                    for _, param in enumerate(parameter_to_optimize):
-                        # create parameter space to draw from
-                        param_space = np.linspace(
-                            param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
-                        # draw a random number out of parameter space
-                        individual[param[0]] = random.choice(param_space)
-            population_list.append(individual)
 
     logging.info("Finished generation {} of {}.".format(
         generation+1, generations))
     logging.info("###################################################\n\n")
 
-logging.info("End of the evolution reached")
+    # do not create a new generation in the last trial
+    if generation < generations:
+        logging.info("Setting up new generation.")
+        # calc sigma to reduce searchspace over generations
+        # start at 100% and end at 1% of search space for linear
+        # sigma = calc_sigma(1.0, 0.01, generations, generation)
+
+        # start at <=100% and end at >=0% of search space for sigmoid
+        sigma = calc_sigma_sigmoid(generations, generation)
+        logging.info(f"Sigma: {sigma}.")
+        # create next generation
+        population_list = []
+        for counter in range(pop_size):
+            individual = {}
+            individual['individual'] = counter
+            # create first 75% from best
+            if counter < 0.75*pop_size:
+                logging.info("Creating pertubation of best.")
+                for counter, param in enumerate(parameter_to_optimize):
+                    # create parameter space based on Gaussian around best params (mu, sigma, nb_samples)
+                    new_val = np.random.normal(
+                        best_individual[param[0]], param_width[counter]*sigma, 1)
+                    individual[param[0]] = new_val[0]
+            # create remaining 25% random
+            else:
+                logging.info("Creating random individual.")
+                for _, param in enumerate(parameter_to_optimize):
+                    # TODO find a ratio of number of entries to create with respect to population size?
+                    # create random distribution from parameter space
+                    param_space = np.linspace(
+                        param[1]-0.5*abs(param[1]), param[2]+0.5*abs(param[2]), 100)
+                    # draw a random entry out of parameter space
+                    individual[param[0]] = random.choice(param_space)
+            population_list.append(individual)
+
+torch.save(very_best_layer, file_storage_path_network)
+logging.info("End of the evolution reached!")
