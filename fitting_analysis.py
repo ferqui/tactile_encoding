@@ -6,7 +6,7 @@ from time import localtime, strftime
 import matplotlib
 import argparse
 import seaborn as sns
-
+import scipy.integrate as scint
 matplotlib.pyplot.ioff()  # turn off interactive mode
 import numpy as np
 import pickle
@@ -16,8 +16,14 @@ from utils_encoding import get_input_step_current, plot_outputs, pca_isi, plot_v
 from sklearn.covariance import MinCovDet
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from classifiers import MahalanobisClassifier
+# from classifiers import MahalanobisClassifier
+from scipy.optimize import curve_fit
 
+def func(x,t, a, b, c,d):
+    return a*np.exp(b*x) + c/np.log(d*x)
+def func_ode(t,a,b,c,d):
+    tspan = np.hstack([[0],np.hstack([t])])
+    return scint.odeint(func_1,0, tspan, args=(a,b,c,d))[1:,0]
 torch.manual_seed(0)
 np.random.seed(19)
 ##########################################################
@@ -82,45 +88,61 @@ def main(args):
                                                   dim=1)  # shape: batch_size, time_steps, neurons (i.e., current amplitudes)
         dict_mem_rec[MN_class_type] = torch.stack(mem_rec, dim=1)
 
-    # plot_outputs(dict_spk_rec, dict_mem_rec, list_mean_current, fig_folder=fig_folder)
-    # plot_vmem(dict_spk_rec, dict_mem_rec, list_mean_current, xlim=(0,30), fig_folder=fig_folder)
+        spks = torch.where(dict_spk_rec[MN_class_type] == 1)
+        # plt.imshow(dict_spk_rec['A'][0,:,:],aspect='auto')
+        x_local_sampled_list = []
+        isi_tensor_list = []
+        time_list = []
+        x_local_sampled = torch.zeros_like(x_local)
+        isi_tensor = torch.zeros_like(x_local)
+        fig1, axis1 = plt.subplots(nrows=2, ncols=1,sharex=True)
+        eee = plt.get_cmap('inferno')
+        uuu = eee(np.linspace(0, 1, 10))
+        time_last = 0
+        for i in range(dict_spk_rec[MN_class_type].shape[2]):
+            idx = torch.where(spks[2] == i)
+            time = spks[1][idx]
+            time_list.append(time+time_last)
+            x_local_sampled_list.append(x_local[0,time,i])
+            isi = torch.diff(time)
+            isi_tensor_list.append(torch.cat([torch.tensor([isi[0]]).to(torch.float64), isi.to(torch.float64)]))
+            time_last += time[-1]
+            axis1[0].plot([i for i in range(x_local.shape[1])], x_local[0, :, i], '-D', markevery=list(time),color = uuu[int(i/n_repetitions)])
+            # axis1[0].plot(time,x_local[0,time,0],'.')
+            # axis1.eventplot(time,lineoffsets=1.4)
+            axis1[1].plot(time, torch.cat([torch.tensor([isi[0]]).to(torch.float64), isi.to(torch.float64)]), 'x',color = uuu[int(i/n_repetitions)])
+            # isi_tensor[0,time,i] = torch.cat([torch.tensor([0]),isi.to(torch.float64)])
+            # plt.plot(time[:-1],isi)
+            fig1.suptitle('Class ' + MN_class_type)
+            axis1[0].set_title('Stimulus')
+            axis1[1].set_xlabel('Time')
+            axis1[1].set_title('ISI')
+            axis1[0].set_ylabel('Current (A)')
+            axis1[1].set_ylabel('ISI')
+        plt.figure()
+        time_tensor = torch.concat(time_list)
+        x_local_sampled = torch.concat(x_local_sampled_list)
+        isi_tensor = torch.concat(isi_tensor_list)
+        popt, pcov = curve_fit(func, x_local_sampled, isi_tensor)
+        # plt.plot(time_list, func(x_local_sampled, *popt), 'r',label='fit')
+        # plt.plot(time_list,x_local_sampled,'b',label='input')
+        # label='fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
+        # plt.plot(time_list, isi_tensor,'g',label='data')
+        plt.title('Class ' + MN_class_type)
+        plt.xlabel('Time * Stimulus')
+        plt.ylabel('ISI (ms)')
+        plt.plot(time_list[0], x_local_sampled_list[0], 'b+-', label='input')
+        plt.plot(time_list[0], isi_tensor_list[0], 'r*-', label='data')
+        #mystr = str(np.round(popt[0])) + "exp(" + str(np.round(popt[1],2)) + "x)  + "+str(np.round(popt[2],2)) + "*1/ln("+str(np.round(popt[4],2)) + ")"
+        mystr = ''
+        plt.plot(time_list[0], func(x_local_sampled_list[0], *popt), 'gx-', label=mystr)
+        for i in range(len(isi_tensor_list))[1:]:
 
-    # PCA over ISI statistics:
-    # X_pca_isi = pca_isi(dict_spk_rec, class_labels, fig_folder=fig_folder)
-
-    # PCA over time bins:
-    X_pca_timebins, Y_labels = pca_timebins(dict_spk_rec, class_labels, exp_variance=exp_variance, fig_folder=fig_folder)
-    assert (X_pca_timebins.shape[0] == n_trials)
-    assert (len(Y_labels) == n_trials)
-    # second dimension = n features kept to explain exp_variance
-
-    # Using Mahlanobis distance for bianry classification
-    # Can we train a classifier to classify which neuron type was, based on the
-    # neural activity?
-
-    # Split dataset into test and train
-    X_pca_timebins = pd.DataFrame(X_pca_timebins)
-    x_train, x_test, y_train, y_test = train_test_split(X_pca_timebins, Y_labels, test_size = 0.2, random_state = 42)
-
-    # MahalanobisClassifier
-    clf = MahalanobisClassifier(x_train, y_train)
-
-    # Predicting
-    pred_probs = clf.predict_probability(x_test)
-    unique_labels = np.unique(Y_labels)
-    pred_class = clf.predict_class(x_test, unique_labels)
-
-    pred_actuals = pd.DataFrame([(pred, act) for pred, act in zip(pred_class, y_test)], columns=['pred', 'true'])
-    truth = pred_actuals.loc[:, 'true']
-    pred = pred_actuals.loc[:, 'pred']
-    cm = confusion_matrix(truth, pred, labels=['A', 'C'])
-    print('\nConfusion Matrix: \n', confusion_matrix(truth, pred))
-    cm_display = ConfusionMatrixDisplay(confusion_matrix=cm,
-                                           display_labels=['A', 'C']
-                                        )
-    cm_display.plot()
-    fig = plt.gcf()
-    fig.savefig(fig_folder.joinpath('Confusion Matrix.pdf'), format='pdf')
+            plt.plot(time_list[i], x_local_sampled_list[i], 'b+-')
+            plt.plot(time_list[i], isi_tensor_list[i], 'r*-')
+            plt.plot(time_list[i], func(x_local_sampled_list[i], *popt), 'gx-')
+        plt.legend()
+        # plt.legend()
     plt.show()
 
     print('Hello')
@@ -133,7 +155,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('TODO')
     parser.add_argument('--MNclasses_to_test', type=list, default=['A', 'C'], help="learning rate")
     parser.add_argument('--nb_inputs', type=int, default=10)
-    parser.add_argument('--n_repetitions', type=int, default=200)
+    parser.add_argument('--n_repetitions', type=int, default=1)
     parser.add_argument('--sigma', type=float, default=0, help='sigma gaussian distribution of I current')
     # NOTE: The number of input neurons = number of different input current amplitudes
     parser.add_argument('--gain', type=int, default=1)
