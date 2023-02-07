@@ -6,4 +6,6 @@ runs
 .idea/
 .venv
 .ipynb_checkpoints
-NNI/*
+NNI/dataset_split.py
+NNI/dataset_splits/*
+NNI/results/*
