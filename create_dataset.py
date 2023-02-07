@@ -3,6 +3,11 @@ Creates data according to the paper "A Generalized Linear
 Integrate-and-Fire Neural Model Produces Diverse Spiking Behaviors"
 by Stefan Mihalas and Ernst Niebur.
 
+Fra, Vittorio,
+Politecnico di Torino,
+EDA Group,
+Torino, Italy.
+
 Muller-Cleve, Simon F.,
 Istituto Italiano di Tecnologia - IIT,
 Event-driven perception in robotics - EDPR,
@@ -360,6 +365,5 @@ if __name__ == '__main__':
 
     print('Creating noisy 1000ms data with temporal jitter.')
     fix_time(add_noise=True, temp_jitter=True)
-
 
     print('Finished with data creation.')
