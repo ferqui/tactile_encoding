@@ -1020,7 +1020,7 @@ try:
     # report results (i.e. test accuracy from best validation) of each trial
     path = './results/reports/{}'.format(name)
     create_directory(path)
-    report_path = path + "/{}_{}_{}".format(trial_datetime,nni.get_experiment_id(),nni.get_trial_id())
+    report_path = path + "/{}_{}".format(nni.get_experiment_id(),nni.get_trial_id())
     with open(report_path, 'a') as f:
         f.write(str(test_acc*100))
         f.write('\n')
@@ -1029,7 +1029,7 @@ try:
     if save_weights:
         path = './results/layers/{}'.format(name)
         create_directory(path)
-        save_layers_path = path + "/{}_{}_{}.pt".format(trial_datetime,nni.get_experiment_id(),nni.get_trial_id())
+        save_layers_path = path + "/{}_{}.pt".format(nni.get_experiment_id(),nni.get_trial_id())
         with open(report_path, 'r') as f:
             if test_acc*100 >= np.max(np.asarray([(line.strip()) for line in f], dtype=np.float64)):
                 torch.save(best_layers, save_layers_path)
