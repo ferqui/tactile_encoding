@@ -28,7 +28,7 @@ search_space = {
     'nb_hidden': {'_type': 'quniform', '_value': [50, 450, 50]}, # use it as an int in the script
     'lr': {'_type': 'choice', '_value': [0.0001, 0.001, 0.01, 0.1]},
     'fwd_weights_std': {'_type': 'quniform', '_value': [0.1, 3, 0.1]},
-    'rec_weights_std': {'_type': 'quniform', '_value': [0.01, 1, 0.01]},
+    'rec_weights_std': {'_type': 'quniform', '_value': [0.01, 0.5, 0.01]},
     'tau_mem': {'_type': 'choice', '_value': [1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 30e-3, 40e-3, 50e-3]},
     'tau_syn': {'_type': 'choice', '_value': [1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 30e-3, 40e-3, 50e-3]},
     #'scale': {'_type': 'quniform', '_value': [5, 20, 5]}, # use it as an int in the script
