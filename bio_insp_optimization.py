@@ -884,7 +884,7 @@ dt = 1/frequ
 # preprocess data
 logging.info("Start preparing data.")
 data_neuron, labels, timestamps, data_steps, labels_as_number, data = load_data(
-    "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=1, filtering=True)
+    "./data/data_braille_letters_all.pkl", upsample_fac=upsample_fac, norm_val=5, filtering=True)
 # create validation split
 # split in train-test and validation set
 x_train_test, x_validation, y_train_test, y_validation = train_test_split(
