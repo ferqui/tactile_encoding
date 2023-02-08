@@ -255,7 +255,7 @@ def nni_train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=Non
                 for ii in layers_update:
                     best_acc_layers.append(ii.detach().clone())
 
-        LOG.debug(print("Epoch {}/{} done. Train accuracy (loss): {:.2f}% ({:.5f}), Validation accuracy (loss): {:.2f}% ({:.5f}).".format(
+        LOG.debug(print("Epoch {}/{} done. Training accuracy (loss): {:.2f}% ({:.5f}), Validation accuracy (loss): {:.2f}% ({:.5f}).".format(
             e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1])))
         
         nni.report_intermediate_result({"default": np.round(accs_hist[1][-1]*100,4),
@@ -895,13 +895,13 @@ def run_NNI(args, params, name, ds_train, ds_test, ds_val):
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = nni_build_and_train(params, ds_train, ds_val, epochs=eps)
 
-    # test the network (on never seen data)
+    # test the network (on never seen data) with weights from best validation
     test_acc, _ = compute_classification_accuracy(ds_test, best_layers)
     LOG.debug(print("Test accuracy for {}: {}%\n".format(
         name, np.round(test_acc*100, 2))))
 
-    nni.report_final_result({"default": np.round(acc_hist[1][-1]*100,4),
-                             "training": np.round(acc_hist[0][-1]*100,4),
+    nni.report_final_result({"default": np.round(np.max(acc_hist[1])*100,4), # the default value is the maximum validation accuracy achieved
+                             "Best training": np.round(np.max(acc_hist[0])*100,4),
                              "test": np.round(test_acc*100, 4)})
     
     return test_acc, best_layers
@@ -992,13 +992,13 @@ try:
     trial_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     LOG.debug(print("\nTrial {} (No. {}) started on: {}-{}-{} {}:{}:{}\n".format(nni.get_sequence_id()+1,
-                                                                               nni.get_sequence_id(),
-                                                                               trial_datetime[:4],
-                                                                               trial_datetime[4:6],
-                                                                               trial_datetime[6:8],
-                                                                               trial_datetime[-6:-4],
-                                                                               trial_datetime[-4:-2],
-                                                                               trial_datetime[-2:])))
+                                                                                 nni.get_sequence_id(),
+                                                                                 trial_datetime[:4],
+                                                                                 trial_datetime[4:6],
+                                                                                 trial_datetime[6:8],
+                                                                                 trial_datetime[-6:-4],
+                                                                                 trial_datetime[-4:-2],
+                                                                                 trial_datetime[-2:])))
 
     # TODO make sure variables from NNI are ALWAYS used! (think about collision with parser)
     # get parameters from the tuner combining them with the line arguments
@@ -1022,7 +1022,7 @@ try:
     create_directory(path)
     report_path = path + "/{}".format(nni.get_experiment_id())
     with open(report_path, 'a') as f:
-        f.write("{} {}".format(str(test_acc*100),nni.get_trial_id()))
+        f.write("{} {} test accuracy (%)".format(str(test_acc*100),nni.get_trial_id()))
         f.write('\n')
     
     # save trained weights giving the highest test accuracy
