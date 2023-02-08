@@ -2,5 +2,6 @@ data/*
 plots/*
 results/*
 logs/*
+bkp/*
 runs
 __pycache__
