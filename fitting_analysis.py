@@ -47,7 +47,14 @@ output_folder.mkdir(parents=True, exist_ok=True)
 
 MNclass_to_param = {
     'A': {'a': 0, 'A1': 0, 'A2': 0},
-    'C': {'a': 5, 'A1': 0, 'A2': 0}
+    'C': {'a': 5, 'A1': 0, 'A2': 0},
+    'K': {'a': 30, 'A1': 0, 'A2': 0},
+    'L': {'a': 30, 'A1': 10, 'A2': -0.6},
+    'M': {'a': 5, 'A1': 10, 'A2': -0.6},
+    'P': {'a': 5, 'A1': 5, 'A2': -0.3},
+    'R': {'a': 0, 'A1': 8, 'A2': -0.1},
+    'S': {'a': 5, 'A1': -3, 'A2': 0.5},
+    'T': {'a': -80, 'A1': 0, 'A2': 0},
 }
 class_labels = dict(zip(list(np.arange(len(MNclass_to_param.keys()))),
                         MNclass_to_param.keys()))
@@ -60,15 +67,16 @@ class fitClass:
         self.b = 1
         self.c = 1
         pass
-    def pend(self,y, t, b, c):
-        dydt = -b * np.exp(c*y) + self.stim[int(t)]
+
+    def func(self,x, a, b, c, d,e,f):
+        return a * np.exp(b * x) + c / np.log(d * x + 1e-12) + e*x**-f
+    def pend_dev(self,y, t, a, b, c):
+        dydt = -a*y + b * np.exp(c*self.stim[int(t)])
         return dydt
-    def func(self,time,b,c):
-        # print(time)
-
+    def func_dev(self,time,a,b,c):
+        print("fitting")
         tspan = np.hstack([[0], np.hstack([time])])
-
-        return scint.odeint(self.pend, y0, tspan, args=(b, c))[1:,0]
+        return scint.odeint(self.pend_dev, y0, tspan, args=(a,b,c))[1:,0]
 ############################################################
 
 def main(args):
@@ -84,7 +92,7 @@ def main(args):
     output_data = prepare_output_data(args)
 
     # Input arguments:
-    list_classes = args.MNclasses_to_test
+    list_classes = MNclass_to_param.keys()
     nb_inputs = args.nb_inputs
     # Linearly map the number of inputs to a range of input current amplitudes.
     amplitudes = np.arange(1, nb_inputs + 1) * args.gain + args.offset
@@ -92,7 +100,7 @@ def main(args):
     sigma = args.sigma
     n_trials = args.n_repetitions * args.nb_inputs * len(list_classes)
     exp_variance = args.exp_variance
-
+    pop_coll = []
     # each neuron receives a different input amplitude
     dict_spk_rec = dict.fromkeys(list_classes, [])
     dict_mem_rec = dict.fromkeys(list_classes, [])
@@ -132,11 +140,15 @@ def main(args):
         for i in range(dict_spk_rec[MN_class_type].shape[2]):
             idx = torch.where(spks[2] == i)
             time = spks[1][idx]
+            if len(time) == 0:
+                time = torch.Tensor([0, 0]).to(torch.int64)
+
             time_list.append(time+time_last)
             x_local_sampled_list.append(x_local[0,time,i])
             isi = torch.diff(time)
             isi_tensor_list.append(torch.cat([torch.tensor([isi[0]]).to(torch.float64), isi.to(torch.float64)]))
             time_last += time[-1]
+
             axis1[0].plot([i for i in range(x_local.shape[1])], x_local[0, :, i], '-D', markevery=list(time),color = uuu[int(i/n_repetitions)])
             # axis1[0].plot(time,x_local[0,time,0],'.')
             # axis1.eventplot(time,lineoffsets=1.4)
@@ -149,19 +161,27 @@ def main(args):
             axis1[1].set_title('ISI')
             axis1[0].set_ylabel('Current (A)')
             axis1[1].set_ylabel('ISI')
+        plt.show()
         plt.figure()
         time_tensor = torch.concat(time_list)
         x_local_sampled = torch.concat(x_local_sampled_list)
         isi_tensor = torch.concat(isi_tensor_list)
         b = 1
         c = 1
-        d = x_local_sampled.numpy()
-        e = time_tensor
+        d = 1
+        e = 1
+        # d = x_local_sampled.numpy()
+        # e = time_tensor
         time = np.linspace(0,len(x_local_full)-1,len(x_local_full))
         padding = np.zeros_like(x_local_full)
         padding[time_tensor] = isi_tensor
         myfit = fitClass(x_local_full.numpy())
-        popt, pcov = curve_fit(myfit.func, time, padding)
+        # popt, pcov = curve_fit(myfit.func, time, padding)
+        try:
+            popt, pcov = curve_fit(myfit.func, x_local_sampled, isi_tensor)
+        except RuntimeError:
+            print('didnt manage to converge')
+        pop_coll.append(popt)
         print('we')
         # popt, pcov = curve_fit(f,y0, sol[], isi_tensor)
         # plt.plot(time_list, func(x_local_sampled, *popt), 'r',label='fit')
@@ -173,16 +193,26 @@ def main(args):
         plt.ylabel('ISI (ms)')
         plt.plot(time_list[0], x_local_sampled_list[0], 'b+-', label='input')
         plt.plot(time_list[0], isi_tensor_list[0], 'r*-', label='data')
-        #mystr = str(np.round(popt[0])) + "exp(" + str(np.round(popt[1],2)) + "x)  + "+str(np.round(popt[2],2)) + "*1/ln("+str(np.round(popt[4],2)) + ")"
-        mystr = ''
-        # plt.plot(time_list[0], func(x_local_sampled_list[0], *popt), 'gx-', label=mystr)
-        plt.plot(time, myfit.func(time, *popt), 'gx-')
+        mystr = str(np.round(popt[0])) + "exp(" + str(np.round(popt[1],2)) + "x)  + "+str(np.round(popt[2],2)) + "*1/ln("+str(np.round(popt[3],2))+ str(np.round(popt[4],2)) + "*x^(-"+str(np.round(popt[5],2)) + ")"
+        # mystr = ''
+        # plt.plot(time, myfit.func(time, *popt), 'gx-')
 
+        plt.plot(time_list[0], myfit.func(x_local_sampled_list[0], *popt), 'gx-',label=mystr)
         for i in range(len(isi_tensor_list))[1:]:
-
+            plt.plot(time_list[i], myfit.func(x_local_sampled_list[i], *popt), 'gx-')
             plt.plot(time_list[i], x_local_sampled_list[i], 'b+-')
             plt.plot(time_list[i], isi_tensor_list[i], 'r*-')
         plt.legend()
+        plt.figure()
+        print(popt)
+    idxes = [0,2,4]
+    myabs = np.abs(np.array(pop_coll))[:,idxes]
+    plt.imshow((myabs.T / np.sum(myabs, axis=1)).T,aspect='auto')
+    plt.xlabel('Fit')
+    plt.ylabel('Class')
+    plt.yticks([0,1,2,3,4,5,6,7,8],MNclass_to_param.keys())
+    plt.xticks([0,1,2],['exp','1/ln','x^'])
+    plt.colorbar()
         # plt.legend()
     plt.show()
 
