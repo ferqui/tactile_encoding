@@ -14,15 +14,12 @@ Genova, Italy.
 
 import logging
 import argparse
-#import sys
 import numpy as np
 import pandas as pd
 
 import nni
 
 import os
-#import pickle
-#import random
 import datetime
 
 import matplotlib.pyplot as plt
@@ -1000,7 +997,6 @@ try:
                                                                                  trial_datetime[-4:-2],
                                                                                  trial_datetime[-2:])))
 
-    # TODO make sure variables from NNI are ALWAYS used! (think about collision with parser)
     # get parameters from the tuner combining them with the line arguments
     params_nni = nni.get_next_parameter()
     for ii in params_nni.keys():
