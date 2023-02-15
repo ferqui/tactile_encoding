@@ -26,7 +26,7 @@ from sklearn.metrics import confusion_matrix
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 #from tactile_encoding.utils.utils import check_cuda, value2index, create_directory, load_layers
 from utils.utils import check_cuda, create_directory
@@ -227,6 +227,15 @@ def build_and_test(features,
 
     test_N = []
 
+    with open(report_path, 'a') as f:
+        f.write("Date and time: {}-{}-{} {}:{}:{}\n\n".format(
+            trial_datetime[:4],
+            trial_datetime[4:6],
+            trial_datetime[6:8],
+            trial_datetime[-6:-4],
+            trial_datetime[-4:-2],
+            trial_datetime[-2:]))
+
     for ii in range(N):
         
         test_acc, _, _ = compute_classification_accuracy(params, ds_test, layers=layers, label_probabilities=True, shuffle=True)
@@ -254,10 +263,22 @@ def build_and_test(features,
             f.write("Mean test accuracy: {}%\n".format(np.round(np.mean(test_N)*100,2)))
             f.write("Median test accuracy: {}%\n".format(np.round(np.median(test_N)*100,2)))
             f.write("Std. Dev. test accuracy: {}%\n".format(np.round(np.std(test_N)*100,2)))
+        # 10 single-sample inferences to check label probbailities
+        for ii in range(10):
+            single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0))) # pin_memory with CPU tensors only
+            _, _, lbl_probs = compute_classification_accuracy(params, TensorDataset(single_sample[0],single_sample[1]), layers, label_probabilities=True)
+            #_, _, lbl_probs = compute_classification_accuracy(params, ds_test, layers=layers, label_probabilities=True)
+            with open(report_path, 'a') as f:
+                f.write("\nSingle-sample inference {}/{} from test set:\n".format(ii+1,10))
+                f.write("\tSample: {} \tPrediction: {} \n\tLabel probabilities (%): {}\n".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]], np.round(np.array(lbl_probs.detach().cpu().numpy())*100,2)))
+                
+        with open(report_path, 'a') as f:
             f.write("---------------------------------------------------------------------------------------------------\n")
-            f.write('\n')
+            f.write("\n")
     
+    print("Buidling the confusion matrix...")
     ConfusionMatrix(params, ds_test, save_fig, layers, list(labels_mapping.keys()))
+    print("...done.")
 
 
 def compute_classification_accuracy(params, dataset, layers=None, label_probabilities=False, shuffle=False):
@@ -596,9 +617,6 @@ class SurrGradSpike(torch.autograd.Function):
         return grad
 
 spike_fn = SurrGradSpike.apply
-
-
-####################################################################################################################################
 
 
 # Specify what kind of data to use
