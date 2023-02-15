@@ -34,14 +34,11 @@ search_space = {
     #'scale': {'_type': 'quniform', '_value': [5, 20, 5]}, # use it as an int in the script
     #'batch_size': {'_type': 'choice', '_value': [8, 16, 32, 64, 128, 256]},
 }
-
-"""
-### Alternatively, if the searchspace is in a file:
-searchspace_filename = "nni_train_rsnn_norse_enc_layer_searchspace"
+searchspace_filename = "train_spike_classifier_searchspace"
 searchspace_path = "./searchspaces/{}.json".format(searchspace_filename)
-with open(searchspace_path, "r") as read_searchspace:
-    search_space = json.load(read_searchspace)
-"""
+with open(searchspace_path, "w") as write_searchspace:
+    json.dump(search_space, write_searchspace)
+
 
 
 if __name__ == '__main__':

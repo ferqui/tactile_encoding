@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 import nni
+from nni.tools.nnictl import updater
 
 import os
 import datetime
@@ -35,14 +36,20 @@ from torch.utils.data import DataLoader
 from utils.utils import check_cuda, create_directory
 
 
+exp_name = "train_spike_classifier" # name of the experiment as in the "main" script for NNI configuration
+LOG = logging.getLogger(exp_name)
+
+searchspace_filename = "{}_searchspace".format(exp_name)
+searchspace_path = "./searchspaces/{}.json".format(searchspace_filename)
+#with open(searchspace_path, "r") as read_searchspace:
+#    search_space = json.load(read_searchspace)
+
 # set up CUDA device
 global device
 device = check_cuda(gpu_sel=1, gpu_mem_frac=0.3)
 
 global use_seed
 use_seed = False
-
-LOG = logging.getLogger('train_spike_classifier')
 
 global seed
 if use_seed:
@@ -904,8 +911,13 @@ def run_NNI(args, params, name, ds_train, ds_test, ds_val):
     return test_acc, best_layers
 
 
-parser = argparse.ArgumentParser(description='TODO')
+parser = argparse.ArgumentParser()
 
+# Name (path) of the search space file (useful to auto-update the searchspace during the experiment)
+parser.add_argument('-filename',
+                    type=str,
+                    default=searchspace_path,
+                    help='Name (path) of the file for the search space.')
 parser.add_argument('-epochs',
                     type=int,
                     default=300,
@@ -952,6 +964,12 @@ parser.add_argument('-tau_syn',
 #                    type=float,
 #                    default=10,
 #                    help='Controls steepness of surrogate gradient.')
+# ID of the running NNI experiment (useful to auto-update the searchspace during the experiment)
+parser.add_argument('--id',
+                    type=str,
+                    default=nni.get_experiment_id(),
+                    help="Experiment ID")
+
 args = parser.parse_args()
 
 params = vars(args)
@@ -996,6 +1014,11 @@ try:
                                                                                  trial_datetime[-6:-4],
                                                                                  trial_datetime[-4:-2],
                                                                                  trial_datetime[-2:])))
+    
+    ### every n_tr, "update" the searchspace inducing a new RandomState for the tuner
+    n_tr = 200
+    if (nni.get_sequence_id() > 0) & (nni.get_sequence_id()%n_tr == 0):
+        updater.update_searchspace(args) # it will use args.filename to update the search space
 
     # get parameters from the tuner combining them with the line arguments
     params_nni = nni.get_next_parameter()
