@@ -79,7 +79,7 @@ labels_mapping = {
 }
 
 
-def run_snn(params, inputs, layers):
+def run_snn(inputs, layers):
 
     if use_trainable_out and use_trainable_tc:
         w1, w2, v1, alpha1, beta1, alpha2, beta2, out_scale, out_offset = layers
@@ -307,9 +307,9 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
                 layers = [w1, w2, v1, alpha1, beta1, alpha2, beta2]
             else:
                 layers = [w1, w2, v1]
-            spks_out, _, _ = run_snn(params=params, inputs=x_local, layers=layers)
+            spks_out, _, _ = run_snn(inputs=x_local, layers=layers)
         else:
-            spks_out, _, _ = run_snn(params=params, inputs=x_local, layers=layers)
+            spks_out, _, _ = run_snn(inputs=x_local, layers=layers)
         # with output spikes
         if use_trainable_out:
             m = spks_out
@@ -360,9 +360,9 @@ def ConfusionMatrix(params, dataset, save, layers=None, labels=None, use_seed=us
                 layers = [w1, w2, v1, alpha1, beta1, alpha2, beta2]
             else:
                 layers = [w1, w2, v1]
-            spks_out, _, _ = run_snn(params=params, inputs=x_local, layers=layers)
+            spks_out, _, _ = run_snn(inputs=x_local, layers=layers)
         else:
-            spks_out, _, _ = run_snn(params=params, inputs=x_local, layers=layers)
+            spks_out, _, _ = run_snn(inputs=x_local, layers=layers)
         # with output spikes
         if use_trainable_out:
             m = spks_out

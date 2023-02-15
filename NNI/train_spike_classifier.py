@@ -210,7 +210,7 @@ def nni_train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=Non
             # reg_loss += 1e-6* \
             #     torch.mean(torch.sum(torch.sum(spk_rec, dim=0), dim=0)**2)
             # L1 loss on total number of spikes (hidden layer)
-            reg_loss = 1e-4**torch.mean(torch.sum(spk_rec, 1))
+            reg_loss = 1e-4*torch.mean(torch.sum(spk_rec, 1))
             # L2 loss on spikes per neuron (hidden layer)
             reg_loss = reg_loss + 1e-8 * \
                 torch.mean(torch.sum(torch.sum(spk_rec, dim=0), dim=0)**2)

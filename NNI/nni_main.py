@@ -63,10 +63,10 @@ if __name__ == '__main__':
                         default='10d',
                         help='Maximum duration of the starting experiment.')
 
-    # How many (if any) GPUs to use
+    # How many (if any) GPUs are available
     parser.add_argument('-exp_gpu_number',
                         type=int,
-                        default=1,
+                        default=2,
                         help='How many GPUs to use for the starting experiment.')
 
     # Which GPU to use
