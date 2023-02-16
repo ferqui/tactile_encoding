@@ -33,7 +33,7 @@ from utils.utils import check_cuda, create_directory
 
 
 experiment_id = "83iopuwk"
-best_test_id = "s0yEm"
+best_test_id = "dZUic"
 
 # set up CUDA device
 global device
@@ -228,6 +228,7 @@ def build_and_test(features,
     test_N = []
 
     with open(report_path, 'a') as f:
+        f.write("Experiment {}, trial {}\n".format(experiment_id,best_test_id))
         f.write("Date and time: {}-{}-{} {}:{}:{}\n\n".format(
             trial_datetime[:4],
             trial_datetime[4:6],
