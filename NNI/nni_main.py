@@ -72,7 +72,7 @@ if __name__ == '__main__':
     # Which GPU to use
     parser.add_argument('-exp_gpu_sel',
                         type=int,
-                        default=1,
+                        default=[0,1],
                         help='GPU index to be used for the experiment.')
 
     # How many trials at the same time
@@ -80,6 +80,12 @@ if __name__ == '__main__':
                         type=int,
                         default=1,
                         help='Concurrency for the starting experiment.')
+    
+    # Max trials per GPU
+    parser.add_argument('-max_per_gpu',
+                        type=int,
+                        default=5,
+                        help='Maximum number of trials per GPU.')
 
     # What script to use for the experiment
     parser.add_argument('-script',
@@ -118,7 +124,7 @@ if __name__ == '__main__':
         max_experiment_duration=args.exp_time,
         trial_concurrency=args.exp_concurrency,
         training_service=LocalConfig(trial_gpu_number=args.exp_gpu_number,
-                                     max_trial_number_per_gpu=args.exp_concurrency,
+                                     max_trial_number_per_gpu=args.max_per_gpu,
                                      use_active_gpu=True)
     )
 

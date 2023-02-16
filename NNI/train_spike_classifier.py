@@ -22,6 +22,8 @@ from nni.tools.nnictl import updater
 
 import os
 import datetime
+from subprocess import check_output
+import random
 
 import matplotlib.pyplot as plt
 import seaborn as sn
@@ -45,8 +47,16 @@ searchspace_path = "./searchspaces/{}.json".format(searchspace_filename)
 #    search_space = json.load(read_searchspace)
 
 # set up CUDA device
+manual_selection = True
+if not manual_selection:
+    if torch.cuda.is_available():
+        gpu_query = str(check_output(["nvidia-smi", "--format=csv", "--query-gpu=index"]), 'utf-8').splitlines()
+        gpu_devices = [int(ii) for ii in gpu_query if ii != 'index']
+        gpu_idx = random.choice(gpu_devices)
+else:
+    gpu_idx = 0
 global device
-device = check_cuda(gpu_sel=1, gpu_mem_frac=0.3)
+device = check_cuda(gpu_sel=gpu_idx, gpu_mem_frac=0.3)
 
 global use_seed
 use_seed = False
