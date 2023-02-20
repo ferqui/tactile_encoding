@@ -47,7 +47,7 @@ searchspace_path = "./searchspaces/{}.json".format(searchspace_filename)
 #    search_space = json.load(read_searchspace)
 
 # set up CUDA device
-manual_selection = False
+manual_selection = True
 if not manual_selection:
     if torch.cuda.is_available():
         gpu_query = str(check_output(["nvidia-smi", "--format=csv", "--query-gpu=index"]), 'utf-8').splitlines()

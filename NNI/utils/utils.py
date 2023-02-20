@@ -1,6 +1,9 @@
 import os
 import torch
 import numpy as np
+import pandas as pd
+import sqlite3
+from datetime import datetime
 from sklearn.model_selection import train_test_split
 
 
@@ -155,3 +158,52 @@ def load_layers(layers, map_location, variable=False, requires_grad=True):
             ii.requires_grad = requires_grad
         
     return lays
+
+
+def retrieve_nni_results(
+    exp_name,
+    exp_id,
+    metrics,
+    max_trial_num=10000,
+    nni_default_path=True,
+    export_csv=False
+    ):
+    """
+    Given an NNI experiment, it returns the trial ID with the highest value of metrics (and the value as well).
+
+    Fra, Vittorio; Politecnico di Torino; EDA Group; Torino, Italy.
+    Klepatsch, Daniel; Silicon Austria Labs; Graz, Austria.
+    """
+
+    if nni_default_path:
+        db_path = os.path.expanduser("~/nni-experiments/{}/{}/db".format(exp_name,exp_id))
+    else:
+        db_path = nni_default_path
+    
+    con = sqlite3.connect(os.path.join(db_path,"nni.sqlite")) # sqlite connector
+
+    # Load the data into a DataFrame
+    trial_data = pd.read_sql_query(" select m.timestamp, t.trialJobId, t.data as params, m.type, m.data as results  "
+                                   " from TrialJobEvent as t INNER JOIN MetricData as m ON t.trialJobId = m.trialJobId "
+                                   " where m.type == \"FINAL\" and t.event == \"WAITING\" and t.sequenceId <= (?) ;", con, params=(max_trial_num,))
+    
+    # Process top10 results of default = test accuracy
+    results_data = pd.json_normalize(trial_data['results'].map(eval).map(eval))
+    params_data = pd.json_normalize(trial_data['params'].map(eval))
+
+    df_trial = pd.concat([trial_data.drop(['results','params'], axis=1), params_data, results_data], axis=1)
+    
+    top = df_trial.sort_values(by=metrics, ascending=False)#.head(10)
+    
+    if export_csv:
+        export_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        fileNamecsv = 'OptimizationResults_{}_{}_{}.csv'.format(
+            exp_name,
+            exp_id,
+            export_datetime)
+        top.to_csv(fileNamecsv, index=False)
+
+    con.close()
+
+    return top.iloc[0]["trialJobId"], top.iloc[0][metrics]
+

@@ -29,11 +29,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 #from tactile_encoding.utils.utils import check_cuda, value2index, create_directory, load_layers
-from utils.utils import check_cuda, create_directory
+from utils.utils import check_cuda, create_directory, retrieve_nni_results
 
 
-experiment_id = "83iopuwk"
-best_test_id = "dZUic"
+global experiment_name
+experiment_name = "spike_classifier"
+experiment_id = "vpeqjlkr"
+best_test_id, best_test_report = retrieve_nni_results(experiment_name, experiment_id, "test")
 
 # set up CUDA device
 global device
@@ -155,7 +157,7 @@ def build_and_test(features,
                    N=10,
                    report=True):
     
-    with open(os.path.expanduser("~/nni-experiments/spike_classifier/{}/trials/{}/parameter.cfg".format(layers_file,best_test_id)), "r") as handle:
+    with open(os.path.expanduser("~/nni-experiments/{}/{}/trials/{}/parameter.cfg".format(experiment_name,layers_file,best_test_id)), "r") as handle:
         read_dict = handle.read()
     params = eval(read_dict) # the dictionary from NNI
     params = params["parameters"]
@@ -215,7 +217,7 @@ def build_and_test(features,
     rec_weight_scale = params["rec_weights_std"]
 
     if report:
-        path = './results/reports/test_spike_classifier/{}'.format(name)
+        path = './results/reports/test_{}/{}'.format(experiment_name,name)
         create_directory(path)
         report_path = path + "/{}".format(layers_file)
 
@@ -228,7 +230,7 @@ def build_and_test(features,
     test_N = []
 
     with open(report_path, 'a') as f:
-        f.write("Experiment {}, trial {}\n".format(experiment_id,best_test_id))
+        f.write("Experiment {}, trial {}, best test accuracy reported: {}%\n".format(experiment_id,best_test_id,best_test_report))
         f.write("Date and time: {}-{}-{} {}:{}:{}\n\n".format(
             trial_datetime[:4],
             trial_datetime[4:6],
