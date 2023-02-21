@@ -221,7 +221,7 @@ def build_and_test(features,
         create_directory(path)
         report_path = path + "/{}".format(layers_file)
 
-        trial_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Spiking network
     layers_path = "./results/layers/fix_len_noisy_temp_jitter/{}.pt".format(layers_file)
@@ -232,14 +232,16 @@ def build_and_test(features,
     with open(report_path, 'a') as f:
         f.write("Experiment {}, trial {}, best test accuracy reported: {}%\n".format(experiment_id,best_test_id,best_test_report))
         f.write("Date and time: {}-{}-{} {}:{}:{}\n\n".format(
-            trial_datetime[:4],
-            trial_datetime[4:6],
-            trial_datetime[6:8],
-            trial_datetime[-6:-4],
-            trial_datetime[-4:-2],
-            trial_datetime[-2:]))
+            report_datetime[:4],
+            report_datetime[4:6],
+            report_datetime[6:8],
+            report_datetime[-6:-4],
+            report_datetime[-4:-2],
+            report_datetime[-2:]))
 
     for ii in range(N):
+
+        trial_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         
         test_acc, _, _ = compute_classification_accuracy(params, ds_test, layers=layers, label_probabilities=True, shuffle=True)
 
