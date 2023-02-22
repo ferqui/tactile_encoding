@@ -193,7 +193,7 @@ def retrieve_nni_results(
 
     df_trial = pd.concat([trial_data.drop(['results','params'], axis=1), params_data, results_data], axis=1)
     
-    top = df_trial.sort_values(by=metrics, ascending=False)#.head(10)
+    top = df_trial.sort_values(by=[metrics,"timestamp"], ascending=False)#.head(10)
     
     if export_csv:
         export_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
