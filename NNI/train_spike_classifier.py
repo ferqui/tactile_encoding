@@ -35,7 +35,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 #from tactile_encoding.utils.utils import check_cuda, value2index, create_directory, load_layers
-from utils.utils import check_cuda, create_directory
+from utils.utils import set_device, check_cuda, gpu_usage_df, check_gpu_memory_constraint, create_directory
 
 
 exp_name = "train_spike_classifier" # name of the experiment as in the "main" script for NNI configuration
@@ -47,16 +47,32 @@ searchspace_path = "./searchspaces/{}.json".format(searchspace_filename)
 #    search_space = json.load(read_searchspace)
 
 # set up CUDA device
+gpu_mem_frac = 0.3
+flag_allocate_memory = False
+flag_print = True
+while not flag_allocate_memory:
+    if check_gpu_memory_constraint(gpu_usage_df(),gpu_mem_frac):
+        flag_allocate_memory = True
+        LOG.debug(print("The available memory is enough."))
+    else:
+        if flag_print:
+            LOG.debug(print("Waiting for more memory available."))
+            flag_print = False
+global device
+device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
+"""
+# With the "old" check_cuda function:
 manual_selection = True
-if not manual_selection:
+if manual_selection:
+    gpu_idx = 0
+else:
     if torch.cuda.is_available():
         gpu_query = str(check_output(["nvidia-smi", "--format=csv", "--query-gpu=index"]), 'utf-8').splitlines()
         gpu_devices = [int(ii) for ii in gpu_query if ii != 'index']
         gpu_idx = random.choice(gpu_devices)
-else:
-    gpu_idx = 0
 global device
 device = check_cuda(gpu_sel=gpu_idx, gpu_mem_frac=0.3)
+"""
 
 global use_seed
 use_seed = False

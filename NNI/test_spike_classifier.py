@@ -29,7 +29,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 #from tactile_encoding.utils.utils import check_cuda, value2index, create_directory, load_layers
-from utils.utils import check_cuda, create_directory, retrieve_nni_results
+from utils.utils import set_device, check_cuda, gpu_usage_df, check_gpu_memory_constraint, create_directory, retrieve_nni_results, load_layers
 
 
 global experiment_name
@@ -38,8 +38,24 @@ experiment_id = "vpeqjlkr"
 best_test_id, best_test_report = retrieve_nni_results(experiment_name, experiment_id, "test")
 
 # set up CUDA device
+gpu_mem_frac = 0.3
+flag_allocate_memory = False
+flag_print = True
+while not flag_allocate_memory:
+    if check_gpu_memory_constraint(gpu_usage_df(),gpu_mem_frac):
+        flag_allocate_memory = True
+        print("The available memory is enough.")
+    else:
+        if flag_print:
+            print("Waiting for more memory available.")
+            flag_print = False
+global device
+device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
+"""
+# With the "old" check_cuda function:
 global device
 device = check_cuda(gpu_sel=1, gpu_mem_frac=0.3)
+"""
 
 global use_seed
 use_seed = False
@@ -137,19 +153,6 @@ def run_snn(inputs, layers):
     return s_out_rec, other_recs, layers_update
 
 
-def load_layers(file, map_location, requires_grad=True, variable=False):
-
-    if variable:
-        lays = file
-        for ii in lays:
-            ii.requires_grad = requires_grad
-    else:
-        lays = torch.load(file, map_location=map_location)
-        for ii in lays:
-            ii.requires_grad = requires_grad
-    return lays
-
-
 def build_and_test(features,
                    attributes,
                    layers_file,
@@ -225,7 +228,7 @@ def build_and_test(features,
 
     # Spiking network
     layers_path = "./results/layers/fix_len_noisy_temp_jitter/{}.pt".format(layers_file)
-    layers = load_layers(layers_path, map_location=device)
+    layers = load_layers(layers_path, map_location=device, requires_grad=False)
 
     test_N = []
 

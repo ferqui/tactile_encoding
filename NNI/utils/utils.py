@@ -5,9 +5,13 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 from sklearn.model_selection import train_test_split
+from subprocess import check_output
+from io import StringIO
 
 
-def create_directory(directory_path):
+def create_directory(
+    directory_path
+    ):
     if os.path.exists(directory_path):
         return None
     else:
@@ -19,7 +23,118 @@ def create_directory(directory_path):
         return directory_path
 
 
-def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.5):
+def gpu_usage_df():
+    """
+    Create a pandas dataframe with index, occupied memory and occupied percentage of the available GPUs from the nvidia-smi command.
+    Columns: [gpu_index, gpu_mem, gpu_perc]
+
+    Fra, Vittorio; Politecnico di Torino; EDA Group; Torino, Italy.
+    """
+
+    gpu_query_usage_df = pd.read_csv(StringIO(str(check_output(["nvidia-smi", "pmon", "-s", "m", "-c", "1"]), 'utf-8')), header=[0,1])
+    
+    gpu_idx = []
+    gpu_mem = []
+    for ii in range(len(gpu_query_usage_df)):
+        row_read = []
+        for jj in gpu_query_usage_df.iloc[ii].item().split(" "):
+            if jj.isdigit():
+                row_read.append(jj)
+        gpu_idx.append(int(row_read[0]))
+        gpu_mem.append(int(row_read[2]))
+    
+    gpu_usage_df = pd.DataFrame()
+    gpu_usage_df["gpu_index"] = gpu_idx
+    gpu_usage_df["gpu_mem"] = gpu_mem
+    
+    gpu_usage_df_sum = gpu_usage_df.groupby("gpu_index").sum().reset_index()
+    
+    gpu_perc = []
+    for num,el in enumerate(gpu_usage_df_sum["gpu_index"]):
+        gpu_perc.append(gpu_usage_df_sum["gpu_mem"].iloc[num]/int(np.round(torch.cuda.get_device_properties(device="cuda:{}".format(el)).total_memory/1e6,0))*100)
+    gpu_usage_df_sum["gpu_perc"] = gpu_perc
+
+    return gpu_usage_df_sum
+
+
+def check_gpu_memory_constraint(
+    gpu_usage_df,
+    gpu_mem_frac
+    ):
+    """
+    Returns a boolean value after checking if (at least one of) the available GPU(s) satisfies the constraint based on the required gpu_mem_frac to be allocated.
+
+    Fra, Vittorio; Politecnico di Torino; EDA Group; Torino, Italy.
+    """
+    
+    flag_available = False
+    for num,el in enumerate(gpu_usage_df["gpu_perc"]):
+        if 100 - el > gpu_mem_frac*100:
+            flag_available = True
+            break
+    
+    return flag_available
+
+
+def set_device(
+    gpu_sel=None,
+    random_sel=False,
+    auto_sel=False,
+    gpu_mem_frac=0.3
+    ):
+    """
+    Check for available GPU and select which to use (manually, randomly or automatically).
+
+    Fra, Vittorio; Politecnico di Torino; EDA Group; Torino, Italy.
+    """
+
+    if (gpu_sel == None) & (random_sel == False) & (auto_sel == False):
+
+        device = torch.device("cpu")
+        print("No GPU-related setting specified. Running on CPU.")
+
+    else:
+
+        if torch.cuda.is_available():
+
+            if torch.cuda.device_count() > 1:
+
+                gpu_df = gpu_usage_df()
+                
+                if random_sel:
+                    gpu_query_index = str(check_output(["nvidia-smi", "--format=csv", "--query-gpu=index"]), 'utf-8').splitlines()
+                    gpu_devices = [int(ii) for ii in gpu_query_index if ii != 'index']
+                    gpu_devices_checked = []
+                    for el in gpu_devices:
+                        if 100 - gpu_df[gpu_df["gpu_index"]==el]["gpu_perc"].item() > gpu_mem_frac*100:
+                            gpu_devices_checked.append(el)
+                    gpu_sel = random.choice(gpu_devices_checked)
+                
+                elif auto_sel:
+                    gpu_sel = gpu_df[gpu_df["gpu_mem"]==np.nanmin(gpu_df["gpu_mem"])]["gpu_index"].item()
+                
+                print("Multiple GPUs detected but single GPU selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
+                device = torch.device("cuda:"+str(gpu_sel))
+            
+            elif torch.cuda.device_count() == 1:
+                print("Single GPU detected. Setting up the simulation there.")
+                device = torch.device("cuda")
+            
+            torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
+        
+        else:
+            
+            device = torch.device("cpu")
+            print("GPU was asked for but not detected. Running on CPU.")
+    
+    return device
+
+
+def check_cuda(
+    share_GPU=False,
+    gpu_sel=0,
+    gpu_mem_frac=0.5
+    ):
     """Check for available GPU and distribute work (if needed/wanted)"""
 
     if (torch.cuda.device_count()>1) & (share_GPU):
@@ -83,7 +198,12 @@ def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.5):
     return device
 
 
-def train_test_validation_split(data, label, split=[70, 20, 10], seed=None):
+def train_test_validation_split(
+    data,
+    label,
+    split=[70, 20, 10],
+    seed=None
+    ):
     """
     Creates a train-test-validation split using the sklearn train_test_split() twice.
     Function accepts lists, arrays, and tensor.
@@ -116,7 +236,10 @@ def train_test_validation_split(data, label, split=[70, 20, 10], seed=None):
     return x_train, y_train, x_test, y_test, x_validation, y_validation
 
 
-def value2key(entry, dictionary):
+def value2key(
+    entry,
+    dictionary
+    ):
     if (type(entry) != list) & (type(entry) != np.ndarray):
 
         key = [list(dictionary.keys())[list(dictionary.values()).index(entry)]]
@@ -128,7 +251,10 @@ def value2key(entry, dictionary):
     return key
 
 
-def value2index(entry, dictionary):
+def value2index(
+    entry,
+    dictionary
+    ):
     if (type(entry) != list) & (type(entry) != np.ndarray):
 
         idx = [list(dictionary.values()).index(entry)]
@@ -140,7 +266,12 @@ def value2index(entry, dictionary):
     return idx
 
 
-def load_layers(layers, map_location, variable=False, requires_grad=True):
+def load_layers(
+    layers,
+    map_location,
+    variable=False,
+    requires_grad=True
+    ):
     
     if variable: # meaning that the weights are not to be loaded <-- layers is a variable name
         
