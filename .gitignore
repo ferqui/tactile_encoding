@@ -2,6 +2,7 @@ __pycache__
 data/*
 plots/*
 logs/*
+bkp/*
 runs
 .idea/
 .venv

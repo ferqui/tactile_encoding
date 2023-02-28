@@ -341,29 +341,29 @@ def fix_time(max_trials=100, max_time=1000, add_noise = False, temp_jitter=False
 
 if __name__ == '__main__':
 
-    print('Creating original data.')
+    print('\nCreating original data.')
     original()
 
-    print('Creating noisy original data.')
+    print('\nCreating noisy original data.')
     original(add_noise=True, temp_jitter=False)
 
-    print('Creating original data with temporal jitter.')
+    print('\nCreating original data with temporal jitter.')
     original(add_noise=False, temp_jitter=True)
 
-    print('Creating noisy original data with temporal jitter.')
+    print('\nCreating noisy original data with temporal jitter.')
     original(add_noise=True, temp_jitter=True)
 
     # fix 1000ms length
-    print('Creating 1000ms data.')
+    print('\nCreating 1000ms data.')
     fix_time_only() # much faster, 'cause current profile only copied
 
-    print('Creating noisy 1000ms data.')
+    print('\nCreating noisy 1000ms data.')
     fix_time(add_noise=True, temp_jitter=False)
 
-    print('Creating 1000ms data with temporal jitter.')
+    print('\nCreating 1000ms data with temporal jitter.')
     fix_time(add_noise=False, temp_jitter=True)
 
-    print('Creating noisy 1000ms data with temporal jitter.')
+    print('\nCreating noisy 1000ms data with temporal jitter.')
     fix_time(add_noise=True, temp_jitter=True)
 
-    print('Finished with data creation.')
+    print('\nFinished with data creation.')
