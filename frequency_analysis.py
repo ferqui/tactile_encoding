@@ -19,23 +19,6 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 # from classifiers import MahalanobisClassifier
 from scipy.optimize import curve_fit
 #
-# def func(x  ,t, a, b, c,d):
-#     return a*np.exp(b*x) + c/np.log(d*x)
-
-y0 = 0
-
-
-# def func(time,b,c,x_local_full,e):
-#
-#     return scint.odeint(pend, y0, time, args=(b, c, x_local_full))[1:,0]
-# def func_ode(t,a,b,c,d):
-#     tspan = np.hstack([[0],np.hstack([t])])
-#     return scint.odeint(func,0, tspan, args=(a,b,c,d))[1:,0]
-
-# sol = scint.odeint(pend, y0, t, args=(b, c))
-
-
-# popt, pcov = curve_fit(f, t, sol[:,0], p0=guess)
 
 torch.manual_seed(0)
 np.random.seed(19)
@@ -86,6 +69,15 @@ class fitClass_diff:
         return y_coll
 ############################################################
 
+def generate_sinusoid_data(freqs,stim_length_sec,dt_sec):
+    x_local = []
+    time = np.arange(0, stim_length_sec, dt_sec)
+    x_local = np.zeros((len(freqs),len(time)))
+    for freq_idx,freq in enumerate(freqs):
+        x_local[freq_idx] = sinusoid(time,10, freq, 0, 0)
+    return x_local,time
+def sinusoid(x, a, b, c, d):
+    return a * np.sin(b * x + c) + d
 def main(args):
     # Prepare path:
     exp_id = strftime("%d%b%Y_%H-%M-%S", localtime())
@@ -114,15 +106,17 @@ def main(args):
     part_list = []
     for MN_class_type in list_classes:
         x_local_full = []
-        neurons = MN_neuron(len(amplitudes) * n_repetitions, MNclass_to_param[MN_class_type], dt=args.dt, train=False)
 
-        x_local, list_mean_current = get_input_step_current(dt_sec=args.dt, stim_length_sec=args.stim_length_sec,
-                                                            amplitudes=amplitudes,
-                                                            n_trials=n_repetitions, sig=sigma)
+        # x_local, list_mean_current = get_input_step_current(dt_sec=args.dt, stim_length_sec=args.stim_length_sec,
+        #                                                     amplitudes=amplitudes,
+        #                                                     n_trials=n_repetitions, sig=sigma)
+        x_local,time = generate_sinusoid_data(freqs=[i*30 for i in range(20)],stim_length_sec=args.stim_length_sec,dt_sec=args.dt)
+        neurons = MN_neuron(x_local.shape[0], MNclass_to_param[MN_class_type], dt=args.dt, train=False)
 
         neurons.reset()
         spk_rec = []
         mem_rec = []
+        x_local = torch.tensor(x_local, dtype=torch.float32)
         for t in range(x_local.shape[1]):
             out = neurons(x_local[:, t])
 
@@ -143,21 +137,21 @@ def main(args):
         isi_tensor = torch.zeros_like(x_local)
         fig1, axis1 = plt.subplots(nrows=2, ncols=1,sharex=True)
         eee = plt.get_cmap('inferno')
-        uuu = eee(np.linspace(0, 1, 10))
+        uuu = eee(np.linspace(0, 1, x_local.shape[0]))
         time_last = 0
-        for i in range(dict_spk_rec[MN_class_type].shape[2]):
+        for i in range(x_local.shape[0]):
             idx = torch.where(spks[2] == i)
             time = spks[1][idx]
             if len(time) == 0:
                 time = torch.Tensor([0, 0]).to(torch.int64)
 
             time_list.append(time+time_last)
-            x_local_sampled_list.append(x_local[0,time,i])
+            x_local_sampled_list.append(x_local[i,time])
             isi = torch.diff(time)
             isi_tensor_list.append(torch.cat([torch.tensor([isi[0]]).to(torch.float64), isi.to(torch.float64)]))
             time_last += time[-1]
 
-            axis1[0].plot([i for i in range(x_local.shape[1])], x_local[0, :, i], '-D', markevery=list(time),color = uuu[int(i/n_repetitions)])
+            axis1[0].plot([i for i in range(x_local.shape[1])], x_local[i, :], '-D', markevery=list(time),color = uuu[int(i/n_repetitions)])
             # axis1[0].plot(time,x_local[0,time,0],'.')
             # axis1.eventplot(time,lineoffsets=1.4)
             axis1[1].plot(time, torch.cat([torch.tensor([isi[0]]).to(torch.float64), isi.to(torch.float64)]), 'x',color = uuu[int(i/n_repetitions)])
@@ -256,7 +250,7 @@ if __name__ == "__main__":
     # NOTE: The number of input neurons = number of different input current amplitudes
     parser.add_argument('--gain', type=int, default=1)
     parser.add_argument('--offset', type=int, default=1)
-    parser.add_argument('--stim_length_sec', type=float, default=1)
+    parser.add_argument('--stim_length_sec', type=float, default=0.1)
     parser.add_argument('--selected_input_channel', type=int, default=0)
     parser.add_argument('--exp_variance', default=.95)
     parser.add_argument('--dt', type=float, default=0.001)
