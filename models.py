@@ -69,7 +69,7 @@ class Encoder(nn.Module):
 class MN_neuron_IT(nn.Module):
     NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
 
-    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50,k1=200,k2 = 20, gain = 1, train=True):
+    def __init__(self, channels, fanout, params_n, a, A1, A2, b=10, G=50,k1=200,k2 = 20, gain = 1, train=True,dt=1/100):
         super(MN_neuron_IT, self).__init__()
 
         # One-to-one synapse
@@ -93,7 +93,6 @@ class MN_neuron_IT(nn.Module):
         self.k1 = 200  # units of 1/s
         self.k2 = 20  # units of 1/s
 
-        self.dt = 1 / 1000
 
         # self.a = nn.Parameter(torch.tensor(a), requires_grad=True)
         one2N_matrix = torch.ones(1,self.fanout,self.channels, 1) # shape: 1 (single neuron) x fanout x channels x 1)
@@ -112,6 +111,7 @@ class MN_neuron_IT(nn.Module):
         self.k2 = torch.permute(nn.Parameter(one2N_matrix * k2, requires_grad=train), (0, 1, 3, 2))
         self.gain = torch.permute(nn.Parameter(one2N_matrix * gain, requires_grad=train), (0, 1, 3, 2))
         self.state = None
+        self.dt=dt
 
     def forward(self, x):
         if self.state is None:
@@ -403,3 +403,60 @@ class LIF_neuron(nn.Module):
                                    S = out)
 
         return out
+
+
+
+class AdexLIF(nn.Module):
+    AdexLIFstate = namedtuple('AdexLIFstate', ['V', 'W'])
+
+    def __init__(self, n_in, n_out,params_n,channels, dt=1.):
+        super(AdexLIF, self).__init__()
+
+        self.linear = nn.Parameter(torch.ones(1, n_out), requires_grad=True)
+        self.dt = dt
+        self.n_in = n_in
+        self.n_out = n_out
+        self.params_n = params_n
+        self.channels = channels
+
+        ## If want to use as a parameter use nn.Parameter(...)
+        self.Vr = nn.Parameter(torch.tensor(-70.),requires_grad=True) # resting potential
+        self.Vth = nn.Parameter(torch.tensor(-30.),requires_grad=True) # Firing threshold
+        self.Vrh = nn.Parameter(torch.tensor(-50.),requires_grad=True)
+        self.Vreset = nn.Parameter(torch.tensor(-51.),requires_grad=True) # reset potential
+        self.delta_T = nn.Parameter(torch.tensor(2.),requires_grad=True) # Sharpness of the exponential term
+        self.a = nn.Parameter(torch.tensor(0.5),requires_grad=True) # Adaptation-Voltage coupling
+        self.b = nn.Parameter(torch.tensor(7.0),requires_grad=True) # Spike-triggered adaptation current
+        self.R = nn.Parameter(torch.tensor(0.5),requires_grad=True) # Resistance
+        self.taum = nn.Parameter(torch.tensor(5.),requires_grad=True) # membrane time scale
+        self.tauw = nn.Parameter(torch.tensor(100.),requires_grad=True) # Adaptation time constant
+
+        self.state = None
+
+    def reset(self):
+        self.state = None
+        # print('reset done')
+    def forward(self, input):
+        if self.state is None:
+            self.state = self.AdexLIFstate(V = torch.zeros(input.shape[0], self.n_out,self.params_n,self.channels, device=input.device) + self.Vr,
+                                           W = torch.zeros(input.shape[0], self.n_out,self.params_n,self.channels, device=input.device))
+        # print(input.shape[0])
+        V = self.state.V
+        W = self.state.W
+
+        I = (self.linear*input)
+        dV = (-(V-self.Vr) + self.delta_T * torch.exp((V-self.Vrh)/self.delta_T) + self.R*(I - W))/(self.taum)
+        dW = (self.a*(V-self.Vr)-W)/self.tauw
+
+        V = V + self.dt * dV
+        W = W + self.dt * dW
+
+        spk = activation(V - self.Vth)
+        # spk = ((V - self.Vth) > 0).float()
+
+        W = (1 - spk) * W + (spk) * (W + self.b)
+        V = (1 - spk) * V + (spk) * self.Vreset
+
+        self.state = self.AdexLIFstate(V = V, W = W)
+
+        return spk
