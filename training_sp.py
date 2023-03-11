@@ -81,30 +81,30 @@ def main(args):
         'a':{
              'ini':5,
              'train':True,
-             'custom_lr':1.1
+             'custom_lr':None#1.1
              },
         'A1':
             {'ini': 0,
              'train': True,
-             'custom_lr': 0.1
+             'custom_lr': None#0.1
              },
         'A2':
             {
             'ini': 0,
              'train': True,
-             'custom_lr': 0.011
+             'custom_lr': None#0.011
              },
         'b':
             {
              'ini':10,
              'train':True,
-             'custom_lr':0.005
+             'custom_lr': None#0.005
              },
         'G':
           {
          'ini': 50,
          'train': True,
-         'custom_lr': 0.005
+         'custom_lr': None#0.005
          },
         'k1':
         {
@@ -121,13 +121,13 @@ def main(args):
         'R1':
         {
          'ini': 0,
-         'train': False,
+         'train': True,
          'custom_lr': None
          },
         'R2':
         {
          'ini': 1,
-         'train': False,
+         'train': True,
          'custom_lr': None
          }
     }
@@ -195,8 +195,13 @@ def main(args):
         custom_param = [kv[1] for kv in
                          filter(lambda kv: any([ele for ele in [param] if (ele in kv[0])]),
                                 network.named_parameters())]
-        param_list.append({'params':custom_param,'lr' : dict_param[param]['custom_lr']})
+        param_list.append({'params':custom_param})#,'lr' : dict_param[param]['custom_lr']})
     optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.nb_epochs, eta_min=0)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 
+                                            T_0 = 75,# Number of iterations for the first restart
+                                            T_mult = 0.8, # A factor increases TiTi​ after a restart
+                                            eta_min = 0) # Minimum learning rate
     # optimizer = torch.optim.Adamax(network.parameters(), lr=0.005, betas=(0.9, 0.995))
     # optimizer = torch.optim.Adamax([{'params': weight_params}, {'params': neuron_params, 'lr': 0.05}], lr=0.005,
     #                                betas=(0.9, 0.995))
@@ -226,7 +231,8 @@ def main(args):
     for e in pbar:
         local_loss = []
         accs = []  # accs: mean training accuracies for each batch
-        for x_local, y_local in dl_train:
+        for batch_idx, (x_local, y_local) in enumerate(dl_train):
+            pbar.set_description(f"{batch_idx}/{len(dl_train)}")
             x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(
                 device, non_blocking=True
             )
@@ -295,6 +301,7 @@ def main(args):
                 tmp = np.mean((y_local == am).detach().cpu().numpy())
                 accs.append(tmp)
 
+        scheduler.step()
         mean_loss = np.mean(local_loss)
         loss_hist.append(mean_loss)
         # mean_accs: mean training accuracy of current epoch (average over all batches)
@@ -335,6 +342,7 @@ def main(args):
 
                 writer.add_scalar("Accuracy/test", test_acc, global_step=e)
                 writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
+                writer.add_scalar("lr", scheduler.get_last_lr()[0], global_step=e)
                 #writer.add_scalar("a", a, global_step=e)
                 writer.add_scalar("Loss", mean_loss, global_step=e)
                 if args.shared_params:
