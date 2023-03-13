@@ -33,22 +33,26 @@ def gpu_usage_df():
 
     gpu_query_usage_df = pd.read_csv(StringIO(str(check_output(["nvidia-smi", "pmon", "-s", "m", "-c", "1"]), 'utf-8')), header=[0,1])
     
+    row_read = []
     gpu_idx = []
     gpu_mem = []
     for ii in range(len(gpu_query_usage_df)):
-        row_read = []
-        for jj in gpu_query_usage_df.iloc[ii].item().split(" "):
-            if jj.isdigit():
-                row_read.append(jj)
-        gpu_idx.append(int(row_read[0]))
-        gpu_mem.append(int(row_read[2]))
+        row_read.append([jj for jj in gpu_query_usage_df.iloc[ii].item().split(" ") if jj != ''])
+        if row_read[ii][0].isdigit():
+            gpu_idx.append(int(row_read[ii][0]))
+        else:
+            gpu_idx.append(0)
+        if row_read[ii][3].isdigit():
+            gpu_mem.append(int(row_read[ii][3]))
+        else:
+            gpu_mem.append(0)
     
     gpu_usage_df = pd.DataFrame()
     gpu_usage_df["gpu_index"] = gpu_idx
     gpu_usage_df["gpu_mem"] = gpu_mem
     
     gpu_usage_df_sum = gpu_usage_df.groupby("gpu_index").sum().reset_index()
-    
+
     gpu_perc = []
     for num,el in enumerate(gpu_usage_df_sum["gpu_index"]):
         gpu_perc.append(gpu_usage_df_sum["gpu_mem"].iloc[num]/int(np.round(torch.cuda.get_device_properties(device="cuda:{}".format(el)).total_memory/1e6,0))*100)
