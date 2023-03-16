@@ -32,6 +32,9 @@ from torch.utils.data import DataLoader, TensorDataset
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, retrieve_nni_results, load_layers
 
 
+do_training = False
+if not do_training:
+    trained_layers_path = "./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr_backup.pt"
 
 experiment_name = "spike_classifier"
 experiment_id = "vpeqjlkr"
@@ -135,12 +138,15 @@ else:
 
 # Load the test subset (always the same)
 ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
-    
-# Select random training and validation set
-rnd_idx = np.random.randint(0, 10)
-LOG.debug("Split number {} (randomly) selected for this experiment.\n".format(rnd_idx))
-ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+
+nb_steps = len(next(iter(ds_test))[0])
+
+if do_training:
+    # Select random training and validation set
+    rnd_idx = np.random.randint(0, 10) # 3
+    LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
+    ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+    ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
 
 # Get the optimized parameters
@@ -560,7 +566,6 @@ def run_snn(
     nb_hidden = int(params["nb_hidden"])
 
     bs = inputs.shape[0]
-    nb_steps = bs
 
     h1 = torch.einsum(
         "abc,cd->abd", (inputs.tile((nb_input_copies,)), w1))
@@ -623,9 +628,9 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
     if use_seed:
         g = torch.Generator()
         g.manual_seed(seed)
-        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True, num_workers=0, generator=g)
+        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=shuffle, num_workers=0, generator=g)
     else:
-        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True, num_workers=0)
+        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=shuffle, num_workers=0)
 
     accs = []
     losss = []
@@ -728,68 +733,70 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
     experiment_datetime[-2:])
     )
 
-# Train the network with validation and test
-print("*** training with validation started ***")
-loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
-print("*** training with validation done ***")
+if do_training:
 
-# Save (to re-load) trained weights 
-path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
-create_directory(path)
-save_layers_path = path + "/{}.pt".format(experiment_id)
-torch.save(best_layers, save_layers_path)
-print("*** weights saved ***")
+    # Train the network with validation and test
+    print("*** training with validation started ***")
+    loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
+    print("*** training with validation done ***")
 
-# Make plots from training and validation
-if save_fig:
-    path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
-    create_directory(path_for_plots)
-# Accuracy:
-plt.figure()
-plt.plot(range(1, len(acc_hist[0])+1), 100 *
-         np.array(acc_hist[0]), color='blue')
-plt.plot(range(1, len(acc_hist[1])+1), 100 *
-         np.array(acc_hist[1]), color='orange')
-plt.xlabel("Epoch")
-plt.ylabel("Accuracy (%)")
-#plt.title("{} ({} epochs)".format(name,nb_epochs))
-plt.legend(["Training", "Validation"], loc='lower right')
-if save_fig:
-    plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-    plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-plt.show()
-if save_fig:
-    print("*** accuracy plot saved ***")
-# Loss:
-plt.figure()
-plt.plot(range(1, len(loss_hist[0])+1),
-         np.array(loss_hist[0]), color='tab:red')
-plt.plot(range(1, len(loss_hist[1])+1),
-         np.array(loss_hist[1]), color='tab:green')
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-#plt.title("{} ({} epochs)".format(name,nb_epochs))
-plt.legend(["Training", "Validation"], loc='upper right')
-if save_fig:
-    plt.savefig(path_for_plots + "/loss_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-    plt.savefig(path_for_plots + "/loss_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-plt.show()
-if save_fig:
-    print("*** loss plot saved ***")
+    # Save (to re-load) trained weights 
+    path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
+    create_directory(path)
+    save_layers_path = path + "/{}.pt".format(experiment_id)
+    torch.save(best_layers, save_layers_path)
+    print("*** weights saved ***")
+
+    # Save (to store) trained weights
+    if store_weights:
+        path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
+        create_directory(path)
+        save_layers_path = path + "/{}_{}.pt".format(experiment_id,experiment_datetime)
+        torch.save(best_layers, save_layers_path)
+        print("*** weights stored ***")
+        trained_layers_path = save_layers_path
+
+    # Make plots from training and validation
+    if save_fig:
+        path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
+        create_directory(path_for_plots)
+    # Accuracy:
+    plt.figure()
+    plt.plot(range(1, len(acc_hist[0])+1), 100 *
+             np.array(acc_hist[0]), color='blue')
+    plt.plot(range(1, len(acc_hist[1])+1), 100 *
+             np.array(acc_hist[1]), color='orange')
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy (%)")
+    #plt.title("{} ({} epochs)".format(name,nb_epochs))
+    plt.legend(["Training", "Validation"], loc='lower right')
+    if save_fig:
+        plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+    plt.show()
+    if save_fig:
+        print("*** accuracy plot saved ***")
+    # Loss:
+    plt.figure()
+    plt.plot(range(1, len(loss_hist[0])+1),
+             np.array(loss_hist[0]), color='tab:red')
+    plt.plot(range(1, len(loss_hist[1])+1),
+             np.array(loss_hist[1]), color='tab:green')
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    #plt.title("{} ({} epochs)".format(name,nb_epochs))
+    plt.legend(["Training", "Validation"], loc='upper right')
+    if save_fig:
+        plt.savefig(path_for_plots + "/loss_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        plt.savefig(path_for_plots + "/loss_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+    plt.show()
+    if save_fig:
+        print("*** loss plot saved ***")
 
 # Test the network with statistics
 print("*** test started ***")
-build_and_test(params,ds_test,save_layers_path)
+build_and_test(params,ds_test,trained_layers_path)
 print("*** test done ***")
-
-# Save (to store) trained weights
-if store_weights:
-    path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
-    create_directory(path)
-    save_layers_path = path + "/{}_{}.pt".format(experiment_id,experiment_datetime)
-    torch.save(best_layers, save_layers_path)
-    print("*** weights stored ***")
-
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
