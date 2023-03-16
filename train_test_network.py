@@ -32,13 +32,16 @@ from torch.utils.data import DataLoader, TensorDataset
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, retrieve_nni_results, load_layers
 
 
-do_training = False
-if not do_training:
-    trained_layers_path = "./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr_backup.pt"
-
 experiment_name = "spike_classifier"
+
+do_training = True
+
 experiment_id = "vpeqjlkr"
-best_test_id, best_test_report = retrieve_nni_results(experiment_name, experiment_id, "test")
+if do_training:
+    best_test_id, _ = retrieve_nni_results(experiment_name, experiment_id, "test")
+else:
+    trained_layers_path = "./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr_backup.pt"
+    best_test_id = "euX7c"
 
 experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -149,16 +152,21 @@ if do_training:
     ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
 
-# Get the optimized parameters
-parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
-with open(parameters_path, 'r') as fp:
-    params = json.load(fp)
+if do_training:
+    # Get the optimized parameters
+    parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
+    with open(parameters_path, 'r') as fp:
+        params = json.load(fp)
 
-# Store the optimized parameters
-parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
-create_directory(parameters_path)
-with open(parameters_path+"/parameters.json", 'w') as fp:
-    json.dump(params, fp)
+    # Store the optimized parameters
+    parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
+    create_directory(parameters_path)
+    with open(parameters_path+"/parameters.json", 'w') as fp:
+        json.dump(params, fp)
+else:
+    parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
+    with open(parameters_path, 'r') as fp:
+        params = json.load(fp)
 
 
 # Temporal dynamics quantities
