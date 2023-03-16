@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import pandas as pd
+import random
 import sqlite3
 from datetime import datetime
 from sklearn.model_selection import train_test_split
@@ -115,9 +116,13 @@ def set_device(
                     gpu_sel = random.choice(gpu_devices_checked)
                 
                 elif auto_sel:
-                    gpu_sel = gpu_df[gpu_df["gpu_mem"]==np.nanmin(gpu_df["gpu_mem"])]["gpu_index"].item()
+                    less_occupied = gpu_df[gpu_df["gpu_mem"]==np.nanmin(gpu_df["gpu_mem"])]["gpu_index"].to_list()
+                    if len(less_occupied) == 1:
+                        gpu_sel = less_occupied[0]
+                    else:
+                        gpu_sel = random.choice(less_occupied)
                 
-                print("Multiple GPUs detected but single GPU selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
+                print("Multiple GPUs detected but single GPU (automatically) selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
                 device = torch.device("cuda:"+str(gpu_sel))
             
             elif torch.cuda.device_count() == 1:

@@ -15,6 +15,7 @@ Torino, Italy.
 
 import numpy as np
 import pandas as pd
+import json
 
 import os
 import datetime
@@ -49,7 +50,7 @@ while not flag_allocate_memory:
         if flag_print:
             print("Waiting for more memory available.")
             flag_print = False
-global device
+#global device
 device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 """
 # With the "old" check_cuda function:
@@ -175,6 +176,11 @@ def build_and_test(features,
         name += "{} ".format(data_attributes[el])
     name = name[:-1]
     name = name.replace(" ","_")
+
+    parameters_path = './results/parameters/best_test/{}/{}'.format(experiment_name,name)
+    create_directory(parameters_path)
+    with open(parameters_path+"/{}.json".format(layers_file), 'w') as fp:
+        json.dump(params, fp)
 
     ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
 
