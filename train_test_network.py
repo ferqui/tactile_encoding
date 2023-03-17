@@ -24,6 +24,7 @@ EDA Group,
 Torino, Italy.
 """
 
+
 import logging
 import argparse
 import numpy as np
@@ -73,7 +74,7 @@ parser.add_argument('-experiment_id',
 # ID of the NNI trial providing the best test accuracy
 parser.add_argument('-best_test_id',
                     type=str,
-                    default="vpeqjlkr",
+                    default="euX7c",
                     help='ID of the NNI trial that gave the highest test accuracy.')
 # Save the weights (to be re-used right after the training to test) or not
 parser.add_argument('-save_weights',
@@ -145,6 +146,16 @@ experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 ### 2) data "configuration" specific for spike classification from MN paper ####
+"""
+Data created following the paper "A Generalized
+Linear Integrate-and-Fire Neural Model Produces Diverse Spiking 
+Behaviors" by Stefan Mihalas and Ernst Niebur.
+
+Muller-Cleve, Simon F.,
+Istituto Italiano di Tecnologia - IIT,
+Event-driven perception in robotics - EDPR,
+Genova, Italy.
+"""
  
 # Specify what kind of data to use
 original = False
