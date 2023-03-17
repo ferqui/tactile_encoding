@@ -889,7 +889,7 @@ if do_training:
         acc_test_list = []
 
         print("*** training (with validation) statistics started ***".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
-        LOG.debug("### Training statistics with {} repetitions started ({}).\n ###".format(repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        LOG.debug("### Training statistics with {} repetitions started ({}). ###\n".format(repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
         
         for rpt in range(repetitions):
             # Reload data for each repetition
