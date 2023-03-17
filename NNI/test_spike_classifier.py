@@ -50,13 +50,8 @@ while not flag_allocate_memory:
         if flag_print:
             print("Waiting for more memory available.")
             flag_print = False
-#global device
-device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
-"""
-# With the "old" check_cuda function:
 global device
-device = check_cuda(gpu_sel=1, gpu_mem_frac=0.3)
-"""
+device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 
 global use_seed
 use_seed = False

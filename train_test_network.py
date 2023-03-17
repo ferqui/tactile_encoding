@@ -5,6 +5,19 @@ found from NNI optimization.
 Such parameters are also saved to be re-used
 independently of the NNI results database.
 
+Settings to be accounted for:
+    experiment_name
+    do_training
+    nb_epochs
+    experiment_id
+    best_test_id
+    save_weights
+    save_fig
+    store_weights
+    trained_layers_path
+    gpu_mem_frac
+    use_seed
+
 Fra, Vittorio,
 Politecnico di Torino,
 EDA Group,
@@ -12,6 +25,7 @@ Torino, Italy.
 """
 
 import logging
+import argparse
 import numpy as np
 import pandas as pd
 import json
@@ -32,27 +46,106 @@ from torch.utils.data import DataLoader, TensorDataset
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, retrieve_nni_results, load_layers
 
 
-experiment_name = "spike_classifier"
+### 1) various experiment settings #############################################
 
-do_training = True
+parser = argparse.ArgumentParser()
 
-experiment_id = "vpeqjlkr"
+# Experiment name
+parser.add_argument('-experiment_name',
+                    type=str,
+                    default="spike_classifier",
+                    help='Name of this experiment.')
+# Training needed or not
+parser.add_argument('-do_training',
+                    type=bool,
+                    default=True,
+                    help='If set to False, test only will be performed.')
+# Number of epochs
+parser.add_argument('-nb_epochs',
+                    type=int,
+                    default=100,
+                    help='Number of training epochs.')
+# ID of the NNI experiment to refer to
+parser.add_argument('-experiment_id',
+                    type=str,
+                    default="vpeqjlkr",
+                    help='ID of the NNI experiment whose results are to be used.')
+# ID of the NNI trial providing the best test accuracy
+parser.add_argument('-best_test_id',
+                    type=str,
+                    default="vpeqjlkr",
+                    help='ID of the NNI trial that gave the highest test accuracy.')
+# Save the weights (to be re-used right after the training to test) or not
+parser.add_argument('-save_weights',
+                    type=bool,
+                    default=True,
+                    help='Weights can be saved to be loaded after training and used for test.')
+# Save figures
+parser.add_argument('-save_fig',
+                    type=bool,
+                    default=True,
+                    help='Save or not the plots produced during training and test.')
+# Store the weights 
+parser.add_argument('-store_weights',
+                    type=bool,
+                    default=True,
+                    help='Weights can be stored with specific, unique name.')
+# Path of weights to perform test only (if do_training is False)
+parser.add_argument('-trained_layers_path',
+                    type=str,
+                    default="./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr_backup.pt",
+                    help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
+# (maximum) GPU memory fraction to be allocated
+parser.add_argument('-gpu_mem_frac',
+                    type=float,
+                    default=0.3,
+                    help='The maximum GPU memory fraction to be used by this experiment.')
+# Set seed usage
+parser.add_argument('-use_seed',
+                    type=bool,
+                    default=True,
+                    help='Set if a seed is to be used or not.')
+
+args = parser.parse_args()
+
+settings = vars(args)
+
+experiment_name = settings["experiment_name"]
+
+do_training = settings["do_training"]
+
+experiment_id = settings["experiment_id"]
 if do_training:
     best_test_id, _ = retrieve_nni_results(experiment_name, experiment_id, "test")
 else:
-    trained_layers_path = "./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr_backup.pt"
-    best_test_id = "euX7c"
+    trained_layers_path = settings["trained_layers_path"]
+    best_test_id = settings["best_test_id"]
+
+save_weights = settings["save_weights"]
+save_fig = settings["save_fig"]
+store_weights = settings["store_weights"]
+
+nb_epochs = settings["nb_epochs"]
+
+use_seed = settings["use_seed"] # it will be in any case "re-set" to False for test statistics
+
+if use_seed:
+    seed = 42
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+else:
+    seed = None
+
+################################################################################
+
 
 experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-save_weights = True # to save weights from the best_layers variable
-save_fig = True # to save accuracy and loss plots from training
-store_weights = True # to store trained weights
-
-nb_epochs = 300
-
-
+### 2) data "configuration" specific for spike classification from MN paper ####
+ 
 # Specify what kind of data to use
 original = False
 fixed_length = not original
@@ -67,25 +160,6 @@ for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
     name += "{} ".format(data_attributes[el])
 name = name[:-1]
 name = name.replace(" ","_")
-
-
-log_path = "./logs/optimized/{}/{}".format(experiment_name,name)
-create_directory(log_path)
-logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
-                    filemode='a',
-                    format="%(asctime)s %(name)s %(message)s",
-                    datefmt='%Y%m%d_%H%M%S')
-LOG = logging.getLogger(experiment_name)
-LOG.setLevel(logging.DEBUG)
-LOG.debug("Experiment started on: {}-{}-{} {}:{}:{}\n".format(
-    experiment_datetime[:4],
-    experiment_datetime[4:6],
-    experiment_datetime[6:8],
-    experiment_datetime[-6:-4],
-    experiment_datetime[-4:-2],
-    experiment_datetime[-2:])
-    )
-
 
 labels_mapping = {
     'A': "Tonic spiking",
@@ -110,9 +184,37 @@ labels_mapping = {
     'T': "Spike latency",
 }
 
+################################################################################
 
-# Set up CUDA device
-gpu_mem_frac = 0.3
+
+### 3) log file configuration ##################################################
+
+log_path = "./logs/optimized/{}/{}".format(experiment_name,name)
+create_directory(log_path)
+logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
+                    filemode='a',
+                    format="%(asctime)s %(name)s %(message)s",
+                    datefmt='%Y%m%d_%H%M%S')
+LOG = logging.getLogger(experiment_name)
+LOG.setLevel(logging.DEBUG)
+LOG.debug("Experiment started on: {}-{}-{} {}:{}:{}\n".format(
+    experiment_datetime[:4],
+    experiment_datetime[4:6],
+    experiment_datetime[6:8],
+    experiment_datetime[-6:-4],
+    experiment_datetime[-4:-2],
+    experiment_datetime[-2:])
+    )
+
+if use_seed:
+    LOG.debug("Seed set to {}\n".format(seed))
+
+################################################################################
+
+
+### 4) CUDA device set-up ######################################################
+
+gpu_mem_frac = settings["gpu_mem_frac"]
 flag_allocate_memory = False
 flag_print = True
 while not flag_allocate_memory:
@@ -125,19 +227,10 @@ while not flag_allocate_memory:
             flag_print = False
 device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 
+################################################################################
 
-use_seed = True # it will be "re-set" to False for test statistics
 
-if use_seed:
-    seed = 42
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    LOG.debug("Seed set to {}\n".format(seed))
-else:
-    seed = None
-
+### 5) data and parameters paths to be used ####################################
 
 # Load the test subset (always the same)
 ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
@@ -145,14 +238,13 @@ ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_
 nb_steps = len(next(iter(ds_test))[0])
 
 if do_training:
+
     # Select random training and validation set
     rnd_idx = np.random.randint(0, 10) # 3
     LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
     ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
     ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
-
-if do_training:
     # Get the optimized parameters
     parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
     with open(parameters_path, 'r') as fp:
@@ -164,21 +256,27 @@ if do_training:
     with open(parameters_path+"/parameters.json", 'w') as fp:
         json.dump(params, fp)
 else:
+
     parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
     with open(parameters_path, 'r') as fp:
         params = json.load(fp)
 
+################################################################################
 
-# Temporal dynamics quantities
+
+### 6)  temporal dynamics quantities for the SNN ###############################
+
 tau_mem = params["tau_mem"]
 tau_syn = params["tau_syn"]
 dt = 1e-3
 alpha = torch.as_tensor(float(np.exp(-dt/tau_syn)))
 beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
 
+################################################################################
 
 
-##########################################################################################################################
+
+### Various definitions ########################################################
 
 class feedforward_layer:
     '''
@@ -375,7 +473,7 @@ class SurrGradSpike(torch.autograd.Function):
 spike_fn = SurrGradSpike.apply
 
 
-def train_validate_test(params, name, ds_train, ds_test, ds_val):
+def train_validate_test(params, name, ds_train, ds_val, ds_test):
 
     # Set the number of epochs
     eps = nb_epochs
@@ -728,9 +826,11 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
     else:
         plt.show()
 
-##########################################################################################################################
+################################################################################
 
 
+
+### WHERE THINGS ACTUALLY HAPPEN ###############################################
 
 print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
     experiment_datetime[:4],
@@ -815,3 +915,5 @@ print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
     conclusion_datetime[-4:-2],
     conclusion_datetime[-2:])
     )
+
+################################################################################

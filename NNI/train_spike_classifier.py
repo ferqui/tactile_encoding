@@ -60,19 +60,6 @@ while not flag_allocate_memory:
             flag_print = False
 global device
 device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
-"""
-# With the "old" check_cuda function:
-manual_selection = True
-if manual_selection:
-    gpu_idx = 0
-else:
-    if torch.cuda.is_available():
-        gpu_query = str(check_output(["nvidia-smi", "--format=csv", "--query-gpu=index"]), 'utf-8').splitlines()
-        gpu_devices = [int(ii) for ii in gpu_query if ii != 'index']
-        gpu_idx = random.choice(gpu_devices)
-global device
-device = check_cuda(gpu_sel=gpu_idx, gpu_mem_frac=0.3)
-"""
 
 global use_seed
 use_seed = False
@@ -191,7 +178,7 @@ def nni_train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=Non
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
-    g = torch.Generator()
+    #g = torch.Generator()
     #g.manual_seed(seed)
     #generator = DataLoader(dataset, batch_size=batch_size, shuffle=True,
     #                       num_workers=0, pin_memory=True, generator=g)
@@ -203,9 +190,6 @@ def nni_train(dataset, lr=0.0015, nb_epochs=300, opt_parameters=None, layers=Non
     loss_hist = [[], []]
     accs_hist = [[], []]
     for e in range(nb_epochs):
-        ### "debug" print:
-        #logging.info(f"Starting epoch {e+1} of {nb_epochs} ")
-        ###
         # learning rate decreases over epochs
         optimizer = torch.optim.Adamax(
             parameters, lr=lr, betas=(0.9, 0.995))
@@ -823,16 +807,12 @@ class SurrGradSpike(torch.autograd.Function):
 spike_fn = SurrGradSpike.apply
 
 
-def run_NNI(args, params, name, ds_train, ds_test, ds_val):
+def run_NNI(args, params, name, ds_train, ds_val, ds_test):
 
     # Set the number of epochs
     eps = params["epochs"]
 
-    #execution_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    #logging.info("Data storage initialized.\n")
     LOG.debug(print("{} data used.\n".format(name)))
-
 
     # Settings for the SNN
     global use_trainable_out
@@ -845,82 +825,6 @@ def run_NNI(args, params, name, ds_train, ds_test, ds_val):
     batch_size = params["batch_size"] # 128
     global lr
     lr = params["lr"]
-
-    """
-    ### "debug" print:
-    #logging.info("Setting up data.")
-    ###
-    # create train-test-validation split
-    ratios = [70, 10, 20]
-
-    # infile = open("./data_encoding", 'rb')
-    infile = open(data_filepath, "rb")
-    encoded_data = pickle.load(infile)
-    infile.close()
-
-    if original:
-        encoded_label = input_currents.keys()
-    else:
-        # infile = open("./label_encoding", 'rb')
-        infile = open(label_filepath, "rb")
-        encoded_label = pickle.load(infile)
-        infile.close()
-
-    x_train, y_train, x_test, y_test, x_validation, y_validation = train_test_validation_split(
-        np.array(encoded_data)[:, 0], encoded_label, split=ratios)
-
-    labels_mapping = {
-        'A': "Tonic spiking",
-        'B': "Class 1",
-        'C': "Spike frequency adaptation",
-        'D': "Phasic spiking",
-        'E': "Accommodation",
-        'F': "Threshold variability",
-        'G': "Rebound spike",
-        'H': "Class 2",
-        'I': "Integrator",
-        'J': "Input bistability",
-        'K': "Hyperpolarizing spiking",
-        'L': "Hyperpolarizing bursting",
-        'M': "Tonic bursting",
-        'N': "Phasic bursting",
-        'O': "Rebound burst",
-        'P': "Mixed mode",
-        'Q': "Afterpotentials",
-        'R': "Basal bistability",
-        'S': "Preferred frequency",
-        'T': "Spike latency",
-    }
-
-    if ratios[2] > 0:
-        data_steps = np.min(np.concatenate(([len(x) for x in x_train], [
-                            len(x) for x in x_validation], [len(x) for x in x_test])), axis=0)
-        x_train = torch.as_tensor(np.array(x_train), dtype=torch.float)
-        labels_train = torch.as_tensor(value2index(
-            y_train, labels_mapping), dtype=torch.long)
-        x_test = torch.as_tensor(np.array(x_test), dtype=torch.float)
-        labels_test = torch.as_tensor(value2index(
-            y_test, labels_mapping), dtype=torch.long)
-        x_validation = torch.as_tensor(
-            np.array(x_validation), dtype=torch.float)
-        labels_validation = torch.as_tensor(value2index(
-            y_validation, labels_mapping), dtype=torch.long)
-        ds_train = TensorDataset(x_train, labels_train)
-        ds_test = TensorDataset(x_test, labels_test)
-        ds_val = TensorDataset(x_validation, labels_validation)
-    else:
-        data_steps = np.min(np.concatenate(
-            ([len(x) for x in x_train], [len(x) for x in x_test])), axis=0)
-        x_train = torch.as_tensor(x_train, dtype=torch.float)
-        labels_train = torch.as_tensor(value2index(
-            y_train, labels_mapping), dtype=torch.long)
-        x_test = torch.as_tensor(x_test, dtype=torch.float)
-        labels_test = torch.as_tensor(value2index(
-            y_test, labels_mapping), dtype=torch.long)
-        ds_train = TensorDataset(x_train, labels_train)
-        ds_test = TensorDataset(x_test, labels_test)
-        ds_val = []
-    """
 
     # tain the network (with validation)
     loss_hist, acc_hist, best_layers = nni_build_and_train(params, ds_train, ds_val, epochs=eps)
@@ -1024,7 +928,7 @@ try:
     ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
     
     # select random train and validation set.
-    # To not mix train and validation data ALWAYS use same ID
+    # To do not mix train and validation data ALWAYS use same ID
     rnd_idx = np.random.randint(0, 10)  # take n_splits as max
     LOG.debug(print("\nSplit number {} (randomly) selected for this trial.".format(rnd_idx)))
     ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
