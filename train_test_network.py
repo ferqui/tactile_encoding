@@ -8,6 +8,7 @@ independently of the NNI results database.
 Settings to be accounted for:
     experiment_name
     do_training
+    training_statistics
     nb_epochs
     experiment_id
     best_test_id
@@ -61,6 +62,11 @@ parser.add_argument('-do_training',
                     type=bool,
                     default=True,
                     help='If set to False, test only will be performed.')
+# Make some statistics for training
+parser.add_argument('-training_statistics',
+                    type=bool,
+                    default=True,
+                    help='If set to True, multiple (5, by default) trainings will be performed (with use_seed consequently set to False).')
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
@@ -114,6 +120,7 @@ settings = vars(args)
 experiment_name = settings["experiment_name"]
 
 do_training = settings["do_training"]
+training_statistics = settings["training_statistics"]
 
 experiment_id = settings["experiment_id"]
 if do_training:
@@ -130,13 +137,17 @@ nb_epochs = settings["nb_epochs"]
 
 use_seed = settings["use_seed"] # it will be in any case "re-set" to False for test statistics
 
-if use_seed:
-    seed = 42
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
+if not training_statistics:
+    if use_seed:
+        seed = 42
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
+    else:
+        seed = None
 else:
+    use_seed = False
     seed = None
 
 ################################################################################
@@ -250,11 +261,12 @@ nb_steps = len(next(iter(ds_test))[0])
 
 if do_training:
 
-    # Select random training and validation set
-    rnd_idx = np.random.randint(0, 10) # 3
-    LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
-    ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-    ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+    if not training_statistics:
+        # Select random training and validation set
+        rnd_idx = np.random.randint(0, 10) # 3
+        LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
+        ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+        ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
     # Get the optimized parameters
     parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
@@ -266,6 +278,7 @@ if do_training:
     create_directory(parameters_path)
     with open(parameters_path+"/parameters.json", 'w') as fp:
         json.dump(params, fp)
+
 else:
 
     parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
@@ -726,8 +739,8 @@ def build_and_test(
     LOG.debug("Median test accuracy: {}%".format(np.round(np.median(test_N)*100,4)))
     LOG.debug("Std. Dev. test accuracy: {}%\n".format(np.round(np.std(test_N)*100,4)))
     
-    # 10 single-sample inferences to check label probbailities
-    for ii in range(10):
+    # N single-sample inferences to check label probbailities
+    for ii in range(N):
         single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0)))
         _, _, lbl_probs = compute_classification_accuracy(params, TensorDataset(single_sample[0],single_sample[1]), layers, label_probabilities=True)
         LOG.debug("Single-sample inference {}/{} from test set:".format(ii+1,10))
@@ -854,11 +867,168 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
 
 if do_training:
 
-    # Train the network with validation and test
-    print("*** training with validation started ***")
-    loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
-    print("*** training with validation done ***")
+    # Path for plots from training and validation
+    if save_fig:
+        path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
+        create_directory(path_for_plots)
 
+    if training_statistics:
+        """
+        Muller-Cleve, Simon F.,
+        Istituto Italiano di Tecnologia - IIT,
+        Event-driven perception in robotics - EDPR,
+        Genova, Italy.
+        """
+        
+        repetitions = 5
+
+        loss_train_list = []
+        acc_train_list = []
+        loss_val_list = []
+        acc_val_list = []
+        acc_test_list = []
+
+        print("*** training (with validation) statistics started ***".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        LOG.debug("### Training statistics with {} repetitions started ({}).\n ###".format(repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        
+        for rpt in range(repetitions):
+            # Reload data for each repetition
+            # Select random training and validation set
+            rnd_idx = np.random.randint(0, 10) # 3
+            LOG.debug("Repetition {}/{}: started ({}) with split number {}.\n".format(rpt+1,repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),rnd_idx))
+            ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+            ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+
+            # Train the network with validation and test
+            loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
+
+            # Save layers providing the best test accuracy
+            if rpt == 0:
+                very_best_layer = best_layers
+                best_acc = test_acc
+            else:
+                if test_acc > best_acc:
+                    very_best_layer = best_layers
+                    best_acc = test_acc
+
+            loss_train_list.append(loss_hist[0])
+            acc_train_list.append(acc_hist[0])
+            loss_val_list.append(loss_hist[1])
+            acc_val_list.append(acc_hist[1])
+            acc_test_list.append(test_acc)
+
+            print("\trepetition {}/{} done ({}) --> test accuracy: {}%".format(rpt+1,repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),np.round(test_acc*100,4)))
+        
+        best_layers = very_best_layer
+
+        LOG.debug("Overall best training accuracy: {}%".format(np.round(np.nanmax(acc_train_list)*100,4)))
+        LOG.debug("Overall best validation accuracy: {}%".format(np.round(np.nanmax(acc_val_list)*100,4)))
+        LOG.debug("Overall best test accuracy: {}%\n".format(np.round(best_acc*100,4)))
+
+        # Make plots for loss and accuracy from training and validation
+        # Accuracy:
+        # Compute mean, median and std. dev.
+        acc_mean_train = np.mean(acc_train_list, axis=0)
+        acc_median_train = np.median(acc_train_list, axis=0)
+        acc_std_train = np.std(acc_train_list, axis=0)
+        acc_mean_val = np.mean(acc_val_list, axis=0)
+        acc_median_val = np.median(acc_val_list, axis=0)
+        acc_std_val = np.std(acc_val_list, axis=0)
+        ## Identify repetition with the best validation accuracy
+        #best_rpt, best_val_idx = np.where(np.max(acc_val_list) == acc_val_list)
+        #best_rpt, best_val_idx = best_rpt[0], best_val_idx[0]
+        plt.figure()
+        ## Plot the identified repetition
+        #plt.plot(range(1, len(acc_train_list[best_rpt])+1), 100*np.array(
+        #    acc_train_list[best_rpt]), color='blue', linestyle='dashed')
+        #plt.plot(range(1, len(acc_val_list[best_rpt])+1), 100*np.array(
+        #    acc_val_list[best_rpt]), color='orangered', linestyle='dashed')
+        # Plot the "median repetition" of training and validation
+        plt.plot(range(1, len(acc_median_train)+1),
+                 100*np.array(acc_median_train), color='blue')
+        plt.plot(range(1, len(acc_median_val)+1), 100 *
+                 np.array(acc_median_val), color='orangered')
+        plt.fill_between(range(1, len(acc_median_train)+1), 100*(acc_median_train+acc_std_train), 100*(
+            acc_median_train-acc_std_train), color='cornflowerblue')
+        plt.fill_between(range(1, len(acc_median_val)+1), 100*(
+            acc_median_val+acc_std_val), 100*(acc_median_val-acc_std_val), color='sandybrown')
+        plt.xlabel("Epoch")
+        plt.ylabel("Accuracy (%)")
+        plt.ylim((0, 105))
+        plt.legend(["Training", "Validation"], loc='lower right')
+        plt.show()
+        if save_fig:
+            plt.savefig(path_for_plots + "/accuracy_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+            plt.savefig(path_for_plots + "/accuracy_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        # Loss:
+        # Compute mean, median and std. dev.
+        loss_mean_train = np.mean(loss_train_list, axis=0)
+        loss_median_train = np.median(loss_train_list, axis=0)
+        loss_std_train = np.std(loss_train_list, axis=0)
+        loss_mean_val = np.mean(loss_val_list, axis=0)
+        loss_median_val = np.median(loss_val_list, axis=0)
+        loss_std_val = np.std(loss_val_list, axis=0)
+        plt.figure()
+        # Plot the "median repetition" of training and validation
+        plt.plot(range(1, len(loss_median_train)+1), np.array(loss_median_train), color='tab:red')
+        plt.plot(range(1, len(loss_median_val)+1), np.array(loss_median_val), color='tab:green')
+        plt.fill_between(range(1, len(loss_median_train)+1), loss_median_train+loss_std_train, loss_median_train-loss_std_train, color='lightcoral')
+        plt.fill_between(range(1, len(loss_median_val)+1), loss_median_val+loss_std_val, loss_median_val-loss_std_val, color='lightgreen')
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.ylim(bottom=0)
+        plt.legend(["Training", "Validation"], loc='lower right')
+        plt.show()
+        if save_fig:
+            plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+            plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+
+        LOG.debug("### Training statistics done ({}). ###\n".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        print("*** training (with validation) statistics done ***")
+
+    else:
+
+        # Train the network with validation and test
+        print("*** training with validation started ***")
+        loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
+        print("*** training with validation done ***")
+
+        # Make plots from training and validation
+        # Accuracy:
+        plt.figure()
+        plt.plot(range(1, len(acc_hist[0])+1), 100 *
+                 np.array(acc_hist[0]), color='blue')
+        plt.plot(range(1, len(acc_hist[1])+1), 100 *
+                 np.array(acc_hist[1]), color='orangered')
+        plt.xlabel("Epoch")
+        plt.ylabel("Accuracy (%)")
+        plt.ylim((0, 105))
+        #plt.title("{} ({} epochs)".format(name,nb_epochs))
+        plt.legend(["Training", "Validation"], loc='lower right')
+        if save_fig:
+            plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+            plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        plt.show()
+        if save_fig:
+            print("*** accuracy plot saved ***")
+        # Loss:
+        plt.figure()
+        plt.plot(range(1, len(loss_hist[0])+1),
+                 np.array(loss_hist[0]), color='tab:red')
+        plt.plot(range(1, len(loss_hist[1])+1),
+                 np.array(loss_hist[1]), color='tab:green')
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.ylim(bottom=0)
+        #plt.title("{} ({} epochs)".format(name,nb_epochs))
+        plt.legend(["Training", "Validation"], loc='upper right')
+        if save_fig:
+            plt.savefig(path_for_plots + "/loss_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+            plt.savefig(path_for_plots + "/loss_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        plt.show()
+        if save_fig:
+            print("*** loss plot saved ***")
+        
     # Save (to re-load) trained weights 
     path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
     create_directory(path)
@@ -875,47 +1045,10 @@ if do_training:
         print("*** weights stored ***")
         trained_layers_path = save_layers_path
 
-    # Make plots from training and validation
-    if save_fig:
-        path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
-        create_directory(path_for_plots)
-    # Accuracy:
-    plt.figure()
-    plt.plot(range(1, len(acc_hist[0])+1), 100 *
-             np.array(acc_hist[0]), color='blue')
-    plt.plot(range(1, len(acc_hist[1])+1), 100 *
-             np.array(acc_hist[1]), color='orange')
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy (%)")
-    #plt.title("{} ({} epochs)".format(name,nb_epochs))
-    plt.legend(["Training", "Validation"], loc='lower right')
-    if save_fig:
-        plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-        plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-    plt.show()
-    if save_fig:
-        print("*** accuracy plot saved ***")
-    # Loss:
-    plt.figure()
-    plt.plot(range(1, len(loss_hist[0])+1),
-             np.array(loss_hist[0]), color='tab:red')
-    plt.plot(range(1, len(loss_hist[1])+1),
-             np.array(loss_hist[1]), color='tab:green')
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    #plt.title("{} ({} epochs)".format(name,nb_epochs))
-    plt.legend(["Training", "Validation"], loc='upper right')
-    if save_fig:
-        plt.savefig(path_for_plots + "/loss_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-        plt.savefig(path_for_plots + "/loss_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-    plt.show()
-    if save_fig:
-        print("*** loss plot saved ***")
-
 # Test the network with statistics
-print("*** test started ***")
-build_and_test(params,ds_test,trained_layers_path)
-print("*** test done ***")
+print("*** test statistics started ***")
+build_and_test(params, ds_test, trained_layers_path, N=50)
+print("*** test statistics done ***")
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
