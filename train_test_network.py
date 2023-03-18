@@ -977,7 +977,7 @@ if do_training:
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.ylim(bottom=0)
-        plt.legend(["Training", "Validation"], loc='lower right')
+        plt.legend(["Training", "Validation"], loc='upper right')
         plt.show()
         if save_fig:
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
