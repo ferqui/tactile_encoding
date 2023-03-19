@@ -413,7 +413,7 @@ class AdexLIF(nn.Module):
         super(AdexLIF, self).__init__()
 
         self.linear = nn.Parameter(torch.ones(1, n_out), requires_grad=True)
-        self.dt = dt
+        self.dt = dt*1000
         self.n_in = n_in
         self.n_out = n_out
         self.params_n = params_n
@@ -428,8 +428,8 @@ class AdexLIF(nn.Module):
         self.a = nn.Parameter(torch.tensor(0.5),requires_grad=True) # Adaptation-Voltage coupling
         self.b = nn.Parameter(torch.tensor(7.0),requires_grad=True) # Spike-triggered adaptation current
         self.R = nn.Parameter(torch.tensor(0.5),requires_grad=True) # Resistance
-        self.taum = nn.Parameter(torch.tensor(5.),requires_grad=True) # membrane time scale
-        self.tauw = nn.Parameter(torch.tensor(100.),requires_grad=True) # Adaptation time constant
+        self.taum = nn.Parameter(torch.tensor(50.),requires_grad=True) # membrane time scale
+        self.tauw = nn.Parameter(torch.tensor(1000.),requires_grad=True) # Adaptation time constant
 
         self.state = None
 
@@ -443,12 +443,14 @@ class AdexLIF(nn.Module):
         # print(input.shape[0])
         V = self.state.V
         W = self.state.W
-
         I = (self.linear*input)
         dV = (-(V-self.Vr) + self.delta_T * torch.exp((V-self.Vrh)/self.delta_T) + self.R*(I - W))/(self.taum)
         dW = (self.a*(V-self.Vr)-W)/self.tauw
 
         V = V + self.dt * dV
+        # print('input_max',input.max())
+        # print('I_max',I.max())
+        # print('dV_max',dV.max())
         W = W + self.dt * dW
 
         spk = activation(V - self.Vth)
@@ -458,5 +460,6 @@ class AdexLIF(nn.Module):
         V = (1 - spk) * V + (spk) * self.Vreset
 
         self.state = self.AdexLIFstate(V = V, W = W)
-
+        # print('spk_sum',spk.sum())
+        # print('spk_max',spk.max())
         return spk
