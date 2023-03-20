@@ -115,7 +115,7 @@ def original(add_offset=False, add_noise=False, temp_jitter=False):
             output_v.append(neurons.state.V[0].cpu().numpy())
         encoded_data_original.append([output_s, output_v, input_current])
 
-    filename = './data/data_encoding_original'
+    filename = './data/original_mn_output/data_encoding_original'
     if add_noise:
         filename = filename + '_noisy'
     if temp_jitter:
@@ -212,9 +212,9 @@ def fix_time_only(max_trials=100, max_time=1000):
     encoded_label = np.array(encoded_label)
 
     # dump neuron output to file
-    with open('./data/data_encoding_fix_len.pkl', 'wb') as handle:
+    with open('./data/original_mn_output/data_encoding_fix_len.pkl', 'wb') as handle:
         pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
-    with open('./data/label_encoding_fix_len.pkl', 'wb') as handle:
+    with open('./data/original_mn_output/label_encoding_fix_len.pkl', 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
@@ -354,8 +354,8 @@ def fix_time(max_trials=100, max_time=1000, add_offset=False, add_noise = False,
             encoded_data.append([output_s, output_v, input_current])
             encoded_label.append(class_name)
 
-    filename_data = './data/data_encoding_fix_len'
-    filename_label = './data/label_encoding_fix_len'
+    filename_data = './data/original_mn_output/data_encoding_fix_len'
+    filename_label = './data/original_mn_output/label_encoding_fix_len'
     if add_noise:
         filename_data = filename_data + '_noisy'
         filename_label = filename_label + '_noisy'
