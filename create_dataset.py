@@ -23,13 +23,16 @@ import torch
 from tactile_encoding.utils.models import MN_neuron
 
 
-def original(add_noise=False, temp_jitter=False):
+def original(add_offset=False, add_noise=False, temp_jitter=False):
     """
     Recreates the original data for behavior classes 
     regarding neuron input current (profiles) over time 
     and neuron parameters. For different classes the 
     length can vary.
     
+    The add_offset flag will add an const. offset on all
+    const values drawn from an equal distribution
+
     The add_noise flag will add Gaussian noise to the 
     input current.
 
@@ -60,6 +63,13 @@ def original(add_noise=False, temp_jitter=False):
                 print('Missing time points.')
             input_current = np.zeros((sim_time, 1))
             for counter, actual_current in enumerate(input_currents[class_name]):
+                if add_offset:
+                    # np.random.random_sample(): Return random floats in the half-open interval [0.0, 1.0).
+                    current_tmp = actual_current + (np.random.random_sample() - 0.5)*1E-1
+                    if current_tmp < 0.0:
+                        actual_current = 0.0
+                    else:
+                        actual_current = current_tmp
                 if temp_jitter:
                     jitter = range(-5, 6) # temporal jitter in ms 
                     jitter = np.random.choice(jitter)
@@ -73,8 +83,15 @@ def original(add_noise=False, temp_jitter=False):
                 input_current[t:] = actual_current
         else:
             # const current
-            input_current = np.ones((sim_time, 1)) * \
-                input_currents[class_name]
+            if add_offset:
+                current_tmp = input_currents[class_name][0] + (np.random.random_sample() - 0.5)*1E-1
+                if current_tmp < 0.0:
+                    input_current_local = 0.0
+                else:
+                    input_current_local = current_tmp
+            else:
+                input_current_local = input_currents[class_name]
+            input_current = np.ones((sim_time, 1)) * input_current_local
 
         # set up MN neuron
         neurons = MN_neuron(
@@ -103,6 +120,8 @@ def original(add_noise=False, temp_jitter=False):
         filename = filename + '_noisy'
     if temp_jitter:
         filename = filename + '_temp_jitter'
+    if add_offset:
+        filename = filename + '_offset'
 
     encoded_data_original = np.array(encoded_data_original, dtype=object)
 
@@ -199,7 +218,7 @@ def fix_time_only(max_trials=100, max_time=1000):
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def fix_time(max_trials=100, max_time=1000, add_noise = False, temp_jitter=False):
+def fix_time(max_trials=100, max_time=1000, add_offset=False, add_noise = False, temp_jitter=False):
     """
     Preferable over fix_time_only.
     Creates data for behavior classes regarding neuron 
@@ -281,11 +300,26 @@ def fix_time(max_trials=100, max_time=1000, add_noise = False, temp_jitter=False
                                 dt_time_points = np.diff(time_points_copy)
                 # calc input current trace
                 for counter, actual_current in enumerate(input_currents_copy):
+                    if add_offset:
+                        current_tmp = actual_current + (np.random.random_sample() - 0.5)*1E-1
+                        if current_tmp < 0.0:
+                            actual_current = 0.0
+                        else:
+                            actual_current = current_tmp
                     input_current[time_points_copy[counter]:] = actual_current
             # const input current
             else:
-                input_current = np.ones((max_time, 1)) * \
-                    input_currents[class_name]
+                # const current
+                if add_offset:
+                    current_tmp = input_currents[class_name][0] + (np.random.random_sample() - 0.5)*1E-1
+                    if current_tmp < 0.0:
+                        input_current_local = 0.0
+                    else:
+                        input_current_local = current_tmp
+                else:
+                    input_current_local = input_currents[class_name]
+                
+                input_current = np.ones((max_time, 1)) * input_current_local
             
             # set fix input length
             if len(input_current) < max_time:
@@ -328,6 +362,9 @@ def fix_time(max_trials=100, max_time=1000, add_noise = False, temp_jitter=False
     if temp_jitter:
         filename_data = filename_data + '_temp_jitter'
         filename_label = filename_label + '_temp_jitter'
+    if add_offset:
+        filename_data = filename_data + '_offset'
+        filename_label = filename_label + '_offset'
 
     encoded_data = np.array(encoded_data)
     encoded_label = np.array(encoded_label)
@@ -344,26 +381,32 @@ if __name__ == '__main__':
     print('\nCreating original data.')
     original()
 
+    print('\nCreating original data with offset.')
+    original(add_offset=True, add_noise=False, temp_jitter=False)
+
     print('\nCreating noisy original data.')
-    original(add_noise=True, temp_jitter=False)
+    original(add_offset=False, add_noise=True, temp_jitter=False)
 
     print('\nCreating original data with temporal jitter.')
-    original(add_noise=False, temp_jitter=True)
+    original(add_offset=False, add_noise=False, temp_jitter=True)
 
-    print('\nCreating noisy original data with temporal jitter.')
-    original(add_noise=True, temp_jitter=True)
+    print('\nCreating noisy original data with temporal jitter and offset.')
+    original(add_offset=True, add_noise=True, temp_jitter=True)
 
     # fix 1000ms length
     print('\nCreating 1000ms data.')
     fix_time_only() # much faster, 'cause current profile only copied
 
+    print('\nCreating 1000ms data with offset.')
+    fix_time(add_offset=True, add_noise=False, temp_jitter=False)
+
     print('\nCreating noisy 1000ms data.')
-    fix_time(add_noise=True, temp_jitter=False)
+    fix_time(add_offset=False, add_noise=True, temp_jitter=False)
 
     print('\nCreating 1000ms data with temporal jitter.')
-    fix_time(add_noise=False, temp_jitter=True)
+    fix_time(add_offset=False, add_noise=False, temp_jitter=True)
 
-    print('\nCreating noisy 1000ms data with temporal jitter.')
-    fix_time(add_noise=True, temp_jitter=True)
+    print('\nCreating noisy 1000ms data with temporal jitter and offset.')
+    fix_time(add_offset=True, add_noise=True, temp_jitter=True)
 
     print('\nFinished with data creation.')
