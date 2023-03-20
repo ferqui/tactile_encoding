@@ -66,7 +66,12 @@ parser.add_argument('-do_training',
 parser.add_argument('-training_statistics',
                     type=bool,
                     default=True,
-                    help='If set to True, multiple (5, by default) trainings will be performed (with use_seed consequently set to False).')
+                    help='If set to True, multiple trainings will be performed (with use_seed consequently set to False).')
+# Number or repetitions for training statistics
+parser.add_argument('-repetitions',
+                    type=int,
+                    default=10,
+                    help='Number of trainings to be performed for statistical evaluation.')
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
@@ -149,6 +154,7 @@ if not training_statistics:
 else:
     use_seed = False
     seed = None
+    repetitions = settings["repetitions"]
 
 ################################################################################
 
@@ -880,8 +886,6 @@ if do_training:
         Genova, Italy.
         """
         
-        repetitions = 5
-
         loss_train_list = []
         acc_train_list = []
         loss_val_list = []
