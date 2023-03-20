@@ -1,8 +1,8 @@
 """
 This script allows to train and test a network for
-spiking activity classification with the parameters 
-found from NNI optimization.
-Such parameters are also saved to be re-used
+spiking activity classification (with the parameters 
+found from NNI optimization) according to the MN paper.
+The NNI parameters are also saved to be re-used
 independently of the NNI results database.
 
 Settings to be accounted for:
