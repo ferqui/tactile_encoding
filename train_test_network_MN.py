@@ -1,8 +1,8 @@
 """
 This script allows to train and test a network for
-spiking activity classification with the parameters 
-found from NNI optimization.
-Such parameters are also saved to be re-used
+spiking activity classification (with the parameters 
+found from NNI optimization) according to the MN paper.
+The NNI parameters are also saved to be re-used
 independently of the NNI results database.
 
 Settings to be accounted for:
@@ -110,7 +110,7 @@ parser.add_argument('-store_weights',
 # Path of weights to perform test only (if do_training is False)
 parser.add_argument('-trained_layers_path',
                     type=str,
-                    default="./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr_backup.pt",
+                    default="./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr.pt",
                     help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',
@@ -294,7 +294,7 @@ if do_training:
 
 else:
 
-    parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
+    parameters_path = './parameters/optimized/{}/{}/parameters.json'.format(experiment_name,name)
     with open(parameters_path, 'r') as fp:
         params = json.load(fp)
 
@@ -756,7 +756,7 @@ def build_and_test(
     for ii in range(N):
         single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0)))
         _, _, lbl_probs = compute_classification_accuracy(params, TensorDataset(single_sample[0],single_sample[1]), layers, label_probabilities=True)
-        LOG.debug("Single-sample inference {}/{} from test set:".format(ii+1,10))
+        LOG.debug("Single-sample inference {}/{} from test set:".format(ii+1,N))
         LOG.debug("Sample: {} \tPrediction: {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]]))
         LOG.debug("Label probabilities (%): {}".format(np.round(np.array(lbl_probs.detach().cpu().numpy())*100,2)))
 
