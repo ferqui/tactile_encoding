@@ -72,6 +72,11 @@ parser.add_argument('-repetitions',
                     type=int,
                     default=10,
                     help='Number of trainings to be performed for statistical evaluation.')
+# Number or tests for statistics
+parser.add_argument('-n_test',
+                    type=int,
+                    default=50,
+                    help='Number of tests to be performed for statistical evaluation.')
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
@@ -155,6 +160,8 @@ else:
     use_seed = False
     seed = None
     repetitions = settings["repetitions"]
+
+n_test = settings["n_test"]
 
 ################################################################################
 
@@ -1051,7 +1058,7 @@ if do_training:
 
 # Test the network with statistics
 print("*** test statistics started ***")
-build_and_test(params, ds_test, trained_layers_path, N=50)
+build_and_test(params, ds_test, trained_layers_path, N=n_test)
 print("*** test statistics done ***")
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
