@@ -9,6 +9,8 @@ Settings to be accounted for:
     experiment_name
     do_training
     training_statistics
+    repetitions
+    n_test
     nb_epochs
     experiment_id
     best_test_id

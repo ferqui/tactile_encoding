@@ -4,6 +4,19 @@ output spike patterns through the spike_classifier
 (with NNI-optimized parameters and pre-trained
 weights) according to the MN paper.
 
+Settings to be accounted for:
+    experiment_name
+    n_samples
+    n_classifications
+    threshold
+    frequency
+    experiment_id
+    best_test_id
+    trained_layers_path
+    gpu_mem_frac
+    save_fig
+    use_seed
+
 Fra, Vittorio,
 Politecnico di Torino,
 EDA Group,
