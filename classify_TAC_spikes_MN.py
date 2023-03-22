@@ -51,10 +51,10 @@ parser.add_argument('-experiment_name',
                     type=str,
                     default="spike_classifier",
                     help='Name of this experiment.')
-# Number of samples giving the activity to be classified
+# Number of samples used to prepare the dataset of the activities to be classified
 parser.add_argument('-n_samples',
                     type=int,
-                    default=1,
+                    default=50,
                     help='Number of samples present in the spiking patterns collection accounted for.')
 # Number of spiking patterns to be classified
 parser.add_argument('-n_classifications',
@@ -84,7 +84,7 @@ parser.add_argument('-best_test_id',
 # Path of weights to perform test only (if do_training is False)
 parser.add_argument('-trained_layers_path',
                     type=str,
-                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_20230319_105910.pt",
+                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt",
                     help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',
