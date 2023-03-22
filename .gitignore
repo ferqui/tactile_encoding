@@ -8,7 +8,6 @@ runs
 .idea/
 .venv
 .ipynb_checkpoints
-NNI/dataset_split.py
-NNI/dataset_splits/*
+NNI/dataset_splits/fix_len/*
 NNI/results/*
 TAC_RSNN/*
