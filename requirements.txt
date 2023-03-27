@@ -7,3 +7,4 @@ tqdm
 tensorboard
 seaborn
 scikit-learn
+progressbar
