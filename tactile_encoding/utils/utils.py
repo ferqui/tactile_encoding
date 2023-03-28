@@ -16,7 +16,7 @@ def create_directory(directory_path):
         return directory_path
 
 
-def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.5):
+def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=None):
     """Check for available GPU and distribute work (if needed/wanted)"""
 
     if (torch.cuda.device_count()>1) & (share_GPU):
@@ -35,49 +35,19 @@ def check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.5):
     elif (torch.cuda.device_count()>1) & (not share_GPU):
         print("Multiple GPUs detected but single GPU selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
         device = torch.device("cuda:"+str(gpu_sel))
-        torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
+        if gpu_mem_frac is not None:
+            torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
     else:
         if torch.cuda.is_available():
             print("Single GPU detected. Setting up the simulation there.")
             device = torch.device("cuda")
             # thr 1: None, thr 2: 0.8, thr 5: 0.5, thr 10: None
-            # torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
+            if gpu_mem_frac is not None:
+                torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
         else:
             device = torch.device("cpu")
             print("No GPU detected. Running on CPU.")
 
-    """
-    # Simon's version for 'default' load distribution
-    if torch.cuda.device_count() > 1:
-        torch.cuda.empty_cache()
-        gpu_sel = 1
-        gpu_av = [torch.cuda.is_available()
-                for ii in range(torch.cuda.device_count())]
-        print("Detected {} GPUs. The load will be shared.".format(
-            torch.cuda.device_count()))
-        for gpu in range(len(gpu_av)):
-            if True in gpu_av:
-                if gpu_av[gpu_sel]:
-                    device = torch.device("cuda:"+str(gpu))
-                    # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
-                    print("Selected GPUs: {}" .format("cuda:"+str(gpu)))
-                else:
-                    device = torch.device("cuda:"+str(gpu_av.index(True)))
-            else:
-                device = torch.device("cpu")
-                print("No GPU detected. Running on CPU.")
-    else:
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-            print("Single GPU detected. Setting up the simulation there.")
-            device = torch.device("cuda:0")
-            # torch.cuda.set_per_process_memory_fraction(0.9, device=device)
-        else:
-            device = torch.device("cpu")
-            print("No GPU detected. Running on CPU.")
-    """
-    
     return device
 
 

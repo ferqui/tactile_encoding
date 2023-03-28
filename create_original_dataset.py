@@ -14,7 +14,6 @@ Event-driven perception in robotics - EDPR,
 Genova, Italy.
 """
 
-import progressbar  # TODO move progessbar into function
 from utils.functions import original, fix_time_only, fix_time
 
 if __name__ == '__main__':
@@ -84,15 +83,13 @@ if __name__ == '__main__':
     # Parameter sweep #
     ###################
 
-    noise_levels = [0.1, 0.2, 0.5, 1.0, 2, 5, 10]
-    offset_levels = [0.1, 0.2, 0.5, 1.0, 2, 5, 10]
+    noise_levels = [0.0, 0.1, 0.2, 0.5, 1.0, 2, 5, 10]
+    # offset_levels = [0.0, 0.1, 0.2, 0.5, 1.0, 2, 5, 10]
+    offset_levels = [0.5, 1.0, 2, 5, 10]
 
-    bar = progressbar.ProgressBar(maxval=len(noise_levels)*len(offset_levels),
-                              widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
-    bar.start()
+   
     
-    for offset_counter, offset in enumerate(noise_levels):
+    for offset_counter, offset in enumerate(offset_levels):
         for noise_counter, noise in enumerate(noise_levels):
+            print(f"Working on {len(noise_levels)*offset_counter+noise_counter+1} of {len(noise_levels)*len(offset_levels)}")
             fix_time(max_trials=100, offset=offset, noise=noise, jitter=10, add_offset=True, add_noise=True, add_jitter=True)
-            bar.update(offset_counter*len(noise_levels)+noise_counter)
-    bar.finish()
