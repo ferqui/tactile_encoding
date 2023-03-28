@@ -210,13 +210,13 @@ class MN_neuron(nn.Module):
 
         i1 += -self.k1 * i1 * self.dt
         i2 += -self.k2 * i2 * self.dt
-        V += self.dt * (self.linear * x + i1 + i2 - self.G * (V - self.EL)) / self.C
-        Thr += self.dt * (self.a * (V - self.EL) - self.b * (Thr - self.Tinf))
+        V += self.dt * (self.linear.to(x.device, non_blocking=True) * x + i1 + i2 - self.G * (V - self.EL)) / self.C
+        Thr += self.dt * (self.a.to(x.device, non_blocking=True) * (V - self.EL) - self.b * (Thr - self.Tinf))
 
         spk = activation(V - Thr)
 
-        i1 = (1 - spk) * i1 + (spk) * (self.R1 * i1 + self.A1)
-        i2 = (1 - spk) * i2 + (spk) * (self.R2 * i2 + self.A2)
+        i1 = (1 - spk) * i1 + (spk) * (self.R1 * i1 + self.A1.to(x.device, non_blocking=True))
+        i2 = (1 - spk) * i2 + (spk) * (self.R2 * i2 + self.A2.to(x.device, non_blocking=True))
         Thr = (1 - spk) * Thr + (spk) * torch.max(Thr, torch.tensor(self.Tr))
         V = (1 - spk) * V + (spk) * self.Vr
 
