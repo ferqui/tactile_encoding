@@ -1,5 +1,6 @@
 import numpy as np
 import pickle as pkl
+import progressbar
 
 import matplotlib.pyplot as plt
 import numpy.polynomial.polynomial as poly
@@ -228,17 +229,21 @@ def fix_time(max_trials=100, offset=1E-1, noise=1E-1, jitter=10, add_offset=Fals
     """
     # import neuron params
     from tactile_encoding.parameters.ideal_params import neuron_parameters, input_currents, time_points, runtime
-    # from tactile_encoding.utils.utils import check_cuda
+    from tactile_encoding.utils.utils import check_cuda
 
-    # device = check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=0.1)
+    # device = check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=None)
     max_time = max(runtime.values())  # get max run time (1000ms)
 
     classes = neuron_parameters.keys()
     encoded_data = []
     encoded_label = []
 
+    bar = progressbar.ProgressBar(maxval=len(classes)*max_trials,
+                              widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+    bar.start()
+    
     # create training dataset by iterating over neuron params and input currents
-    for _, class_name in enumerate(classes):
+    for counter_classes, class_name in enumerate(classes):
         # print(f'Working on {class_name}')
         # do some sanity checks
         if runtime[class_name] is None:
@@ -247,7 +252,8 @@ def fix_time(max_trials=100, offset=1E-1, noise=1E-1, jitter=10, add_offset=Fals
             print('No input current given.')
 
         # create max_trials trials per class
-        for _ in range(max_trials):
+        for counter_trials in range(max_trials):
+            bar.update(counter_classes*max_trials+counter_trials)
             # iterate over changes
             sim_time = runtime[class_name]
 
@@ -333,7 +339,7 @@ def fix_time(max_trials=100, offset=1E-1, noise=1E-1, jitter=10, add_offset=Fals
                     [input_current[x] + _noise[x] for x in range(len(input_current))])
 
             # convert input current to tensor
-            input = torch.as_tensor(input_current)  # .to(device)
+            input = torch.as_tensor(input_current)#.to(device)
 
             # set up MN neuron
             neurons = MN_neuron(
@@ -372,6 +378,8 @@ def fix_time(max_trials=100, offset=1E-1, noise=1E-1, jitter=10, add_offset=Fals
         pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
     with open(f"{filename_label}.pkl", 'wb') as handle:
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
+
+    bar.finish()
 
 
 def indices_of_sign_change(data):
