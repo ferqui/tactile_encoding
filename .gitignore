@@ -1,7 +1,9 @@
 __pycache__
 data/*
 plots/*
-results/*
+results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/experiments_history/*
+results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_attempts/*
+results/plots/*
 logs/*
 bkp/*
 runs
