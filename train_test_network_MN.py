@@ -342,7 +342,7 @@ class feedforward_layer:
         for t in range(nb_steps):
             mthr = mem-1.0
             out = spike_fn(mthr)
-            rst_out = out.detach()
+            rst_out = out #.detach()
 
             new_syn = alpha*syn + input_activity[:, t]
             new_mem = (beta*mem + syn)*(1.0-rst_out)
@@ -372,7 +372,7 @@ class feedforward_layer:
         for t in range(nb_steps):
             mthr = mem-1.0
             out = spike_fn(mthr)
-            rst_out = out.detach()
+            rst_out = out #.detach()
 
             new_syn = torch.abs(alpha)*syn + input_activity[:, t]
             new_mem = (torch.abs(beta)*mem + syn)*(1.0-rst_out)
@@ -422,7 +422,7 @@ class recurrent_layer:
                 torch.einsum("ab,bc->ac", (out, layer))
             mthr = mem-1.0
             out = spike_fn(mthr)
-            rst = out.detach()  # We do not want to backprop through the reset
+            rst = out #.detach()  # We do not want to backprop through the reset
 
             new_syn = alpha*syn + h1
             new_mem = (beta*mem + syn)*(1.0-rst)
@@ -455,7 +455,7 @@ class recurrent_layer:
                 torch.einsum("ab,bc->ac", (out, layer))
             mthr = mem-1.0
             out = spike_fn(mthr)
-            rst = out.detach()  # We do not want to backprop through the reset
+            rst = out #.detach()  # We do not want to backprop through the reset
 
             new_syn = torch.abs(alpha)*syn + h1
             new_mem = (torch.abs(beta)*mem + syn)*(1.0-rst)
