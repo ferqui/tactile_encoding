@@ -83,15 +83,15 @@ class MN_neuron_IT(nn.Module):
 
         self.EL = -0.07
         self.Vr = -0.07
-        self.R1 = 0
-        self.R2 = 1
+        self.R1 = 0.
+        self.R2 = 1.
         self.Tr = -0.06
         self.Tinf = -0.05
 
         # self.b = b  # units of 1/s
         # self.G = G * self.C  # units of 1/s
-        self.k1 = 200  # units of 1/s
-        self.k2 = 20  # units of 1/s
+        self.k1 = 200.  # units of 1/s
+        self.k2 = 20.  # units of 1/s
 
 
         # self.a = nn.Parameter(torch.tensor(a), requires_grad=True)
