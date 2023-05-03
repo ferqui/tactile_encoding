@@ -112,7 +112,7 @@ parser.add_argument('-store_weights',
 # Path of weights to perform test only (if do_training is False)
 parser.add_argument('-trained_layers_path',
                     type=str,
-                    default="./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr.pt",
+                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt", #"./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr.pt",
                     help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',
