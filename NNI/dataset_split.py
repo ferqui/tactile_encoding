@@ -212,10 +212,10 @@ def value2index(entry, dictionary):
 
 
 # Specify what kind of data to take into account
-original = False
+original = True
 fixed_length = not original
-noise = True
-jitter = True
+noise = False
+jitter = False
 
 # prepare data selection
 data_filepath = "../data/data_encoding"
@@ -236,7 +236,20 @@ encoded_data = pkl.load(infile)
 infile.close()
 
 if original:
-    encoded_label = input_currents.keys()
+    original_panels = []
+    for num_panel,el_panel in enumerate(encoded_data):
+        original_variables = []
+        for num_variable,el_variable in enumerate(el_panel):
+            original_signal = []
+            if num_variable < 2:
+                for num_signal,el_signal in enumerate(el_variable):
+                    original_signal.append([el_signal.item()])
+            else:
+                for num_signal,el_signal in enumerate(el_variable):
+                    original_signal.append(el_signal)
+            original_variables.append(original_signal)
+        original_panels.append(np.array(original_variables))
+    encoded_label = list(input_currents.keys())
 else:
     infile = open(label_filepath, "rb")
     encoded_label = pkl.load(infile)
@@ -270,4 +283,4 @@ train_validation_test_split(np.array(encoded_data)[:, 0], encoded_label,
                             save_tensor=True,
                             labels_mapping=labels_MNpaper, 
                             save_name=name.replace(" ","_"),
-                            save_path="./dataset_splits/{}/".format(name.replace(" ","_")))
+                            save_path="../dataset_splits/{}/".format(name.replace(" ","_")))

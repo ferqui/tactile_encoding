@@ -17,11 +17,11 @@ Genova, Italy.
 from utils.functions import original, fix_time_only, fix_time
 
 if __name__ == '__main__':
-    # ################
-    # ### original ###
-    # ################
-    # print('\nCreating original data.')
-    # original()
+    ################
+    ### original ###
+    ################
+    print('\nCreating original data.')
+    original()
 
     # # single
     # print('\nCreating original data with offset.')
@@ -79,16 +79,16 @@ if __name__ == '__main__':
 
     # print('\nFinished with data creation.')
 
-    ###################
-    # Parameter sweep #
-    ###################
+    # ###################
+    # # Parameter sweep #
+    # ###################
 
-    noise_levels = [0.0, 0.1, 0.2, 0.5, 1.0, 2, 5, 10]
-    offset_levels = [0.0, 0.1, 0.2, 0.5, 1.0, 2, 5, 10]
+    # noise_levels = [0.0, 0.1, 0.2, 0.5, 1.0, 2, 5, 10]
+    # offset_levels = [0.0, 0.1, 0.2, 0.5, 1.0, 2, 5, 10]
 
    
     
-    for offset_counter, offset in enumerate(offset_levels):
-        for noise_counter, noise in enumerate(noise_levels):
-            print(f"Working on {len(noise_levels)*offset_counter+noise_counter+1} of {len(noise_levels)*len(offset_levels)}")
-            fix_time(max_trials=100, offset=offset, noise=noise, jitter=10, add_offset=True, add_noise=True, add_jitter=True)
+    # for offset_counter, offset in enumerate(offset_levels):
+    #     for noise_counter, noise in enumerate(noise_levels):
+    #         print(f"Working on {len(noise_levels)*offset_counter+noise_counter+1} of {len(noise_levels)*len(offset_levels)}")
+    #         fix_time(max_trials=100, offset=offset, noise=noise, jitter=10, add_offset=True, add_noise=True, add_jitter=True)

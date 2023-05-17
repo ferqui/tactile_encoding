@@ -82,7 +82,7 @@ parser.add_argument('-n_test',
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
-                    default=100,
+                    default=300,
                     help='Number of training epochs.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
@@ -184,10 +184,10 @@ Genova, Italy.
 """
  
 # Specify what kind of data to use
-original = False
+original = True
 fixed_length = not original
-noise = True
-jitter = True
+noise = False
+jitter = False
 
 # Prepare data selection
 name = ""
