@@ -1,9 +1,15 @@
 """
 This script allows to train and test a network for
 spiking activity classification (with the parameters 
-found from NNI optimization) according to the MN paper.
+found from NNI optimization) of the original data in
+the MN paper in an extended version with 100 copies
+of each reported neural response.
 The NNI parameters are also saved to be re-used
 independently of the NNI results database.
+
+NOTE that there is no need for random selection of
+train-validation splits due to the use of identical
+copies of each class (i.e. neural response) of data.
 
 Settings to be accounted for:
     experiment_name
@@ -32,6 +38,7 @@ import logging
 import argparse
 import numpy as np
 import pandas as pd
+import pickle as pkl
 import json
 import random
 
@@ -82,7 +89,7 @@ parser.add_argument('-n_test',
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
-                    default=100,
+                    default=300,
                     help='Number of training epochs.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
@@ -112,7 +119,7 @@ parser.add_argument('-store_weights',
 # Path of weights to perform test only (if do_training is False)
 parser.add_argument('-trained_layers_path',
                     type=str,
-                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt", #"./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr.pt",
+                    default="./results/layers/optimized/spike_classifier/original_extended/vpeqjlkr_ref.pt",
                     help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',
@@ -181,13 +188,18 @@ Muller-Cleve, Simon F.,
 Istituto Italiano di Tecnologia - IIT,
 Event-driven perception in robotics - EDPR,
 Genova, Italy.
+
+Fra, Vittorio,
+Politecnico di Torino,
+EDA Group,
+Torino, Italy.
 """
  
 # Specify what kind of data to use
-original = False
+original = True
 fixed_length = not original
-noise = True
-jitter = True
+noise = False
+jitter = False
 
 # Prepare data selection
 name = ""
@@ -226,7 +238,7 @@ labels_mapping = {
 
 ### 3) log file configuration ##################################################
 
-log_path = "./logs/optimized/{}/{}".format(experiment_name,name)
+log_path = "./logs/optimized/{}/{}_extended".format(experiment_name,name)
 create_directory(log_path)
 logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
                     filemode='a',
@@ -269,34 +281,49 @@ device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 
 ### 5) data and parameters paths to be used ####################################
 
-# Load the test subset (always the same)
-ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
-
-nb_steps = len(next(iter(ds_test))[0])
+# Load data and labels
+# Training
+with open("./dataset_splits/{}_extended/{}_extended_ds_train.pkl".format(name,name), 'rb') as handle:
+    data_train = pkl.load(handle)
+with open("./dataset_splits/{}_extended/{}_extended_ds_train_label.pkl".format(name,name), 'rb') as handle:
+    labels_train = pkl.load(handle)
+train_set = []
+for num,el in enumerate(data_train):
+    train_set.append([el[0], [labels_train[num]]])
+# Validation
+with open("./dataset_splits/{}_extended/{}_extended_ds_val.pkl".format(name,name), 'rb') as handle:
+    data_val = pkl.load(handle)
+with open("./dataset_splits/{}_extended/{}_extended_ds_val_label.pkl".format(name,name), 'rb') as handle:
+    labels_val = pkl.load(handle)
+val_set = []
+for num,el in enumerate(data_val):
+    val_set.append([el[0], [labels_val[num]]])
+# Test
+with open("./dataset_splits/{}_extended/{}_extended_ds_test.pkl".format(name,name), 'rb') as handle:
+    data_test = pkl.load(handle)
+with open("./dataset_splits/{}_extended/{}_extended_ds_test_label.pkl".format(name,name), 'rb') as handle:
+    labels_test = pkl.load(handle)
+test_set = []
+for num,el in enumerate(data_test):
+    test_set.append([el[0], [labels_test[num]]])
 
 if do_training:
 
-    if not training_statistics:
-        # Select random training and validation set
-        rnd_idx = np.random.randint(0, 10) # 3
-        LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
-        ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-        ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
-
     # Get the optimized parameters
-    parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
+    #parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
+    parameters_path = './parameters/optimized/spike_classifier/fix_len_noisy_temp_jitter/parameters.json'
     with open(parameters_path, 'r') as fp:
         params = json.load(fp)
 
     # Store the optimized parameters
-    parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
+    parameters_path = './parameters/optimized/{}/{}_extended'.format(experiment_name,name)
     create_directory(parameters_path)
     with open(parameters_path+"/parameters.json", 'w') as fp:
         json.dump(params, fp)
 
 else:
 
-    parameters_path = './parameters/optimized/{}/{}/parameters.json'.format(experiment_name,name)
+    parameters_path = './parameters/optimized/{}/{}_extended/parameters.json'.format(experiment_name,name)
     with open(parameters_path, 'r') as fp:
         params = json.load(fp)
 
@@ -418,7 +445,7 @@ class recurrent_layer:
         # Compute recurrent layer activity
         for t in range(nb_steps):
             # input activity plus last step output activity
-            h1 = input_activity[:, t] + \
+            h1 = input_activity[t] + \
                 torch.einsum("ab,bc->ac", (out, layer))
             mthr = mem-1.0
             out = spike_fn(mthr)
@@ -512,26 +539,26 @@ class SurrGradSpike(torch.autograd.Function):
 spike_fn = SurrGradSpike.apply
 
 
-def train_validate_test(params, name, ds_train, ds_val, ds_test):
+def train_validate_test(params, name, train_set, val_set, test_set):
 
     # Set the number of epochs
     eps = nb_epochs
 
-    LOG.debug("{} data used.\n".format(name))
+    LOG.debug("{}_extended data used.\n".format(name))
 
     # Train the network with validation
-    loss_hist, acc_hist, best_layers = build_and_train(params, ds_train, ds_val, epochs=eps)
+    loss_hist, acc_hist, best_layers = build_and_train(params, train_set, val_set, epochs=eps)
     LOG.debug("Best validation accuracy: {}%".format(np.round(np.max(acc_hist[1])*100,4)))
     LOG.debug("Best training accuracy: {}%".format(np.round(np.max(acc_hist[0])*100,4)))
 
     # Test the network (on never seen data) with weights from best validation
-    test_acc, _ = compute_classification_accuracy(params, ds_test, best_layers)
+    test_acc, _ = compute_classification_accuracy(params, test_set, best_layers)
     LOG.debug("Test accuracy from best validation: {}%\n".format(np.round(test_acc*100, 4)))
     
     return loss_hist, acc_hist, test_acc, best_layers
 
 
-def build_and_train(params, ds_train, ds_val, epochs=300):
+def build_and_train(params, train_set, val_set, epochs=300):
 
     # Network parameters
     nb_inputs = 1
@@ -559,7 +586,7 @@ def build_and_train(params, ds_train, ds_val, epochs=300):
     opt_parameters = [w1, w2, v1]
 
     loss_hist, accs_hist, best_layers = train_net(
-        ds_train, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_val=ds_val)
+        train_set, lr=lr, nb_epochs=epochs, opt_parameters=opt_parameters, layers=layers, dataset_val=val_set)
 
     # best training and validation (test) at best training
     acc_best_train = np.max(accs_hist[0])  # returns max value
@@ -608,9 +635,9 @@ def train_net(
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
-    batch_size = params["batch_size"] # 128
+    batch_size = 1 #params["batch_size"] # 128
 
-    generator = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    #generator = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
     # The optimization loop
     loss_hist = [[], []]
@@ -625,9 +652,9 @@ def train_net(
 
         # accs: mean training accuracies for each batch
         accs = []
-        for x_local, y_local in generator:
-            x_local, y_local = x_local.to(
-                device, non_blocking=True), y_local.to(device, non_blocking=True)
+        for x_local, y_local in dataset:
+            x_local, y_local = torch.as_tensor(np.array(x_local), dtype=torch.float).to(
+                device, non_blocking=True), torch.as_tensor(np.array(y_local), dtype=torch.long).to(device, non_blocking=True)
             spks_out, recs, layers_update = run_snn(x_local, layers)
             # [mem_rec, spk_rec, out_rec]
             _, spk_rec, _ = recs
@@ -710,10 +737,11 @@ def run_snn(
     nb_outputs = 20  # number of spiking behaviours from MN paper
     nb_hidden = int(params["nb_hidden"])
 
-    bs = inputs.shape[0]
+    bs = 1 #inputs.shape[0]
+    nb_steps = inputs.shape[0]
 
     h1 = torch.einsum(
-        "abc,cd->abd", (inputs.tile((nb_input_copies,)), w1))
+        "ab,bc->ac", (inputs.tile((nb_input_copies,)), w1)) #"abc,cd->abd"
     spk_rec, mem_rec = recurrent_layer.compute_activity(
         bs, nb_hidden, h1, v1, nb_steps)
 
@@ -730,7 +758,7 @@ def run_snn(
 
 def build_and_test(
     params,
-    ds_test,
+    test_set,
     trained_path,
     device=device,
     N=10,
@@ -743,7 +771,7 @@ def build_and_test(
 
     for ii in range(N):
 
-        test_acc, _, _ = compute_classification_accuracy(params, ds_test, layers=layers, label_probabilities=True, shuffle=True, use_seed=False)
+        test_acc, _, _ = compute_classification_accuracy(params, test_set, layers=layers, label_probabilities=True, shuffle=True, use_seed=False)
         
         test_N.append(test_acc)
         LOG.debug("Test {}/{}: {}%".format(ii+1,N,np.round(test_acc*100,4)))
@@ -756,26 +784,27 @@ def build_and_test(
     
     # N single-sample inferences to check label probbailities
     for ii in range(N):
-        single_sample = next(iter(DataLoader(ds_test, batch_size=1, shuffle=True, num_workers=0)))
-        _, _, lbl_probs = compute_classification_accuracy(params, TensorDataset(single_sample[0],single_sample[1]), layers, label_probabilities=True)
+        rnd_idx = np.random.randint(0, len(test_set))
+        single_sample = test_set[rnd_idx]
+        _, _, lbl_probs = compute_classification_accuracy(params, single_sample, layers, label_probabilities=True)
         LOG.debug("Single-sample inference {}/{} from test set:".format(ii+1,N))
         LOG.debug("Sample: {} \tPrediction: {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]]))
         LOG.debug("Label probabilities (%): {}".format(np.round(np.array(lbl_probs.detach().cpu().numpy())*100,2)))
 
     LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
     
-    ConfusionMatrix(params, ds_test, save_fig, layers=layers, labels=list(labels_mapping.keys()), use_seed=False)
+    ConfusionMatrix(params, test_set, save_fig, layers=layers, labels=list(labels_mapping.keys()), use_seed=False)
 
 
 def compute_classification_accuracy(params, dataset, layers=None, label_probabilities=False, shuffle=False, use_seed=use_seed):
     """ Computes classification accuracy on supplied data in batches. """
 
-    if use_seed:
-        g = torch.Generator()
-        g.manual_seed(seed)
-        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=shuffle, num_workers=0, generator=g)
-    else:
-        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=shuffle, num_workers=0)
+    # if use_seed:
+    #     g = torch.Generator()
+    #     g.manual_seed(seed)
+    #     generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=shuffle, num_workers=0, generator=g)
+    # else:
+    #     generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=shuffle, num_workers=0)
 
     accs = []
     losss = []
@@ -783,8 +812,8 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
     log_softmax_fn = nn.LogSoftmax(dim=1)
     loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
 
-    for x_local, y_local in generator:
-        x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
+    for x_local, y_local in dataset:
+        x_local, y_local = torch.as_tensor(np.array(x_local), dtype=torch.float).to(device, non_blocking=True), torch.as_tensor(np.array(y_local), dtype=torch.long).to(device, non_blocking=True)
         if layers == None:
             layers = [w1, w2, v1]
             spks_out, _, _ = run_snn(inputs=x_local, layers=layers)
@@ -809,20 +838,20 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
 
 def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None, use_seed=use_seed):
         
-    if use_seed:
-        g = torch.Generator()
-        g.manual_seed(seed)
-        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True,
-                            num_workers=0, generator=g)
-    else:
-        generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True, num_workers=0)
+    # if use_seed:
+    #     g = torch.Generator()
+    #     g.manual_seed(seed)
+    #     generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True,
+    #                         num_workers=0, generator=g)
+    # else:
+    #     generator = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True, num_workers=0)
         
     accs = []
     trues = []
     preds = []
-    for x_local, y_local in generator:
-        x_local, y_local = x_local.to(
-            device, non_blocking=True), y_local.to(device, non_blocking=True)
+    for x_local, y_local in dataset:
+        x_local, y_local = torch.as_tensor(np.array(x_local), dtype=torch.float).to(
+            device, non_blocking=True), torch.as_tensor(np.array(y_local), dtype=torch.long).to(device, non_blocking=True)
         if layers == None:
             layers = [w1, w2, v1]
             spks_out, _, _ = run_snn(inputs=x_local, layers=layers)
@@ -853,7 +882,7 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
     plt.ylabel('True\n')
     plt.xticks(rotation=0)
     if save:
-        path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
+        path_for_plots = "./results/plots/optimized/{}/{}_extended".format(experiment_name,name)
         create_directory(path_for_plots)
         #path_to_save_fig = f'{path_for_plots}/generation_{generation+1}_individual_{best_individual+1}'
         path_to_save_fig = f'{path_for_plots}/cm_{experiment_id}_{best_test_id}'
@@ -884,7 +913,7 @@ if do_training:
 
     # Path for plots from training and validation
     if save_fig:
-        path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
+        path_for_plots = "./results/plots/optimized/{}/{}_extended".format(experiment_name,name)
         create_directory(path_for_plots)
 
     if training_statistics:
@@ -905,15 +934,14 @@ if do_training:
         LOG.debug("### Training statistics with {} repetitions started ({}). ###\n".format(repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
         
         for rpt in range(repetitions):
-            # Reload data for each repetition
-            # Select random training and validation set
-            rnd_idx = np.random.randint(0, 10) # 3
-            LOG.debug("Repetition {}/{}: started ({}) with split number {}.\n".format(rpt+1,repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),rnd_idx))
-            ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-            ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+            # # Reload data for each repetition
+            # rnd_idx = np.random.randint(0, 10)
+            LOG.debug("Repetition {}/{} started ({}).\n".format(rpt+1,repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+            # ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+            # ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
             # Train the network with validation and test
-            loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
+            loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, train_set, val_set, test_set)
 
             # Save layers providing the best test accuracy
             if rpt == 0:
@@ -1003,7 +1031,7 @@ if do_training:
 
         # Train the network with validation and test
         print("*** training with validation started ***")
-        loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
+        loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, train_set, val_set, test_set)
         print("*** training with validation done ***")
 
         # Make plots from training and validation
@@ -1043,7 +1071,7 @@ if do_training:
             print("*** loss plot saved ***")
         
     # Save (to re-load) trained weights 
-    path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
+    path = './results/layers/optimized/{}/{}_extended'.format(experiment_name,name)
     create_directory(path)
     save_layers_path = path + "/{}.pt".format(experiment_id)
     torch.save(best_layers, save_layers_path)
@@ -1051,7 +1079,7 @@ if do_training:
 
     # Save (to store) trained weights
     if store_weights:
-        path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
+        path = './results/layers/optimized/{}/{}_extended'.format(experiment_name,name)
         create_directory(path)
         save_layers_path = path + "/{}_{}.pt".format(experiment_id,experiment_datetime)
         torch.save(best_layers, save_layers_path)
@@ -1060,7 +1088,7 @@ if do_training:
 
 # Test the network with statistics
 print("*** test statistics started ***")
-build_and_test(params, ds_test, trained_layers_path, N=n_test)
+build_and_test(params, test_set, trained_layers_path, N=n_test)
 print("*** test statistics done ***")
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
