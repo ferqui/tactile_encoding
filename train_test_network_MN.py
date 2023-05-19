@@ -743,7 +743,7 @@ def build_and_test(
 
     for ii in range(N):
 
-        test_acc, _, _ = compute_classification_accuracy(params, ds_test, layers=layers, label_probabilities=True, shuffle=True, use_seed=False)
+        test_acc, _ = compute_classification_accuracy(params, ds_test, layers=layers, shuffle=True, use_seed=False)
         
         test_N.append(test_acc)
         LOG.debug("Test {}/{}: {}%".format(ii+1,N,np.round(test_acc*100,4)))
@@ -801,10 +801,10 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
         tmp = np.mean((y_local == am).detach().cpu().numpy())
         accs.append(tmp)
 
-        if label_probabilities:
-            return np.mean(accs), np.mean(losss), torch.exp(log_p_y)
-        else:
-            return np.mean(accs), np.mean(losss)
+    if label_probabilities:
+        return np.mean(accs), np.mean(losss), torch.exp(log_p_y)
+    else:
+        return np.mean(accs), np.mean(losss)
 
 
 def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None, use_seed=use_seed):

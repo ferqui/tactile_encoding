@@ -84,7 +84,7 @@ parser.add_argument('-repetitions',
 # Number or tests for statistics
 parser.add_argument('-n_test',
                     type=int,
-                    default=50,
+                    default=10,
                     help='Number of tests to be performed for statistical evaluation.')
 # Number of epochs
 parser.add_argument('-nb_epochs',
@@ -281,7 +281,9 @@ device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 
 ### 5) data and parameters paths to be used ####################################
 
-# Load data and labels
+# Load data and labels and shuffle them with fixed seed
+random.seed(9)
+
 # Training
 with open("./dataset_splits/{}_extended/{}_extended_ds_train.pkl".format(name,name), 'rb') as handle:
     data_train = pkl.load(handle)
@@ -290,6 +292,7 @@ with open("./dataset_splits/{}_extended/{}_extended_ds_train_label.pkl".format(n
 train_set = []
 for num,el in enumerate(data_train):
     train_set.append([el[0], [labels_train[num]]])
+random.shuffle(train_set)
 # Validation
 with open("./dataset_splits/{}_extended/{}_extended_ds_val.pkl".format(name,name), 'rb') as handle:
     data_val = pkl.load(handle)
@@ -298,6 +301,7 @@ with open("./dataset_splits/{}_extended/{}_extended_ds_val_label.pkl".format(nam
 val_set = []
 for num,el in enumerate(data_val):
     val_set.append([el[0], [labels_val[num]]])
+random.shuffle(val_set)
 # Test
 with open("./dataset_splits/{}_extended/{}_extended_ds_test.pkl".format(name,name), 'rb') as handle:
     data_test = pkl.load(handle)
@@ -306,6 +310,13 @@ with open("./dataset_splits/{}_extended/{}_extended_ds_test_label.pkl".format(na
 test_set = []
 for num,el in enumerate(data_test):
     test_set.append([el[0], [labels_test[num]]])
+random.shuffle(test_set)
+
+# "re-initialize" seed
+if use_seed:
+    random.seed(seed)
+else:
+    random.seed()
 
 if do_training:
 
@@ -684,6 +695,7 @@ def train_net(
             tmp = np.mean((y_local == am).detach().cpu().numpy())
             accs.append(tmp)
 
+        # mean_loss: mean training loss of current epoch (average over all batches)
         mean_loss = np.mean(local_loss)
         loss_hist[0].append(mean_loss)
 
@@ -771,7 +783,7 @@ def build_and_test(
 
     for ii in range(N):
 
-        test_acc, _, _ = compute_classification_accuracy(params, test_set, layers=layers, label_probabilities=True, shuffle=True, use_seed=False)
+        test_acc, _ = compute_classification_accuracy(params, test_set, layers=layers, shuffle=True, use_seed=False)
         
         test_N.append(test_acc)
         LOG.debug("Test {}/{}: {}%".format(ii+1,N,np.round(test_acc*100,4)))
@@ -785,10 +797,11 @@ def build_and_test(
     # N single-sample inferences to check label probbailities
     for ii in range(N):
         rnd_idx = np.random.randint(0, len(test_set))
-        single_sample = test_set[rnd_idx]
+        single_sample = [test_set[rnd_idx]]
+        sample_lbl = single_sample[0][1][0]
         _, _, lbl_probs = compute_classification_accuracy(params, single_sample, layers, label_probabilities=True)
         LOG.debug("Single-sample inference {}/{} from test set:".format(ii+1,N))
-        LOG.debug("Sample: {} \tPrediction: {}".format(list(labels_mapping.keys())[single_sample[1]],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]]))
+        LOG.debug("Sample: {} \tPrediction: {}".format(list(labels_mapping.keys())[sample_lbl],list(labels_mapping.keys())[torch.max(lbl_probs.cpu(),1)[1]]))
         LOG.debug("Label probabilities (%): {}".format(np.round(np.array(lbl_probs.detach().cpu().numpy())*100,2)))
 
     LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
@@ -830,10 +843,10 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
         tmp = np.mean((y_local == am).detach().cpu().numpy())
         accs.append(tmp)
 
-        if label_probabilities:
-            return np.mean(accs), np.mean(losss), torch.exp(log_p_y)
-        else:
-            return np.mean(accs), np.mean(losss)
+    if label_probabilities:
+        return np.mean(accs), np.mean(losss), torch.exp(log_p_y)
+    else:
+        return np.mean(accs), np.mean(losss)
 
 
 def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None, use_seed=use_seed):
