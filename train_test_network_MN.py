@@ -122,7 +122,7 @@ parser.add_argument('-gpu_mem_frac',
 # Set seed usage
 parser.add_argument('-use_seed',
                     type=bool,
-                    default=True,
+                    default=False,
                     help='Set if a seed is to be used or not.')
 
 args = parser.parse_args()
@@ -1058,10 +1058,18 @@ if do_training:
         print("*** weights stored ***")
         trained_layers_path = save_layers_path
 
-# Test the network with statistics
-print("*** test statistics started ***")
-build_and_test(params, ds_test, trained_layers_path, N=n_test)
-print("*** test statistics done ***")
+    # Test the network with statistics
+    print("*** test statistics (after training) started ***")
+    build_and_test(params, ds_test, save_layers_path, N=n_test)
+    print("*** test statistics (after training) done ***")
+
+else:
+
+    # Test the network with statistics
+    print("*** test statistics started ***")
+    build_and_test(params, ds_test, trained_layers_path, N=n_test)
+    print("*** test statistics done ***")
+
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(

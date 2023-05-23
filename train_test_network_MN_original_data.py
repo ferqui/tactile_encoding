@@ -52,7 +52,7 @@ from sklearn.metrics import confusion_matrix
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+#from torch.utils.data import DataLoader, TensorDataset
 
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, retrieve_nni_results, load_layers
 
@@ -89,7 +89,7 @@ parser.add_argument('-n_test',
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
-                    default=300,
+                    default=100,
                     help='Number of training epochs.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
@@ -129,7 +129,7 @@ parser.add_argument('-gpu_mem_frac',
 # Set seed usage
 parser.add_argument('-use_seed',
                     type=bool,
-                    default=True,
+                    default=False,
                     help='Set if a seed is to be used or not.')
 
 args = parser.parse_args()
@@ -1099,10 +1099,17 @@ if do_training:
         print("*** weights stored ***")
         trained_layers_path = save_layers_path
 
-# Test the network with statistics
-print("*** test statistics started ***")
-build_and_test(params, test_set, trained_layers_path, N=n_test)
-print("*** test statistics done ***")
+    # Test the network with statistics
+    print("*** test statistics started ***")
+    build_and_test(params, test_set, save_layers_path, N=n_test)
+    print("*** test statistics done ***")
+
+else:
+
+    # Test the network with statistics
+    print("*** test statistics started ***")
+    build_and_test(params, test_set, trained_layers_path, N=n_test)
+    print("*** test statistics done ***")
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
