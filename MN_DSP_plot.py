@@ -17,7 +17,8 @@ MNclasses = {
     'P2Q': {'a':5,'A1':5,'A2': -0.3},
     'R': {'a':0,'A1':8,'A2': -0.1},
     'S': {'a':5,'A1':-3,'A2': 0.5},
-    'T': {'a':-80,'A1':0,'A2': 0}
+    'T': {'a':-80,'A1':0,'A2': 0},
+    
 }
 # df['class'] = ''
 # df['sweep'] = ''
@@ -102,7 +103,7 @@ import os
 # folder = 'experiments/results/15May2023_15-32-16/histogram_IT'
 # folder = 'experiments/results/15May2023_15-40-18/histogram_isi_IT'
 # folder = 'experiments/results/15May2023_17-34-41/count_hist'
-folder_high = 'experiments/results/16May2023_19-37-21'
+folder_high = 'experiments/results/31May2023_09-56-01'
 sweeps = ['ampli_neg']#,'freqs','slopes']
 window_width = 1
 avg_width = 10
