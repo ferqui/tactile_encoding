@@ -450,14 +450,17 @@ class ALIF_neuron(nn.Module):
         self.state = self.ALIFstate(syn=torch.zeros_like(input, device=input.device),
                                     mem=torch.zeros_like(input, device=input.device),
                                     S=torch.zeros_like(input, device=input.device),
-                                    b=self.b_0 * torch.ones_like(input, device=input.device))
+                                    b= torch.zeros_like(input, device=input.device))
 
     def reset(self):
         self.state = None
 
     def forward(self, input):
         # Input = analog current
-        h1 = torch.mm(input, self.weight)
+        # print(input.shape)
+        # print(self.weight.shape)
+        # print(torch.type(input))
+        h1 = torch.mm(input, self.weight.double())
 
         if self.state is None:
             self.initialize(h1)
@@ -469,7 +472,10 @@ class ALIF_neuron(nn.Module):
         if self.is_recurrent:
             h1 += torch.mm(S, self.weight_rec)
 
-        b = self.ro * self.state.b + (1 - self.ro) * self.state.S  # decaying factor
+        # b = self.ro * self.state.b + (1 - self.ro) * S  # decaying factor
+        self.b_dec = self.ro * self.state.b
+        self.b_update = (1 - self.ro) * S
+        b = self.b_dec + self.b_update
         self.thr = self.b_0 + self.beta_adapt * b  # updating threshold (increases with spike, else it decays exp)
 
         if self.analog_input:
