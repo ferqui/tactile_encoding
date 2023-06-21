@@ -405,59 +405,97 @@ class LIF_neuron(nn.Module):
         return out
 
 
-class ALIF_neuron(nn.Module):
-    ALIFstate = namedtuple('ALIFstate', ['syn', 'V', 'spk', 'b'])
+# class ALIF_neuron(nn.Module):
+#     ALIFstate = namedtuple('ALIFstate', ['V', 'spk'])
+#
+#     def __init__(self, nb_inputs, beta = 1, is_recurrent=False, fwd_weight_scale=1.0,
+#                  rec_weight_scale=1.0, b_0=1, dt=1, tau_adp=None, beta_adapt=1.8,
+#                  analog_input=True,alpha = 1,nb_outputs=1):
+#         super(ALIF_neuron, self).__init__()
+#
+#         self.N = nb_inputs
+#         self.dt = dt
+#         self.b_0 = b_0
+#         self.beta_adapt = beta_adapt
+#         self.tau_adp = tau_adp
+#         self.alpha = alpha
+#         self.beta = beta
+#         self.state = None
+#         self.analog_input = analog_input
+#         self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=False)
+#
+#         # if self.analog_input == False:
+#         #     self.weight = torch.nn.Parameter(torch.empty((nb_inputs, nb_outputs)), requires_grad=True)
+#         #     torch.nn.init.normal_(self.weight, mean=0.0, std=fwd_weight_scale / np.sqrt(nb_inputs))
+#         # if is_recurrent:
+#         #     self.weight_rec = torch.nn.Parameter(torch.empty((nb_outputs, nb_outputs)), requires_grad=True)
+#         #     torch.nn.init.normal_(self.weight_rec, mean=0.0, std=rec_weight_scale / np.sqrt(nb_inputs))
+#         #
+#
+#
+#
+#
+#     def reset(self):
+#         self.state = None
+#
+#     def forward(self, input):
+#         if self.state is None:
+#             self.state = self.ALIFstate(V=torch.zeros(input.shape[0],self.N, device=input.device),
+#                                         spk=torch.zeros(input.shape[0],self.N, device=input.device))
+#         # V = self.state.V
+#         # S =
+#         # ro = 1#torch.exp(-self.dt / self.tau_adp)*1.
+#         # b_dec = ro * self.state.b
+#         # b_update = (1 - ro) * self.state.spk
+#         # b = b_dec + b_update
+#         # thr = self.b_0 #+ self.beta_adapt * b  # updating threshold (increases with spike, else it decays exp)
+#         V = self.state.V
+#         new_mem = self.beta * V + self.linear * input
+#         mthr = new_mem - 1# thr
+#         spk = activation(mthr)
+#         new_mem = (1 - spk) * new_mem
+#         self.state = self.ALIFstate(V=new_mem,
+#                                     spk=spk)
+#         return spk
 
-    def __init__(self, nb_inputs, device, beta = 1, is_recurrent=False, fwd_weight_scale=1.0,
-                 rec_weight_scale=1.0, b_0=1, dt=1, tau_adp=None, beta_adapt=1.8,
-                 analog_input=True,alpha = 1,nb_outputs=1):
+class ALIF_neuron(nn.Module):
+    NeuronState = namedtuple('NeuronState', ['V', 'spk','b'])
+
+    def __init__(self, nb_inputs, dt=1 / 1000, beta_alif=1,b_0=1,beta_adapt=1,tau_adp=1, train=True):  # default combination: M2O of the original paper
         super(ALIF_neuron, self).__init__()
 
-        self.dt = dt
-        self.is_recurrent = is_recurrent
+        # One-to-one synapse
+        self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=False)
+
+
+        self.N = nb_inputs
+        self.beta_alif = beta_alif
         self.b_0 = b_0
         self.beta_adapt = beta_adapt
         self.tau_adp = tau_adp
-        self.alpha = alpha
-        self.beta = beta
+        self.dt = dt  # get dt from sample rate!
         self.state = None
-        self.analog_input = analog_input
-        self.device = device
 
-        # if self.analog_input == False:
-        #     self.weight = torch.nn.Parameter(torch.empty((nb_inputs, nb_outputs)), requires_grad=True)
-        #     torch.nn.init.normal_(self.weight, mean=0.0, std=fwd_weight_scale / np.sqrt(nb_inputs))
-        # if is_recurrent:
-        #     self.weight_rec = torch.nn.Parameter(torch.empty((nb_outputs, nb_outputs)), requires_grad=True)
-        #     torch.nn.init.normal_(self.weight_rec, mean=0.0, std=rec_weight_scale / np.sqrt(nb_inputs))
-        #
+    def forward(self, x):
+        if self.state is None:
+            self.state = self.NeuronState(V=torch.ones(x.shape[0], self.N, device=x.device),
+                                          spk=torch.zeros(x.shape[0], self.N, device=x.device),
+                                          b=torch.zeros(x.shape[0], self.N, device=x.device))
+        V = self.state.V
+        b = self.state.b
+        spk = self.state.spk
+        ro = torch.exp(-self.dt / self.tau_adp)
+        b_dec = ro * b
+        b_update = (1-ro)*spk
+        b = b_dec + b_update
+        thr = self.b_0 + self.beta_adapt * b
+        V += self.dt * (self.linear * x - self.beta_alif * (V-0))
+        spk = activation(V - thr)
+        V = (1 - spk) * V + (spk) * 0
 
+        self.state = self.NeuronState(V=V,spk=spk,b=b)
 
-    def initialize(self, input):
-        self.state = self.ALIFstate(syn=torch.zeros_like(input, device=input.device),
-                                    V=torch.zeros_like(input, device=input.device),
-                                    spk=torch.zeros_like(input, device=input.device),
-                                    b= torch.zeros_like(input, device=input.device))
+        return spk
 
     def reset(self):
         self.state = None
-
-    def forward(self, input):
-        if self.state is None:
-            self.initialize(input)
-        # V = self.state.V
-        # S =
-        ro = torch.exp(-1. * self.dt / self.tau_adp)
-        # b_dec = ro * self.state.b
-        # b_update = (1 - ro) * self.state.spk
-        b = ro * self.state.b + (1 - ro) * self.state.spk
-        thr = self.b_0 + self.beta_adapt * b  # updating threshold (increases with spike, else it decays exp)
-        new_mem = self.beta * self.state.V + input
-        mthr = new_mem - thr
-        spk = activation(mthr)
-        rst = spk.detach()
-        self.state = self.ALIFstate(syn=None,
-                                    V=new_mem * (1 - rst),
-                                    spk=spk,
-                                    b=b)
-        return spk

@@ -45,12 +45,11 @@ MN_dict_param = {
 }
 
 ALIF_dict_param = {
-    "alpha": {"ini": 1, "train": False, "custom_lr": None},
-    "beta_alif": {"ini": 1, "train": True, "custom_lr": None},
-    "b_0": {"ini": 0.1, "train": True, "custom_lr": None},
-    "tau_adp": {"ini": 1, "train": True, "custom_lr": None},
-    "beta_adapt": {"ini": 1.8, "train": True, "custom_lr": None},
-}
+    "beta_alif": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "tau_adp": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "b_0": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "beta_adapt": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    }
 
 
 def main(args):
@@ -128,18 +127,15 @@ def main(args):
             )
     for param in dict_param:
         dict_param[param]["param"].to(device)
-    # torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(True)
     if args.ALIF == True:
         l0 = ALIF_neuron(
                  nb_inputs=nb_inputs,
-                 beta = dict_param["beta_alif"]["param"],
-                 is_recurrent=False,
+                 beta_alif = dict_param["beta_alif"]["param"],
                  b_0=dict_param["b_0"]["param"],
                  dt=dt,
                  tau_adp=dict_param["tau_adp"]["param"],
-                 beta_adapt=dict_param["beta_adapt"]["param"],
-                 analog_input=True,
-                 device = device)
+                 beta_adapt=dict_param["beta_adapt"]["param"])
     else:
         l0 = MN_neuron_sp(
                 nb_inputs,
@@ -252,8 +248,8 @@ def main(args):
             # Reset all the layers in the network
             for layer in network:
                 if hasattr(layer.__class__, "reset"):
-                    layer.reset()
 
+                    layer.reset()
             # Simulate the network
             # we are going to record the hidden layer
             # spikes for regularization purposes
@@ -288,7 +284,8 @@ def main(args):
             lif1_mem = torch.stack(lif1_mem, dim=1)
             lif2_spk = torch.stack(lif2_spk, dim=1)
             lif2_mem = torch.stack(lif2_mem, dim=1)
-            m = torch.sum(lif2_spk, 1)  # sum over time
+            m = torch.sum(lif2_spk,1)
+              # sum over time
             log_p_y = log_softmax_fn(m)
 
             # Here we can set up our regularizer loss
@@ -304,14 +301,19 @@ def main(args):
 
             optimizer.zero_grad()
             # loss_val.backward()
-            loss_val.backward(create_graph=True)  # backpropagation of original loss
+            loss_val.backward(create_graph=True)
+            # backpropagation of original loss
             loss_DB = args.gr * sum(
                 [
                     torch.abs(kv[1]["param"].grad).sum()
                     for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
                 ]
-            )  # computing GR term
-            loss_DB.backward(retain_graph=True)  # backpropagation of GR ter
+            )
+
+            # computing GR term
+            # torchviz.make_dot(loss_DB).render("attached", format="png")
+
+            loss_DB.backward()  # backpropagation of GR ter
             optimizer.step()
             local_loss.append(loss_val.item())
 
