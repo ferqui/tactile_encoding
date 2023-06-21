@@ -403,3 +403,86 @@ class LIF_neuron(nn.Module):
                                    S = out)
 
         return out
+
+
+class ALIF_neuron(nn.Module):
+    ALIFstate = namedtuple('ALIFstate', ['syn', 'V', 'spk', 'b'])
+
+    def __init__(self, nb_inputs, device, beta = 1, is_recurrent=False, fwd_weight_scale=1.0,
+                 rec_weight_scale=1.0, b_0=1, dt=1, tau_adp=None, beta_adapt=1.8,
+                 analog_input=True,alpha = 1,nb_outputs=1):
+        super(ALIF_neuron, self).__init__()
+
+        self.dt = dt
+        self.is_recurrent = is_recurrent
+        self.b_0 = b_0
+        self.beta_adapt = beta_adapt
+        self.tau_adp = tau_adp
+        self.alpha = alpha
+        self.beta = beta
+        self.ro = torch.exp(-1. * self.dt / self.tau_adp).to(torch.float).to(device)
+        self.state = None
+        self.analog_input = analog_input
+        self.new_mem = None
+        self.device = device
+
+        if self.analog_input == False:
+            self.weight = torch.nn.Parameter(torch.empty((nb_inputs, nb_outputs)), requires_grad=True)
+            torch.nn.init.normal_(self.weight, mean=0.0, std=fwd_weight_scale / np.sqrt(nb_inputs))
+        if is_recurrent:
+            self.weight_rec = torch.nn.Parameter(torch.empty((nb_outputs, nb_outputs)), requires_grad=True)
+            torch.nn.init.normal_(self.weight_rec, mean=0.0, std=rec_weight_scale / np.sqrt(nb_inputs))
+
+
+
+    def initialize(self, input):
+        self.state = self.ALIFstate(syn=torch.zeros_like(input, device=input.device),
+                                    V=torch.zeros_like(input, device=input.device),
+                                    spk=torch.zeros_like(input, device=input.device),
+                                    b= torch.zeros_like(input, device=input.device))
+
+    def reset(self):
+        self.state = None
+
+    def forward(self, input):
+        if self.analog_input == False:
+            h1 = torch.mm(input, self.weight.double())
+            if self.state is None:
+                self.initialize(h1)
+        else:
+            h1 = input
+            if self.state is None:
+                self.initialize(h1)
+
+        syn = self.state.syn
+        V = self.state.V
+        S = self.state.spk
+
+        if self.is_recurrent:
+            h1 += torch.mm(S, self.weight_rec)
+
+        # b = self.ro * self.state.b + (1 - self.ro) * S  # decaying factor
+        self.b_dec = self.ro * self.state.b
+        self.b_update = (1 - self.ro) * S
+        b = self.b_dec + self.b_update
+        self.thr = self.b_0 + self.beta_adapt * b  # updating threshold (increases with spike, else it decays exp)
+
+        if self.analog_input:
+            # Input current
+            new_syn = input
+        else:
+            # Input spikes
+            new_syn = self.alpha * syn + h1
+
+        self.new_mem = self.beta * V + new_syn
+
+        mthr = self.new_mem - self.thr
+        spk = activation(mthr)
+        rst = spk.detach()
+
+        self.state = self.ALIFstate(syn=new_syn,
+                                    V=self.new_mem * (1 - rst),
+                                    spk=spk,
+                                    b=b)
+
+        return spk

@@ -14,7 +14,7 @@ import numpy as np
 from datasets import load_data
 
 from parameters.MN_params import MNparams_dict, INIT_MODE
-from models import Encoder, LIF_neuron, MN_neuron_sp
+from models import Encoder, LIF_neuron, MN_neuron_sp, ALIF_neuron
 from auxiliary import compute_classification_accuracy, plot_spikes, plot_voltages
 
 from sklearn.model_selection import train_test_split
@@ -30,6 +30,26 @@ firing_mode_dict = {
     "FA": {"a": 5, "A1": 0, "A2": 0},
     "SA": {"a": 0, "A1": 0, "A2": 0},
     "MIX": {"a": 5, "A1": 5, "A2": -0.3},
+}
+
+MN_dict_param = {
+    "a": {"ini": 5, "train": True, "custom_lr": 5e-3},
+    "A1": {"ini": 0, "train": True, "custom_lr": 5e-3},
+    "A2": {"ini": 0, "train": True, "custom_lr": 5e-3},
+    "b": {"ini": 10, "train": True, "custom_lr": 5e-3},
+    "G": {"ini": 50, "train": True, "custom_lr": 5e-3},
+    "k1": {"ini": 200, "train": False, "custom_lr": None},
+    "k2": {"ini": 20, "train": False, "custom_lr": None},
+    "R1": {"ini": 0, "train": True, "custom_lr": 5e-3},
+    "R2": {"ini": 1, "train": True, "custom_lr": 5e-3},
+}
+
+ALIF_dict_param = {
+    "alpha": {"ini": 1, "train": False, "custom_lr": None},
+    "beta_alif": {"ini": 1, "train": True, "custom_lr": None},
+    "b_0": {"ini": 0.1, "train": True, "custom_lr": None},
+    "tau_adp": {"ini": 1, "train": True, "custom_lr": None},
+    "beta_adapt": {"ini": 1.8, "train": True, "custom_lr": None},
 }
 
 
@@ -84,18 +104,11 @@ def main(args):
     ##                Network                ##
     ###########################################
 
-    dict_param = {
-        "a": {"ini": 5, "train": True, "custom_lr": 5e-3},
-        "A1": {"ini": 0, "train": True, "custom_lr": 5e-3},
-        "A2": {"ini": 0, "train": True, "custom_lr": 5e-3},
-        "b": {"ini": 10, "train": True, "custom_lr": 5e-3},
-        "G": {"ini": 50, "train": True, "custom_lr": 5e-3},
-        "k1": {"ini": 200, "train": False, "custom_lr": None},
-        "k2": {"ini": 20, "train": False, "custom_lr": None},
-        "R1": {"ini": 0, "train": True, "custom_lr": 5e-3},
-        "R2": {"ini": 1, "train": True, "custom_lr": 5e-3},
-    }
 
+    if args.ALIF == True:
+        dict_param = ALIF_dict_param
+    else:
+        dict_param = MN_dict_param
     C = 1
     print(dict_param)
 
@@ -114,24 +127,37 @@ def main(args):
                 dict_param[param]["ini"] * 0.9, dict_param[param]["ini"] * 1.1
             )
     # torch.autograd.set_detect_anomaly(True)
+    if args.ALIF == True:
+        l0 = ALIF_neuron(
+                 nb_inputs=nb_inputs,
+                 beta = dict_param["beta_alif"]["param"],
+                 is_recurrent=False,
+                 b_0=dict_param["b_0"]["param"],
+                 dt=dt,
+                 tau_adp=dict_param["tau_adp"]["param"],
+                 beta_adapt=dict_param["beta_adapt"]["param"],
+                 analog_input=True,
+                 device = device)
+    else:
+        l0 = MN_neuron_sp(
+                nb_inputs,
+                firing_mode_dict[args.firing_mode],
+                dt=dt,
+                train=args.train,
+                a=dict_param["a"]["param"],
+                A1=dict_param["A1"]["param"],
+                A2=dict_param["A2"]["param"],
+                b=dict_param["b"]["param"],
+                G=dict_param["G"]["param"],
+                k1=dict_param["k1"]["param"],
+                k2=dict_param["k2"]["param"],
+                R1=dict_param["R1"]["param"],
+                R2=dict_param["R2"]["param"],
+                C=C,
+            )
     network = nn.Sequential(
         Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
-        MN_neuron_sp(
-            nb_inputs,
-            firing_mode_dict[args.firing_mode],
-            dt=dt,
-            train=args.train,
-            a=dict_param["a"]["param"],
-            A1=dict_param["A1"]["param"],
-            A2=dict_param["A2"]["param"],
-            b=dict_param["b"]["param"],
-            G=dict_param["G"]["param"],
-            k1=dict_param["k1"]["param"],
-            k2=dict_param["k2"]["param"],
-            R1=dict_param["R1"]["param"],
-            R2=dict_param["R2"]["param"],
-            C=C,
-        ),
+        l0,
         LIF_neuron(
             nb_inputs,
             nb_hidden,
@@ -171,7 +197,6 @@ def main(args):
         )
     ]
     param_list = [{"params": weight_params}]
-
     ## Add parameters form dict_param
     for param in dict_param:
         custom_param = [
@@ -187,6 +212,7 @@ def main(args):
             )
         else:
             param_list.append({"params": custom_param})
+
 
     ## Create optimizer
     optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
@@ -232,11 +258,11 @@ def main(args):
             # spikes for regularization purposes
             loss_local = 0
 
-            mn_spk = []
+            l0_spk = []
             lif1_spk = []
             lif2_spk = []
 
-            mn_mem = []
+            l0_mem = []
             lif1_mem = []
             lif2_mem = []
 
@@ -244,8 +270,8 @@ def main(args):
                 out = network(x_local[:, t])
 
                 # Get the spikes and voltages from the MN neuron encoder
-                mn_spk.append(network[1].state.spk)
-                mn_mem.append(network[1].state.V)
+                l0_spk.append(network[1].state.spk)
+                l0_mem.append(network[1].state.V)
 
                 # Get the spikes and voltages from the first LIF
                 lif1_spk.append(network[2].state.S)
@@ -255,8 +281,8 @@ def main(args):
                 lif2_spk.append(network[3].state.S)
                 lif2_mem.append(network[3].state.mem)
 
-            mn_spk = torch.stack(mn_spk, dim=1)
-            mn_mem = torch.stack(mn_mem, dim=1)
+            l0_spk = torch.stack(l0_spk, dim=1)
+            l0_mem = torch.stack(l0_mem, dim=1)
             lif1_spk = torch.stack(lif1_spk, dim=1)
             lif1_mem = torch.stack(lif1_mem, dim=1)
             lif2_spk = torch.stack(lif2_spk, dim=1)
@@ -306,10 +332,10 @@ def main(args):
             (
                 test_acc,
                 test_ttc,
-                mn_spk,
+                l0_spk,
                 lif1_spk,
                 lif2_spk,
-                mn_mem,
+                l0_mem,
                 lif1_mem,
                 lif2_mem,
             ) = compute_classification_accuracy(dl_test, network, True, device)
@@ -490,6 +516,11 @@ if __name__ == "__main__":
         type=float,
         default=1.0,
         help="Gradient regularization",
+    )
+    parser.add_argument(
+        "--ALIF",
+        action="store_true",
+        help="Use ALIF neurons instead of MN",
     )
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
