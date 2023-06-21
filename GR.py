@@ -126,6 +126,8 @@ def main(args):
             dict_param[param]["param"].data.uniform_(
                 dict_param[param]["ini"] * 0.9, dict_param[param]["ini"] * 1.1
             )
+    for param in dict_param:
+        dict_param[param]["param"].to(device)
     # torch.autograd.set_detect_anomaly(True)
     if args.ALIF == True:
         l0 = ALIF_neuron(
@@ -179,8 +181,7 @@ def main(args):
     ).to(device)
     print(network)
 
-    for param in dict_param:
-        dict_param[param]["param"].to(device)
+
 
     ###########################################
     ##               Training                ##
@@ -230,12 +231,12 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="MN_WITH_GR_L1")  # For logging purpose
+        writer = SummaryWriter(comment="ALIF_WITH_GR_L1")  # For logging purpose
     dl_train = DataLoader(
-        ds_train, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
+        ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
     )
     dl_test = DataLoader(
-        ds_test, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
+        ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
     )
 
     pbar = trange(nb_epochs)
@@ -310,7 +311,7 @@ def main(args):
                     for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
                 ]
             )  # computing GR term
-            loss_DB.backward()  # backpropagation of GR ter
+            loss_DB.backward(retain_graph=True)  # backpropagation of GR ter
             optimizer.step()
             local_loss.append(loss_val.item())
 
