@@ -3,3 +3,12 @@ runs
 __pycache__
 .idea/
 .venv
+experiments/
+
+tactile_venv/
+
+lib/
+
+bin/
+
+*.cfg
