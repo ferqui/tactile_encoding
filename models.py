@@ -489,7 +489,7 @@ class ALIF_neuron(nn.Module):
         b_update = (1-ro)*spk
         b = b_dec + b_update
         thr = self.b_0 + self.beta_adapt * b
-        V += self.dt * (self.linear * x - self.beta_alif * (V-0))
+        V = (self.linear * x) + self.beta_alif * (V-0)
         spk = activation(V - thr)
         V = (1 - spk) * V + (spk) * 0
 
