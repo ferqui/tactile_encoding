@@ -229,10 +229,10 @@ def main(args):
     if args.log:
         writer = SummaryWriter(comment="ALIF_WITH_GR_L1")  # For logging purpose
     dl_train = DataLoader(
-        ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        ds_train, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
     )
     dl_test = DataLoader(
-        ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        ds_test, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
     )
 
     pbar = trange(nb_epochs)
@@ -280,6 +280,9 @@ def main(args):
 
             l0_spk = torch.stack(l0_spk, dim=1)
             l0_mem = torch.stack(l0_mem, dim=1)
+            l0_events = torch.where(l0_spk[0])
+            # plt.scatter(l0_events[0], l0_events[1], s=0.1)
+            # plt.show()
             lif1_spk = torch.stack(lif1_spk, dim=1)
             lif1_mem = torch.stack(lif1_mem, dim=1)
             lif2_spk = torch.stack(lif2_spk, dim=1)

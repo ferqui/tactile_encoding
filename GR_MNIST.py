@@ -76,13 +76,14 @@ def main(args):
 
     nb_channels = dataMN.data.shape[1] * dataMN.data.shape[2]
 
-    limited_samples = 300
-    train_data = dataMN.train_data[:limited_samples].flatten(start_dim=1,end_dim=2).unsqueeze(1).repeat(1, 300, 1)
+    limited_samples = 2000
+    time_length = 300
+    train_data = dataMN.train_data[:limited_samples].flatten(start_dim=1,end_dim=2).unsqueeze(1).repeat(1, time_length, 1)
     train_labels = dataMN.train_labels[:limited_samples]
-    test_data = dataMN.test_data[:limited_samples].flatten(start_dim=1,end_dim=2).unsqueeze(1).repeat(1, 300, 1)
+    test_data = dataMN.test_data[:limited_samples].flatten(start_dim=1,end_dim=2).unsqueeze(1).repeat(1, time_length, 1)
     test_labels = dataMN.test_labels[:limited_samples]
-    train_data_noise = train_data + torch.randint_like(train_data,high=10)*0.05
-    test_data_noise = test_data + torch.randint_like(test_data,high=10) * 0.05
+    train_data_noise = train_data + torch.randint_like(train_data,high=10)*0.02
+    test_data_noise = test_data + torch.randint_like(test_data,high=10) * 0.02
     ds_train = TensorDataset(train_data_noise, train_labels)
     ds_test = TensorDataset(test_data_noise, test_labels)
 
@@ -239,12 +240,12 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="MN_WITH_GR_L1")  # For logging purpose
+        writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
     dl_train = DataLoader(
-        ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        ds_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True
     )
     dl_test = DataLoader(
-        ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        ds_test, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True
     )
 
     pbar = trange(nb_epochs)
