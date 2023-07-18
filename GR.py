@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+import os
 
 # import torchviz
 import matplotlib.pyplot as plt
@@ -55,6 +56,8 @@ ALIF_dict_param = {
 def main(args):
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     print(device)
+    if device == torch.device("cuda:0"):
+        torch.cuda.empty_cache()
 
     if args.seed >= 0:
         torch.manual_seed(args.seed)
@@ -227,7 +230,12 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="ALIF_WITH_GR_L1")  # For logging purpose
+        #writer = SummaryWriter(comment="ALIF_WITH_GR_L1")  # For logging purpose
+        if args.nni:
+            log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
+            writer = SummaryWriter(log_dir=log_dir, comment="ALIF_WITH_GR_L1")
+        else:
+            writer = SummaryWriter(comment="ALIF_WITH_GR_L1")
     dl_train = DataLoader(
         ds_train, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
     )
@@ -304,8 +312,10 @@ def main(args):
 
             optimizer.zero_grad()
             # loss_val.backward()
+            # add to the graph the computation of the gradient
             loss_val.backward(create_graph=True)
             # backpropagation of original loss
+            # L1 loss of the gradient of the parameters
             loss_DB = args.gr * sum(
                 [
                     torch.abs(kv[1]["param"].grad).sum()
@@ -528,10 +538,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Use ALIF neurons instead of MN",
     )
+    parser.add_argument(
+        "--nni",
+        action="store_true",
+        help="run with nni",
+    )
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
     parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
+
+    if args.nni:
+        PARAMS = nni.get_next_parameter()
+        print(PARAMS)
+        # Replace default args with new set
+        d = vars(args)  # copy by reference (checked below)
+        for key, val in PARAMS.items():
+            d[key] = val
+            assert (args.__dict__[key] == d[key])
+
     main(args)
