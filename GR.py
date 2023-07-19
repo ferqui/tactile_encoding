@@ -130,7 +130,7 @@ def main(args):
             )
     for param in dict_param:
         dict_param[param]["param"].to(device)
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
     if args.ALIF == True:
         l0 = ALIF_neuron(
                  nb_inputs=nb_inputs,
