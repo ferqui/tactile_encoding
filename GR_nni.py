@@ -89,7 +89,7 @@ if __name__ == '__main__':
     # How many epochs per trial
     parser.add_argument('-n_epochs',
                         type=int,
-                        default=200,
+                        default=300,
                         help='Port number for the starting experiment.')
 
     parser.add_argument('-batch_size',
