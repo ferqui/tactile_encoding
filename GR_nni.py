@@ -19,7 +19,20 @@ search_space = {
     'reg_spikes': {'_type': 'loguniform',
            '_value': [0.004, 0.01]},
     'reg_neurons': {'_type': 'loguniform',
-           '_value': [0.000001, 0.01]}
+           '_value': [0.000001, 0.01]},
+    'shared_params': {'_type': 'choice',
+           '_value': [True, False]}
+}
+
+initial_search_space = {
+    'gr': {'_type': 'choice',
+           '_value': [1.0]},
+    'reg_spikes': {'_type': 'choice',
+           '_value': [0.004]},
+    'reg_neurons': {'_type': 'choice',
+           '_value': [0.000001]},
+    'shared_params': {'_type': 'choice',
+           '_value': [True]}
 }
 
 if __name__ == '__main__':
@@ -108,16 +121,16 @@ if __name__ == '__main__':
                                    use_active_gpu=True)
 
     if args.ALIF:
-        trial_command = f"python3 {args.script} --train --log --shared_params --nni --ALIF"
+        trial_command = f"python3 {args.script} --train --log --nb_epochs {args.n_epochs} --nni --ALIF"
     else:
-        trial_command = f"python3 {args.script} --train --log --shared_params --nni "
+        trial_command = f"python3 {args.script} --train --log --nb_epochs {args.n_epochs} --nni "
 
     config = ExperimentConfig(
         experiment_name=args.script,
         experiment_working_directory="~/nni-experiments/{}".format(os.path.splitext(args.script)[0]),
         trial_command=trial_command,
         trial_code_directory="./",
-        search_space=search_space,
+        search_space=initial_search_space,
         tuner=AlgorithmConfig(name=args.tuner,  # "Anneal",
                               class_args={"optimize_mode": "maximize"}),
         assessor=AlgorithmConfig(name="Medianstop",
@@ -133,7 +146,10 @@ if __name__ == '__main__':
 
     experiment = Experiment(config)
 
-    experiment.run(args.port)
+    experiment.run(args.port, wait_completion=False)
+    while len(experiment.list_trial_jobs())==0:
+        pass
+    experiment.update_search_space(search_space)
 
     # Stop through input
     input('Press any key to stop the experiment.')
