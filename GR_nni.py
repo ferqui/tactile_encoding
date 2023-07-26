@@ -26,7 +26,7 @@ search_space = {
 
 initial_search_space = {
     'gr': {'_type': 'choice',
-           '_value': [1.0]},
+           '_value': [0.5714285714285714]},
     'reg_spikes': {'_type': 'choice',
            '_value': [0.004]},
     'reg_neurons': {'_type': 'choice',
@@ -121,9 +121,9 @@ if __name__ == '__main__':
                                    use_active_gpu=True)
 
     if args.ALIF:
-        trial_command = f"python3 {args.script} --train --log --nb_epochs {args.n_epochs} --nni --ALIF"
+        trial_command = f"python3 {args.script} --norm 10 --batch_size 128 --train --log --nb_epochs {args.n_epochs} --nni --ALIF"
     else:
-        trial_command = f"python3 {args.script} --train --log --nb_epochs {args.n_epochs} --nni "
+        trial_command = f"python3 {args.script} --norm 10 --batch_size 128 --train --log --nb_epochs {args.n_epochs} --nni "
 
     config = ExperimentConfig(
         experiment_name=args.script,
