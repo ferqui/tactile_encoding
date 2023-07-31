@@ -140,19 +140,32 @@ if __name__ == '__main__':
         tuner_gpu_indices=args.exp_gpu_sel,
         max_trial_number=args.exp_trials,
         max_experiment_duration=args.exp_time,
-        trial_concurrency=args.exp_concurrency,
+        trial_concurrency=1,
         training_service=training_service
     )
 
     experiment = Experiment(config)
-
+#     experiment.run(args.port)
     experiment.run(args.port, wait_completion=False)
     while len(experiment.list_trial_jobs())==0:
         pass
-    experiment.update_search_space(search_space)
 
-    # Stop through input
-    input('Press any key to stop the experiment.')
+    print('Waiting 1 minute to update')
+    time.sleep(60)
+    experiment.update_search_space(search_space)
+    experiment.update_trial_concurrency(args.exp_concurrency)
+
+    print('Waiting 1 minute to stop')
+    time.sleep(60)
+
+#     # Stop through input
+#     input('Press any key to stop the experiment.')
 
     # Stop at the end
+    id = experiment.id
     experiment.stop()
+    print(id)
+
+    print('Waiting 1 minuto to resume')
+    time.sleep(60)
+    Experiment.resume(id, port=args.port, wait_completion=True)
