@@ -17,6 +17,9 @@ from sklearn.covariance import MinCovDet
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from classifiers import MahalanobisClassifier
+import seaborn as sns
+
+sns.set_style('whitegrid')
 
 torch.manual_seed(0)
 np.random.seed(19)
@@ -62,6 +65,7 @@ def main(args):
     # each neuron receives a different input amplitude
     dict_spk_rec = dict.fromkeys(list_classes, [])
     dict_mem_rec = dict.fromkeys(list_classes, [])
+
     for MN_class_type in list_classes:
         neurons = MN_neuron(len(amplitudes) * n_repetitions, MNclass_to_param[MN_class_type], dt=args.dt, train=False)
 
@@ -82,17 +86,20 @@ def main(args):
                                                   dim=1)  # shape: batch_size, time_steps, neurons (i.e., current amplitudes)
         dict_mem_rec[MN_class_type] = torch.stack(mem_rec, dim=1)
 
-    # plot_outputs(dict_spk_rec, dict_mem_rec, list_mean_current, fig_folder=fig_folder)
-    # plot_vmem(dict_spk_rec, dict_mem_rec, list_mean_current, xlim=(0,30), fig_folder=fig_folder)
-
-    # PCA over ISI statistics:
-    # X_pca_isi = pca_isi(dict_spk_rec, class_labels, fig_folder=fig_folder)
+    plot_outputs(dict_spk_rec, dict_mem_rec, list_mean_current, fig_folder=fig_folder)
+    plot_vmem(dict_spk_rec, dict_mem_rec, list_mean_current, xlim=(0, 30), fig_folder=fig_folder)
 
     # PCA over time bins:
-    X_pca_timebins, Y_labels = pca_timebins(dict_spk_rec, class_labels, exp_variance=exp_variance, fig_folder=fig_folder)
+    # from dict_spk_rec of size (per class 'A' or 'C'):
+    # 1 (single batch) x timebins x n_neurons=n_trials
+    # to:
+    # n_neurons=n_trials x PCs
+    X_pca_timebins, Y_labels = pca_timebins(dict_spk_rec, class_labels, exp_variance=exp_variance,
+                                            fig_folder=fig_folder)
     assert (X_pca_timebins.shape[0] == n_trials)
     assert (len(Y_labels) == n_trials)
-    # second dimension = n features kept to explain exp_variance
+    # X_pca_timebins.shape[0] = n trials (A + C)
+    # X_pca_timebins.shape[1] = n features needed to explain exp_variance
 
     # Using Mahlanobis distance for bianry classification
     # Can we train a classifier to classify which neuron type was, based on the
@@ -100,7 +107,9 @@ def main(args):
 
     # Split dataset into test and train
     X_pca_timebins = pd.DataFrame(X_pca_timebins)
-    x_train, x_test, y_train, y_test = train_test_split(X_pca_timebins, Y_labels, test_size = 0.2, random_state = 42)
+    test_size = 0.2
+    x_train, x_test, y_train, y_test = train_test_split(X_pca_timebins, Y_labels, test_size=test_size, random_state=42)
+    assert (x_train.shape[0] == (1 - test_size) * X_pca_timebins.shape[0])
 
     # MahalanobisClassifier
     clf = MahalanobisClassifier(x_train, y_train)
@@ -116,14 +125,44 @@ def main(args):
     cm = confusion_matrix(truth, pred, labels=['A', 'C'])
     print('\nConfusion Matrix: \n', confusion_matrix(truth, pred))
     cm_display = ConfusionMatrixDisplay(confusion_matrix=cm,
-                                           display_labels=['A', 'C']
+                                        display_labels=['A', 'C']
                                         )
+    sns.set_style("white")
     cm_display.plot()
     fig = plt.gcf()
     fig.savefig(fig_folder.joinpath('Confusion Matrix.pdf'), format='pdf')
     plt.show()
 
-    print('Hello')
+    # Display input samples that were not classified correctly:
+    sns.set_style("whitegrid")
+    list_pairs = [('C', 'A'), ('C', 'C'), ('A', 'A')]
+    dict_idx_true_predicted = dict.fromkeys(list_pairs)
+    for pair in list_pairs:
+        idx_true_predicted = np.where(np.logical_and(truth == pair[0], pred == pair[1]))[0]
+        idx_true = inv_class_labels[pair[0]]
+        idx_pred = inv_class_labels[pair[1]]
+        assert (len(idx_true_predicted) == cm[idx_true, idx_pred])
+        dict_idx_true_predicted[pair] = idx_true_predicted
+
+    fig, axs = plt.subplots(3, 1)
+    axs[0].set_title('True C - predicted A')
+    axs[0].plot(torch.transpose(torch.tensor(x_train.values)[dict_idx_true_predicted[('C', 'A')], :], 0, 1), 'o-')
+    axs[1].set_title('True C - predicted C')
+    axs[1].plot(torch.transpose(torch.tensor(x_train.values)[dict_idx_true_predicted[('C', 'C')], :], 0, 1), 'o-')
+    axs[2].set_title('True A - predicted A')
+    axs[2].plot(torch.transpose(torch.tensor(x_train.values)[dict_idx_true_predicted[('A', 'A')], :], 0, 1), 'o-')
+    fig.set_size_inches(20, 10)
+    plt.subplots_adjust(hspace=0.3)
+    fig.savefig(fig_folder.joinpath('Trials_classified.pdf'), format='pdf')
+    plt.show()
+
+    # Quantify how diagonal is the matrix:
+    # Track the number of non diagonal elements, as a fraction of the total number of samples
+    tot_trials = np.sum(cm)
+    assert (tot_trials == (args.n_repetitions * args.nb_inputs * test_size * len(class_labels.keys())))
+    output_data['confusion_matrix'] = cm
+    output_data['spk_rec'] = {'A': dict_spk_rec['A'][0], 'C': dict_spk_rec['C'][0]}
+
     # ******************************************** Store data **********************************************************
     with open(exp_folder.joinpath('output_data.pickle'), 'wb') as f:
         pickle.dump(output_data, f)

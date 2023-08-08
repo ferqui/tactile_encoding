@@ -75,13 +75,15 @@ def get_pca(X, Y, class_labels=None, exp_variance=None, fig_folder=None):
     scaler.fit(X)
     X_scaled = scaler.transform(X)
 
+    sns.set_style('white')
     fig = plt.figure()
-    plt.imshow(X, cmap='Greys', interpolation=None, aspect='auto')
+    plt.imshow(X, interpolation='none', aspect='auto', cmap='Greys')
     plt.title('Input')
     plt.xlabel('Time (ms)')
     plt.ylabel('Trials')
     plt.show()
     fig.savefig(fig_folder.joinpath('Input_rasterplot.pdf'), format='pdf')
+    sns.set_style('whitegrid')
 
     # Keep as many components needed to explain 95% of the variance:
     pca = PCA(n_components=exp_variance)
@@ -275,6 +277,7 @@ def pca_timebins(dict_spk_rec, class_labels, exp_variance=.95, fig_folder=None):
 def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder=None):
     dict_mem_rec = dict.fromkeys(mem_rec.keys(), [])
     dict_isi = dict.fromkeys(mem_rec.keys(), [])
+    dict_raster = dict.fromkeys(mem_rec.keys(), [])
 
     n_trials_with_output_spikes = {}
     for key in mem_rec.keys():
@@ -282,6 +285,7 @@ def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder
         dict_mem_rec[key] = {'time': [], 'vmem': [], 'Ie': []}
         tmp = mem_rec[key][0]
         dict_isi[key] = {'time': [], 'isi': [], 'Ie': []}
+        dict_raster[key] = {'time': [], 'trial': [], 'Ie': []}
 
         n_trials_with_output_spikes[key] = np.zeros(len(np.unique(list_mean_current)))
         amplitude_previous_step = -1
@@ -292,7 +296,7 @@ def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder
             vmem = np.array(tmp[:, a])
             dict_mem_rec[key]['time'].extend(list(np.arange(len(vmem))))
             dict_mem_rec[key]['vmem'].extend(list(vmem*1e3)) # from V to mV
-            dict_mem_rec[key]['Ie'].extend([list_mean_current[a]] * len(vmem))
+            dict_mem_rec[key]['Ie'].extend([np.round(list_mean_current[a],2)] * len(vmem))
 
             t_spike_in_dt = np.arange(len(vmem))
             idx_spike = np.where(np.array(dict_spk_rec[key][0][:, a]).astype(int))[0]
@@ -302,36 +306,47 @@ def plot_outputs(dict_spk_rec, mem_rec, list_mean_current, xlim=None, fig_folder
                 dict_isi[key]['time'].extend(t_spike_in_dt[:-1])
                 dict_isi[key]['isi'].extend(np.diff(t_spike_in_dt))
                 dict_isi[key]['Ie'].extend([list_mean_current[a]] * (len(t_spike_in_dt)-1))
+                dict_raster[key]['time'].extend(t_spike_in_dt)
+                dict_raster[key]['trial'].extend([a]*len(t_spike_in_dt))
+                dict_raster[key]['Ie'].extend([np.round(list_mean_current[a],2)] * len(t_spike_in_dt))
             else:
                 dict_isi[key]['time'].extend([])
                 dict_isi[key]['isi'].extend([])
                 dict_isi[key]['Ie'].extend([])
-
+                dict_raster[key]['time'].extend([])
+                dict_raster[key]['trial'].extend([])
+                dict_raster[key]['Ie'].extend([])
             amplitude_previous_step = list_mean_current[a]
 
     palette_vmem = sns.cubehelix_palette(n_colors=len(np.unique(list_mean_current)))
 
     fig, axs = plt.subplots(3, len(dict_spk_rec.keys()), sharex=True)
+    t_spike_in_dt = np.arange(len(vmem))
     for i, neuron_type in enumerate(dict_spk_rec.keys()):
         n_tot_diff_amplitudes_with_spikes = len(np.where(n_trials_with_output_spikes[neuron_type]>0)[0])
         palette_isi = sns.cubehelix_palette(n_colors=n_tot_diff_amplitudes_with_spikes)
-        axs[0, i].imshow(np.transpose(dict_spk_rec[neuron_type][0]), cmap='Greys',
-                         interpolation='none', aspect='auto')
+        # axs[0, i].imshow(np.transpose(dict_spk_rec[neuron_type][0]), cmap='Greys',
+        #                  interpolation='none', aspect='auto')
+        s = sns.scatterplot(data=pd.DataFrame(dict_raster[neuron_type]), x='time', y='trial', hue='Ie',
+                        ax=axs[0,i], palette=palette_isi)
         sns.lineplot(data=pd.DataFrame(dict_mem_rec[neuron_type]), x='time', y='vmem', hue='Ie',
-                     ax=axs[2, i], palette=palette_vmem)
+                     ax=axs[2, i], palette=palette_vmem, legend=False)
         axs[2, i].set_xlabel('Time (ms)')
         axs[0, i].set_title('MN type: ' + neuron_type)
 
         sns.lineplot(data=pd.DataFrame(dict_isi[neuron_type]), x='time', y='isi', hue='Ie',
-                     ax=axs[1, i], palette=palette_isi)
+                     ax=axs[1, i], palette=palette_isi, legend=False)
         # for a in range(mem_rec[neuron_type][0].shape[1]):
         #     axs[1, i].plot(dict_isi[neuron_type][a]['time'], dict_isi[neuron_type][a]['isi'], 'o', markersize=2,
         #                    color=palette[list(np.unique(list_mean_current)).index(list_mean_current[a])])
 
     axs[1, 0].set_ylabel('ISI (ms)')
     axs[2, 0].set_ylabel('Vmem (mV)')
-    axs[0, 0].set_ylabel('Ie (V/s)')
+    axs[0, 0].set_ylabel('Trial')
     axs[2, 1].set_ylabel('')
+    axs[0, 1].set_ylabel('')
+    axs[1, 1].set_ylabel('')
+
     if xlim:
         axs[0,0].set_xlim(xlim)
 
