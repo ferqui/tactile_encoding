@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+import os
 
 # import torchviz
 import matplotlib.pyplot as plt
@@ -240,7 +241,13 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
+        #writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
+        if args.nni:
+            log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
+            writer = SummaryWriter(log_dir=log_dir, comment="GR_MNIST")
+        else:
+            writer = SummaryWriter(comment="GR_MNIST")
+
     dl_train = DataLoader(
         ds_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True
     )
@@ -535,10 +542,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Use ALIF neurons instead of MN",
     )
+    parser.add_argument(
+        "--nni",
+        action="store_true",
+        help="run with nni",
+    )
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
     parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
+
+    if args.nni:
+        PARAMS = nni.get_next_parameter()
+        print(PARAMS)
+        # Replace default args with new set
+        d = vars(args)  # copy by reference (checked below)
+        for key, val in PARAMS.items():
+            d[key] = val
+            assert (args.__dict__[key] == d[key])
+
     main(args)
