@@ -121,9 +121,9 @@ if __name__ == '__main__':
                                    use_active_gpu=True)
 
     if args.ALIF:
-        trial_command = f"python3 {args.script} --norm 10 --batch_size 128 --train --log --nb_epochs {args.n_epochs} --nni --ALIF"
+        trial_command = f"python3 {args.script} --norm 10 --batch_size {args.batch_size} --train --log --nb_epochs {args.n_epochs} --nni --ALIF"
     else:
-        trial_command = f"python3 {args.script} --norm 10 --batch_size 128 --train --log --nb_epochs {args.n_epochs} --nni "
+        trial_command = f"python3 {args.script} --norm 10 --batch_size {args.batch_size} --train --log --nb_epochs {args.n_epochs} --nni "
 
     config = ExperimentConfig(
         experiment_name=args.script,
