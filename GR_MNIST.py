@@ -301,7 +301,7 @@ def main(args):
             l0_spk = torch.stack(l0_spk, dim=1)
             l0_events = np.where(l0_spk[0, :, :].cpu().detach().numpy())
             plt.scatter(l0_events[0], l0_events[1], s=0.1)
-            plt.show()
+            #plt.show()
             l0_mem = torch.stack(l0_mem, dim=1)
             lif1_spk = torch.stack(lif1_spk, dim=1)
             lif1_mem = torch.stack(lif1_mem, dim=1)
