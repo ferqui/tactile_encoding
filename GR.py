@@ -336,6 +336,11 @@ def main(args):
                 tmp = np.mean((y_local == am).detach().cpu().numpy())
                 accs.append(tmp)
 
+                ## Clip parameter values
+                if args.ALIF == True:
+                    network[1].beta_alif.data = torch.clamp_min(network[1].beta_alif.data, 0.0)
+                    network[1].beta_adapt.data = torch.clamp_min(network[1].beta_adapt.data, 0.0)
+
         # scheduler.step()
         mean_loss = np.mean(local_loss)
         loss_hist.append(mean_loss)
