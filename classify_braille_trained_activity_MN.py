@@ -1,5 +1,5 @@
 """
-##### NOTE: work in progress (last modified 2023.09.07 - 16:35)
+##### NOTE: work in progress (last modified 2023.09.08 - 16:18)
 #####
 ##### History:
 #####   - added comments to identify key changes to be implemented
@@ -7,6 +7,8 @@
 #####   - trained MN parameters set as default
 #####   - plotting part commented and save_fig set to False
 #####   - GPU settings updated and auto_gpu set to False as default, with index 1 as default selection
+#####   - Braille data loading added
+#####   - Dataframe to collect behaviour predictions created
 
 This script allows to classify MN neuron output 
 spike patterns obtained from an NNI-optimized
@@ -54,6 +56,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, load_layers
+
+from data.datasets import load_data
 
 
 ### 1) various experiment settings #############################################
@@ -135,36 +139,20 @@ else:
 experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-### 2) data "configuration" specific for spike classification from MN paper ####
-### THIS PART IS NOT NEEDED, SINCE WE NOW WANT TO EXTRACT THE ACTIVITY FROM THE
-### TRAINED MN NEURON OF AN NNI-OPTIMIZED NETWORK THAT CLASSIFIES BRAILLE LETTERS.
-### We only need to load the Braille data.
-"""
-Data created following the paper "A Generalized
-Linear Integrate-and-Fire Neural Model Produces Diverse Spiking 
-Behaviors" by Stefan Mihalas and Ernst Niebur.
+### 2) data loading ############################################################
 
-Muller-Cleve, Simon F.,
-Istituto Italiano di Tecnologia - IIT,
-Event-driven perception in robotics - EDPR,
-Genova, Italy.
-"""
- 
-# Specify what kind of data to use
-original = True
-fixed_length = not original
-noise = False
-jitter = False
+braille_data_path = "./data/100Hz/data_braille_letters_all.pkl"
 
-# Prepare data selection
-name = ""
-data_features = [original, fixed_length, noise, jitter]
-data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
-for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
-    name += "{} ".format(data_attributes[el])
-name = name[:-1]
-name = name.replace(" ","_")
+#braille_data = np.array(pd.read_pickle(braille_data_path))
 
+data, labels, _, _, _, _ = load_data(braille_data_path)
+
+letter_written = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+           'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+
+letters = [letter_written[ii] for ii in labels]
+
+# For the activity classification:
 labels_mapping = {
     'A': "Tonic spiking",
     'B': "Class 1",
@@ -240,11 +228,7 @@ else:
 ################################################################################
 
 
-### 5) original data as from the MN paper ######################################
-### Names must be changed: as input, no longer original_input but Braille data
-original_input_data = np.array(pd.read_pickle("./data/data_encoding_{}.pkl".format(name)))
-#original_input_labels = list(labels_mapping.keys())
-#original_input_ds = TensorDataset(original_input_data, original_input_labels)
+### 5) NNI-optimized spike_classifier hyperparameters ##########################
 
 parameters_path = './NNI/results/parameters/best_test/spike_classifier/fix_len_noisy_temp_jitter/{}.json'.format(experiment_id)
 with open(parameters_path, 'r') as fp:
@@ -611,7 +595,7 @@ def classify_spikes(input_spikes, single_input, labels_mapping, trained_path, de
     if single_input:
         if type(input_spikes) != torch.Tensor:
             input_spikes = torch.as_tensor(input_spikes, dtype=torch.float, device=device)
-        single_sample = torch.reshape(input_spikes, (1,input_spikes.shape[0],1)) # (batch_size, time, channels)
+        single_sample = torch.reshape(input_spikes, (1,input_spikes.shape[0],input_spikes.shape[1])) # (batch_size, time, channels)
     else:
         rnd_idx = np.random.randint(0, input_spikes.shape[0])
         single_sample = torch.as_tensor(np.array(input_spikes[rnd_idx,:]), dtype=torch.float, device=device)
@@ -654,15 +638,24 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
 #     path_for_plots = "./results/plots/classification/braille_trained_activity_MN"
 #     create_directory(path_for_plots)
 print("*** classification started ***")
-for num,el in enumerate(original_input_data):
-    encoder_MN = MN_neuron_braille_trained(nb_inputs=1, parameters_combination=None).to(device)
-    nb_steps = el[-1].shape[0]
-    activity_spikes = encoder_MN(torch.as_tensor(el[-1], dtype=torch.float, device=device))
-    pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
-    LOG.debug("Single-sample inference {}/{} ({}) from original MN input for neuronal responses:".format(num+1,len(list(labels_mapping.keys())),list(labels_mapping.keys())[num]))
-    LOG.debug("Prediction: {} ({})".format(pred, labels_mapping[pred]))
-    LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
-    print("\tsingle-sample classification {}/{} done".format(num+1,len(list(labels_mapping.keys()))))
+activity_classification = pd.DataFrame()
+letter = []
+behaviour = []
+behaviour_probs = []
+for num,el in enumerate(data):
+    LOG.debug("Single-sample inference {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
+    LOG.debug("Letter: {}\n".format(letters[num]))
+    encoder_MN = MN_neuron_braille_trained(nb_inputs=el.shape[-1], parameters_combination=None).to(device)
+    nb_steps = el.shape[0]
+    for ch in range(el.shape[1]):
+        activity_spikes = encoder_MN(torch.as_tensor(torch.reshape(el[:,ch],(len(el[:,ch]),1)), dtype=torch.float, device=device))
+        pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
+        letter.append(letters[num])
+        behaviour.append(pred)
+        behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
+        LOG.debug("Behaviour prediction (neuron {}/{}): {} ({})".format(ch+1,el.shape[1],pred, labels_mapping[pred]))
+        LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
+    print("\tsingle-sample classification {}/{} done".format(num+1,len(data)))
     # # The plotting part is comented and must be checked and adapted in case it's needed to produce some figure
     # #plt.figure()
     # fig, ax1 = plt.subplots()
@@ -685,7 +678,12 @@ for num,el in enumerate(original_input_data):
     # if save_fig:
     #     print("\tactivity plot {}/{} saved".format(num+1,len(list(labels_mapping.keys()))))
 LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+activity_classification["Letter"] = letter
+activity_classification["Behaviour"] = behaviour
+activity_classification["Probabilities"] = behaviour_probs
 print("*** classification done ***")
+
+print(activity_classification)
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
