@@ -1,14 +1,17 @@
 """
-##### NOTE: work in progress (last modified 2023.09.08 - 16:18)
+##### NOTE: work in progress (last modified 2023.09.09 - 17:15)
 #####
 ##### History:
 #####   - added comments to identify key changes to be implemented
 #####   - except for the input data name (since they must be replaced with Braille data) "original_input" replaced with "braille_trained"
 #####   - trained MN parameters set as default
 #####   - plotting part commented and save_fig set to False
-#####   - GPU settings updated and auto_gpu set to False as default, with index 1 as default selection
+#####   - GPU settings and selection updated
 #####   - Braille data loading added
 #####   - Dataframe to collect behaviour predictions created
+#####   - dt fixed
+#####   - "debugging mode" for log file added
+#####   - nb_steps definition in classify_spikes modified
 
 This script allows to classify MN neuron output 
 spike patterns obtained from an NNI-optimized
@@ -87,7 +90,7 @@ parser.add_argument('-trained_layers_path',
 # Auto-selection of GPU
 parser.add_argument('-auto_gpu',
                     type=bool,
-                    default=False,
+                    default=True,
                     help='Enable or not auto-selection of GPU to use.')
 # Manual selection of GPU
 parser.add_argument('-manual_gpu_idx',
@@ -109,6 +112,11 @@ parser.add_argument('-use_seed',
                     type=bool,
                     default=True,
                     help='Set if a seed is to be used or not.')
+# Specify if running for debug
+parser.add_argument('-debugging',
+                    type=bool,
+                    default=True,
+                    help='Set if the run is to debug the code or not.')
 
 args = parser.parse_args()
 
@@ -183,10 +191,16 @@ labels_mapping = {
 
 log_path = "./logs/classification/braille_trained_activity_MN"
 create_directory(log_path)
-logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
-                    filemode='a',
-                    format="%(asctime)s %(name)s %(message)s",
-                    datefmt='%Y%m%d_%H%M%S')
+if settings["debugging"]:
+    logging.basicConfig(filename=log_path+"/{}_{}_debug.log".format(experiment_id,best_test_id),
+                        filemode='a',
+                        format="%(asctime)s %(name)s %(message)s",
+                        datefmt='%Y%m%d_%H%M%S')
+else:
+    logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
+                        filemode='a',
+                        format="%(asctime)s %(name)s %(message)s",
+                        datefmt='%Y%m%d_%H%M%S')
 LOG = logging.getLogger(experiment_name)
 LOG.setLevel(logging.DEBUG)
 LOG.debug("Experiment started on: {}-{}-{} {}:{}:{}\n".format(
@@ -424,7 +438,8 @@ class MN_neuron_braille_trained(nn.Module):
     }
     """
 
-    def __init__(self, nb_inputs, parameters_combination, dt=1 / 1000,
+    def __init__(self, nb_inputs, parameters_combination,
+                 dt=1/100,
                  a=2.6239240169525146, 
                  A1=-0.015625353902578354, 
                  A2=-1.0590057373046875, 
@@ -559,6 +574,7 @@ spike_fn = SurrGradSpike.apply
 
 def run_snn(
     inputs,
+    nb_steps,
     layers,
     ):
 
@@ -604,7 +620,7 @@ def classify_spikes(input_spikes, single_input, labels_mapping, trained_path, de
     # The log softmax function across output units
     log_softmax_fn = nn.LogSoftmax(dim=1)
 
-    spks_out, _, _ = run_snn(inputs=single_sample, layers=layers)
+    spks_out, _, _ = run_snn(inputs=single_sample, nb_steps=activity_spikes.shape[0], layers=layers)
 
     m = torch.sum(spks_out, 1)  # sum over time
     _, am = torch.max(m, 1)     # argmax over output units
@@ -645,10 +661,11 @@ behaviour_probs = []
 for num,el in enumerate(data):
     LOG.debug("Single-sample inference {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
     LOG.debug("Letter: {}\n".format(letters[num]))
-    encoder_MN = MN_neuron_braille_trained(nb_inputs=el.shape[-1], parameters_combination=None).to(device)
-    nb_steps = el.shape[0]
+    encoder_MN = MN_neuron_braille_trained(nb_inputs=1, parameters_combination=None).to(device)
+    #nb_steps = el.shape[0]
     for ch in range(el.shape[1]):
-        activity_spikes = encoder_MN(torch.as_tensor(torch.reshape(el[:,ch],(len(el[:,ch]),1)), dtype=torch.float, device=device))
+        input_signal = torch.as_tensor(torch.reshape(el[:,ch],(len(el[:,ch]),1)), dtype=torch.float, device=device)
+        activity_spikes = encoder_MN(input_signal)
         pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
         letter.append(letters[num])
         behaviour.append(pred)
