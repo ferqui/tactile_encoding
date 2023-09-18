@@ -134,7 +134,7 @@ def load_and_extract_events(params, file_name, ratios=[0.8, 0, 0.2], taxels=None
 
     return ds_train, ds_val, ds_test, labels, selected_chans, data_steps
 
-def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False, specify_letters = []):
+def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0, norm_val=1, filtering=False, specify_letters = [], label_ascii=False):
     '''
     Load the tactile Braille data.
     '''
@@ -153,6 +153,7 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
         labels = data_dict['letter']
     timestamps = data_dict['timestamp']
     # TODO find a way to use letters as labels
+    labels_ascii = labels
     le = LabelEncoder()
     le.fit(labels)
     labels = le.transform(labels)  # labels as int numbers
@@ -217,6 +218,8 @@ def load_data(file_name="./data/data_braille_letters_0.0.pkl", upsample_fac=1.0,
     labels = torch.as_tensor(labels, dtype=torch.long)
 
     # selected_chans = 2*len(data[0][0])
+    if label_ascii:
+        return data_split, labels, timestamps_resampled, data_steps, le, data, labels_ascii
     return data_split, labels, timestamps_resampled, data_steps, le, data
 
 def load_event_data(params, file_name):
