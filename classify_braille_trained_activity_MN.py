@@ -1,5 +1,5 @@
 """
-##### NOTE: work in progress (last modified 2023.09.09 - 17:15)
+##### NOTE: work in progress (last modified 2023.09.21 - 18:07)
 #####
 ##### History:
 #####   - added comments to identify key changes to be implemented
@@ -12,6 +12,7 @@
 #####   - dt fixed
 #####   - "debugging mode" for log file added
 #####   - nb_steps definition in classify_spikes modified
+#####   - loading Braille-trained activity from Fernando's file added
 
 This script allows to classify MN neuron output 
 spike patterns obtained from an NNI-optimized
@@ -149,6 +150,7 @@ experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 ### 2) data loading ############################################################
 
+"""
 braille_data_path = "./data/100Hz/data_braille_letters_all.pkl"
 
 #braille_data = np.array(pd.read_pickle(braille_data_path))
@@ -159,6 +161,15 @@ letter_written = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'
            'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 letters = [letter_written[ii] for ii in labels]
+"""
+
+braille_activity_path = "./data/Braille_trained_activity/activity_df"
+
+braille_activity_df = pd.read_pickle(braille_activity_path)
+
+data = braille_activity_df["Activity"].values
+label = braille_activity_df["Label"].values
+letter_lbl = braille_activity_df["Letter"].values
 
 # For the activity classification:
 labels_mapping = {
