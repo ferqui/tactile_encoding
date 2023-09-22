@@ -1,5 +1,5 @@
 """
-##### NOTE: work in progress (last modified 2023.09.21 - 18:07)
+##### NOTE: classification works (last modified 2023.09.22 - 16:23)
 #####
 ##### History:
 #####   - added comments to identify key changes to be implemented
@@ -13,6 +13,7 @@
 #####   - "debugging mode" for log file added
 #####   - nb_steps definition in classify_spikes modified
 #####   - loading Braille-trained activity from Fernando's file added
+#####   - spiking behaviour classification started
 
 This script allows to classify MN neuron output 
 spike patterns obtained from an NNI-optimized
@@ -48,20 +49,16 @@ import numpy as np
 import pandas as pd
 import json
 import random
-from collections import namedtuple
 
 import os
 import datetime
 
-import matplotlib.pyplot as plt
-
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
 
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, load_layers
 
-from data.datasets import load_data
+from data.load_BrailleTrained import *
 
 
 ### 1) various experiment settings #############################################
@@ -150,22 +147,9 @@ experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 ### 2) data loading ############################################################
 
-"""
-braille_data_path = "./data/100Hz/data_braille_letters_all.pkl"
+braille_activity_path = "./data/Braille_trained_activity"
 
-#braille_data = np.array(pd.read_pickle(braille_data_path))
-
-data, labels, _, _, _, _ = load_data(braille_data_path)
-
-letter_written = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-           'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-
-letters = [letter_written[ii] for ii in labels]
-"""
-
-braille_activity_path = "./data/Braille_trained_activity/activity_df"
-
-braille_activity_df = pd.read_pickle(braille_activity_path)
+braille_activity_df = load_BrailleTrained_activity(braille_activity_path)
 
 data = braille_activity_df["Activity"].values
 label = braille_activity_df["Label"].values
@@ -203,7 +187,7 @@ labels_mapping = {
 log_path = "./logs/classification/braille_trained_activity_MN"
 create_directory(log_path)
 if settings["debugging"]:
-    logging.basicConfig(filename=log_path+"/{}_{}_debug.log".format(experiment_id,best_test_id),
+    logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
                         filemode='a',
                         format="%(asctime)s %(name)s %(message)s",
                         datefmt='%Y%m%d_%H%M%S')
@@ -431,118 +415,6 @@ class recurrent_layer:
         return spk_rec, mem_rec
 
 
-class MN_neuron_braille_trained(nn.Module):
-    NeuronState = namedtuple('NeuronState', ['V', 'i1', 'i2', 'Thr', 'spk'])
-
-    """
-    # Trained MN parameters:
-    {
-        "A1": -0.015625353902578354, 
-        "G": 45.24007797241211, 
-        "a": 2.6239240169525146, 
-        "A2": -1.0590057373046875, 
-        "k2": 20.0, 
-        "b": 12.77495288848877, 
-        "R2": -1.1421641111373901, 
-        "R1": 0.3858567178249359, 
-        "k1": 200.0
-    }
-    """
-
-    def __init__(self, nb_inputs, parameters_combination,
-                 dt=1/100,
-                 a=2.6239240169525146, 
-                 A1=-0.015625353902578354, 
-                 A2=-1.0590057373046875, 
-                 b=12.77495288848877, 
-                 G=45.24007797241211, 
-                 k1=200.0, 
-                 k2=20.0, 
-                 R1=0.3858567178249359, 
-                 R2=-1.1421641111373901,
-                 C=1, 
-                 train=False):  
-        super(MN_neuron_braille_trained, self).__init__()
-
-        # One-to-one synapse
-        self.linear = nn.Parameter(torch.ones(1, nb_inputs), requires_grad=train)
-
-        self.C = C
-
-        self.N = nb_inputs
-
-        self.EL = -0.07
-        self.Vr = -0.07
-        self.Tr = -0.06
-        self.Tinf = -0.05
-
-        self.a = a
-        self.A1 = A1
-        self.A2 = A2
-        self.b = b  # units of 1/s
-        self.G = G * self.C  # units of 1/s
-        self.k1 = k1  # units of 1/s
-        self.k2 = k2  # units of 1/s
-        self.R1 = R1
-        self.R2 = R2
-
-        self.dt = dt # get dt from sample rate!
-
-        if parameters_combination != None:
-            parameters_list = ["a", "A1", "A2", "b", "G", "k1", "k2", "R1", "R2"]
-            for ii in parameters_list:
-                if ii in list(parameters_combination.keys()):
-                    eval_string = "self.{}".format(ii) + " = " + str(parameters_combination[ii])
-                    exec(eval_string)
-
-        one2N_matrix = torch.ones(1, nb_inputs)
-
-        self.a = nn.Parameter(one2N_matrix * self.a, requires_grad=train)
-        
-        self.A1 = nn.Parameter(one2N_matrix * self.A1 * self.C, requires_grad=train)
-        self.A2 = nn.Parameter(one2N_matrix * self.A2 * self.C, requires_grad=train)
-
-        self.state = None
-
-    def forward(self, x):
-
-        if self.state is None:
-            self.state = self.NeuronState(V=torch.ones(x.shape[1], self.N, device=x.device) * self.EL,
-                                          i1=torch.zeros(x.shape[1], self.N, device=x.device),
-                                          i2=torch.zeros(x.shape[1], self.N, device=x.device),
-                                          Thr=torch.ones(x.shape[1], self.N, device=x.device) * self.Tinf,
-                                          spk=torch.zeros(x.shape[1], self.N, device=x.device))
-
-        V = self.state.V
-        i1 = self.state.i1
-        i2 = self.state.i2
-        Thr = self.state.Thr
-
-        activity_spikes = []
-
-        for t in range(x.shape[0]):
-
-            i1 += -self.k1 * i1 * self.dt
-            i2 += -self.k2 * i2 * self.dt
-            V += self.dt * (self.linear * x[t] + i1 + i2 - self.G * (V - self.EL)) / self.C
-            Thr += self.dt * (self.a * (V - self.EL) - self.b * (Thr - self.Tinf))
-
-            spk = spike_fn(V - Thr)
-            activity_spikes.append(spk.detach().flatten().cpu().numpy())
-
-            i1 = (1 - spk) * i1 + (spk) * (self.R1 * i1 + self.A1)
-            i2 = (1 - spk) * i2 + (spk) * (self.R2 * i2 + self.A2)
-            Thr = (1 - spk) * Thr + (spk) * torch.max(Thr, torch.tensor(self.Tr))
-            V = (1 - spk) * V + (spk) * self.Vr
-
-            self.state = self.NeuronState(V=V, i1=i1, i2=i2, Thr=Thr, spk=spk)
-
-        return np.array(activity_spikes) #spk
-
-    def reset(self):
-        self.state = None
-
-
 class SurrGradSpike(torch.autograd.Function):
     """
     Here we implement our spiking nonlinearity which also implements 
@@ -622,11 +494,11 @@ def classify_spikes(input_spikes, single_input, labels_mapping, trained_path, de
     if single_input:
         if type(input_spikes) != torch.Tensor:
             input_spikes = torch.as_tensor(input_spikes, dtype=torch.float, device=device)
-        single_sample = torch.reshape(input_spikes, (1,input_spikes.shape[0],input_spikes.shape[1])) # (batch_size, time, channels)
+        single_sample = torch.reshape(input_spikes, (1,input_spikes.shape[0],1)).to(device) # (batch_size, time, channels)
     else:
         rnd_idx = np.random.randint(0, input_spikes.shape[0])
         single_sample = torch.as_tensor(np.array(input_spikes[rnd_idx,:]), dtype=torch.float, device=device)
-        single_sample = torch.reshape(single_sample, (1,single_sample.shape[0],1)) # (batch_size, time, channels)
+        single_sample = torch.reshape(single_sample, (1,single_sample.shape[0],1)).to(device) # (batch_size, time, channels)
 
     # The log softmax function across output units
     log_softmax_fn = nn.LogSoftmax(dim=1)
@@ -660,58 +532,33 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
     )
 
 ### Perform spiking patterns classification
-# # The plotting part is comented and must be checked and adapted in case it's needed to produce some figure
-# if save_fig:
-#     path_for_plots = "./results/plots/classification/braille_trained_activity_MN"
-#     create_directory(path_for_plots)
 print("*** classification started ***")
 activity_classification = pd.DataFrame()
 letter = []
 behaviour = []
 behaviour_probs = []
 for num,el in enumerate(data):
-    LOG.debug("Single-sample inference {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
-    LOG.debug("Letter: {}\n".format(letters[num]))
-    encoder_MN = MN_neuron_braille_trained(nb_inputs=1, parameters_combination=None).to(device)
-    #nb_steps = el.shape[0]
-    for ch in range(el.shape[1]):
-        input_signal = torch.as_tensor(torch.reshape(el[:,ch],(len(el[:,ch]),1)), dtype=torch.float, device=device)
-        activity_spikes = encoder_MN(input_signal)
+    
+    activity_spikes = el
+    
+    if el.nonzero().shape[0] > 0:
+        LOG.debug("Single-sample inference of 'active channel' {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
+        LOG.debug("Letter: {}".format(letter_lbl[num]))
         pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
-        letter.append(letters[num])
+        letter.append(letter_lbl[num])
         behaviour.append(pred)
         behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
-        LOG.debug("Behaviour prediction (neuron {}/{}): {} ({})".format(ch+1,el.shape[1],pred, labels_mapping[pred]))
+        LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
         LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
-    print("\tsingle-sample classification {}/{} done".format(num+1,len(data)))
-    # # The plotting part is comented and must be checked and adapted in case it's needed to produce some figure
-    # #plt.figure()
-    # fig, ax1 = plt.subplots()
-    # ax2 = ax1.twinx()
-    # ax2.set_ylim(4, 20)
-    # ax1.plot(range(1, len(el[-1])+1), el[-1], color="tab:blue", label="Ie/C")
-    # ax1.set_ylabel("External current (a.u.)")
-    # ax2.scatter(range(1, len(activity_spikes)+1), activity_spikes, color='tab:red', s=0.2, label="Activity")
-    # ax2.set_ylim((-1,2))
-    # ax2.set_yticks([0,1], ['rest', 'spike'])
-    # ax2.set_ylabel("Neuronal response")
-    # plt.title("Spikes from input as for panel {} \npred: {} ({}) with {}% probability".format(list(labels_mapping.keys())[num],pred,labels_mapping[pred],np.round(np.max(probs.cpu().numpy())*100,2)))
-    # ax1.legend(loc=2)
-    # ax2.legend(loc=1)
-    # if save_fig:
-    #     figure_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    #     plt.savefig(path_for_plots + "/input_{}_{}.pdf".format(list(labels_mapping.keys())[num],figure_datetime), dpi=300)
-    #     plt.savefig(path_for_plots + "/input_{}_{}.png".format(list(labels_mapping.keys())[num],figure_datetime), dpi=300)
-    # plt.show()
-    # if save_fig:
-    #     print("\tactivity plot {}/{} saved".format(num+1,len(list(labels_mapping.keys()))))
+        print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
+        
 LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
 activity_classification["Letter"] = letter
 activity_classification["Behaviour"] = behaviour
 activity_classification["Probabilities"] = behaviour_probs
 print("*** classification done ***")
 
-print(activity_classification)
+activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_{}".format(experiment_datetime))
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
