@@ -1,21 +1,5 @@
 """
-##### NOTE: classification works (last modified 2023.09.22 - 16:23)
-#####
-##### History:
-#####   - added comments to identify key changes to be implemented
-#####   - except for the input data name (since they must be replaced with Braille data) "original_input" replaced with "braille_trained"
-#####   - trained MN parameters set as default
-#####   - plotting part commented and save_fig set to False
-#####   - GPU settings and selection updated
-#####   - Braille data loading added
-#####   - Dataframe to collect behaviour predictions created
-#####   - dt fixed
-#####   - "debugging mode" for log file added
-#####   - nb_steps definition in classify_spikes modified
-#####   - loading Braille-trained activity from Fernando's file added
-#####   - spiking behaviour classification started
-
-This script allows to classify MN neuron output 
+This script allows to classify the MN neuron output 
 spike patterns obtained from an NNI-optimized
 network with trained MN neuron parameters for 
 Braille letters classification.
@@ -24,17 +8,15 @@ and pre-trained weights is used.
 
 Settings to be accounted for:
     experiment_name
-    n_samples
-    threshold
-    frequency
     experiment_id
     best_test_id
     trained_layers_path
     auto_gpu
     manual_gpu_idx
     gpu_mem_frac
-    save_fig
     use_seed
+    debugging
+    save_hm
 
 Fra, Vittorio,
 Politecnico di Torino,
@@ -43,21 +25,20 @@ Torino, Italy.
 """
 
 
-import logging
 import argparse
-import numpy as np
-import pandas as pd
-import json
-import random
-
-import os
 import datetime
-
+import json
+import logging
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
+import random
+import seaborn as sn
 import torch
 import torch.nn as nn
 
 from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, load_layers
-
 from data.load_BrailleTrained import *
 
 
@@ -100,11 +81,6 @@ parser.add_argument('-gpu_mem_frac',
                     type=float,
                     default=0.3,
                     help='The maximum GPU memory fraction to be used by this experiment.')
-# Save figures
-parser.add_argument('-save_fig',
-                    type=bool,
-                    default=False,
-                    help='Save or not the plots of the spiking patterns.')
 # Set seed usage
 parser.add_argument('-use_seed',
                     type=bool,
@@ -113,8 +89,13 @@ parser.add_argument('-use_seed',
 # Specify if running for debug
 parser.add_argument('-debugging',
                     type=bool,
-                    default=True,
+                    default=False,
                     help='Set if the run is to debug the code or not.')
+# Save heatmap
+parser.add_argument('-save_hm',
+                    type=bool,
+                    default=True,
+                    help='Save or not the heatmap produced for behaviour classification.')
 
 args = parser.parse_args()
 
@@ -125,8 +106,6 @@ experiment_name = settings["experiment_name"]
 experiment_id = settings["experiment_id"]
 trained_layers_path = settings["trained_layers_path"]
 best_test_id = settings["best_test_id"]
-
-save_fig = settings["save_fig"]
 
 use_seed = settings["use_seed"]
 
@@ -154,6 +133,9 @@ braille_activity_df = load_BrailleTrained_activity(braille_activity_path)
 data = braille_activity_df["Activity"].values
 label = braille_activity_df["Label"].values
 letter_lbl = braille_activity_df["Letter"].values
+
+letter_written = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 # For the activity classification:
 labels_mapping = {
@@ -187,7 +169,7 @@ labels_mapping = {
 log_path = "./logs/classification/braille_trained_activity_MN"
 create_directory(log_path)
 if settings["debugging"]:
-    logging.basicConfig(filename=log_path+"/{}_{}.log".format(experiment_id,best_test_id),
+    logging.basicConfig(filename=log_path+"/{}_{}_debug.log".format(experiment_id,best_test_id),
                         filemode='a',
                         format="%(asctime)s %(name)s %(message)s",
                         datefmt='%Y%m%d_%H%M%S')
@@ -258,7 +240,7 @@ beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
 
 
 
-### Various definitions ########################################################
+### various definitions ########################################################
 
 class feedforward_layer:
     '''
@@ -519,7 +501,6 @@ def classify_spikes(input_spikes, single_input, labels_mapping, trained_path, de
 ################################################################################
 
 
-
 ### WHERE THINGS ACTUALLY HAPPEN ###############################################
 
 print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
@@ -553,12 +534,40 @@ for num,el in enumerate(data):
         print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
         
 LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+print("*** classification done ***")
+
 activity_classification["Letter"] = letter
 activity_classification["Behaviour"] = behaviour
 activity_classification["Probabilities"] = behaviour_probs
-print("*** classification done ***")
-
 activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_{}".format(experiment_datetime))
+
+### Prepare the dataframe for the heatmap and plot it
+grouped = activity_classification[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
+classified_activity_df = pd.DataFrame(index=range(len(letter_written)), columns=range(len(list(labels_mapping.values()))))
+for ii in range(len(letter_written)):
+    for jj in range(len(list(labels_mapping.keys()))):
+        classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==letter_written[ii]]["Probabilities"].item()[-1][jj])
+classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
+plt.figure(figsize=(16, 12))
+sn.heatmap(classified_activity_df.T,
+           annot=True,
+           fmt='.2f',
+           cbar=False,
+           square=False,
+           cmap="YlOrBr"
+           )
+plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=letter_written, rotation=0)
+plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
+plt.tight_layout()
+if settings["save_hm"]:
+    path_for_plots = "./results/plots/BrailleTrained_activity_MN/{}".format(experiment_name)
+    create_directory(path_for_plots)
+    path_to_save_fig = f'{path_for_plots}/hm_{experiment_id}_{best_test_id}_{experiment_datetime}'
+    plt.savefig(path_to_save_fig+".png", dpi=300)
+    plt.savefig(path_to_save_fig+".pdf", dpi=300)
+    plt.close()
+else:
+    plt.show()
 
 conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
