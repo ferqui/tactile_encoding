@@ -26,7 +26,10 @@ def extract_interval(data, freqs, samples_n, center, span):
 
     for f in range(len(frange) - 1):
         idx = np.where(np.logical_and(freqs >= frange[f], freqs < frange[f + 1]))[0]
-        data_f[:, f] = torch.mean(data[:, idx])  # mean across freq range and channels
+        if np.isnan(np.array(torch.mean(data[:, idx]))):
+            data_f[:, f] = 0
+        else:
+            data_f[:, f] = torch.mean(data[:, idx])  # mean across freq range and channels
 
     return data_f
 
