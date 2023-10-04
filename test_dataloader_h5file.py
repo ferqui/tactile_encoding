@@ -120,10 +120,10 @@ if __name__ == "__main__":
                         default='current',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
     parser.add_argument('--center',
-                        type=int,
+                        type=float,
                         default=10)
     parser.add_argument('--span',
-                        type=int,
+                        type=float,
                         default=10)
     parser.add_argument('--sample_size',
                         type=int,
