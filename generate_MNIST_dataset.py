@@ -149,10 +149,10 @@ if __name__ == '__main__':
                         default=10)
     parser.add_argument('--n_samples_train',
                         type=int,
-                        default=500)
+                        default=-1)
     parser.add_argument('--n_samples_test',
                         type=int,
-                        default=10)
+                        default=-1)
     parser.add_argument('--stim_len_sec',
                         type=float,
                         help='Duration (in sec) of input stimulus',
