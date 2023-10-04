@@ -169,17 +169,17 @@ if __name__ == '__main__':
                         help='Parameter used for noise generation',
                         default=0.2)
     parser.add_argument('--center',
-                        type=int,
-                        default=10)
+                        type=float,
+                        default=0.1)
     parser.add_argument('--span',
-                        type=int,
-                        default=10)
+                        type=float,
+                        default=0.1)
     parser.add_argument('--sample_size',
                         type=int,
                         default=10)
     parser.add_argument('--data_type',
                         type=str,
-                        default='current',
+                        default='frequency',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
 
     args = parser.parse_args()
