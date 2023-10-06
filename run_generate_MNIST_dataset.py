@@ -13,12 +13,13 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = f'python3 generate_MNIST_dataset.py --data_type {args.data_type} --center {center} --span {span}'
+                cmd = (f'python3 generate_MNIST_dataset.py --data_type {args.data_type} '
+                       f'--center {center} --span {span} --n_samples_train {args.n_samples_train}')
                 os.system(cmd)
                 sweep.update()
 
     elif args.data_type == 'current':
-        cmd = f'python3 generate_MNIST_dataset.py --data_type {args.data_type}'
+        cmd = f'python3 generate_MNIST_dataset.py --data_type {args.data_type} --n_samples_train {args.n_samples_train}'
         os.system(cmd)
     else:
         # TODO:
@@ -33,6 +34,9 @@ if __name__ == "__main__":
                         type=str,
                         default='frequency',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
+    parser.add_argument('--n_samples_train',
+                        type=int,
+                        default=-1)
 
     args = parser.parse_args()
 
