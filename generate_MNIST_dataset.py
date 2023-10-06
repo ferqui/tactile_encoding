@@ -69,7 +69,8 @@ def main(args):
     for subset in ['train', 'test']:
         n_tot_samples = len(dict_dataset[subset + '_loader'])
 
-        with h5py.File('./' + str(filename_dataset.joinpath(subset + '.h5')), 'w') as out:
+        output_filename = str(filename_dataset.joinpath(subset + '.h5'))
+        with h5py.File(output_filename, 'w') as out:
             out.attrs['batch_size'] = dict_dataset['batch_size']
             out.attrs['n_time_steps'] = dict_dataset['n_time_steps']
             out.attrs['n_freq_steps'] = dict_dataset['n_freq_steps']
@@ -132,7 +133,7 @@ def main(args):
                     list_idx_inputs.append(np.array([]))
                 list_target.append(np.array(targets[i_batch].item()))
 
-                with h5py.File('./' + str(filename_dataset.joinpath(subset + '.h5')), 'a') as out:
+                with h5py.File(output_filename, 'a') as out:
                     out['values'][i:i + 1] = np.array(list_values, dtype=val_type)
                     out['idx_time'][i:i + 1] = np.array(list_idx_time, dtype=ids_type)
                     out['idx_inputs'][i:i + 1] = np.array(list_idx_inputs, dtype=ids_type)
