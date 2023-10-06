@@ -63,7 +63,7 @@ def main(args):
 
     output_path = Path(filename_dataset)
     output_path.mkdir(parents=True, exist_ok=True)
-    val_type = h5py.vlen_dtype(np.dtype('float64'))
+    val_type = h5py.vlen_dtype(np.dtype('float32'))
     ids_type = h5py.vlen_dtype(np.dtype('int32'))
 
     for subset in ['train', 'test']:
