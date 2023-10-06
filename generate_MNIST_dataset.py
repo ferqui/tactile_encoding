@@ -44,7 +44,7 @@ def main(args):
                                 n_samples_train=args.n_samples_train,
                                 n_samples_test=args.n_samples_test)
 
-    path_to_dataset = Path('./dataset/')
+    path_to_dataset = Path(args.home_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
 
     if args.data_type == 'current':
@@ -181,7 +181,10 @@ if __name__ == '__main__':
                         type=str,
                         default='frequency',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
-
+    parser.add_argument('--home_dataset',
+                        type=str,
+                        help='Absolute path to output folder where the dataset is stored',
+                        default='./dataset/')
     args = parser.parse_args()
 
     main(args)
