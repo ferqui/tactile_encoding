@@ -217,7 +217,7 @@ def main(args):
             ds_test, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
         )
         for subset in dl.keys():
-            folder = output_folder.joinpath(subset)
+            folder = output_folder.joinpath('Braille', subset)
             folder.mkdir(parents=True, exist_ok=True)
             for batch_idx, (x_local, y_local) in enumerate(dl[subset]):
                 # Reset all the layers in the network
