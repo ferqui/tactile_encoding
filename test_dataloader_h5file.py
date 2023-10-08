@@ -53,7 +53,7 @@ def main(args):
     else:
         n_samples_test = args.n_samples_test
 
-    path_to_dataset = Path('dataset')
+    path_to_dataset = Path(args.path_to_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
     dict_dataset = {}
     if args.data_type == 'current':
@@ -111,20 +111,20 @@ if __name__ == "__main__":
                         default=10)
     parser.add_argument('--n_samples_train',
                         type=int,
-                        default=500)
+                        default=20000)
     parser.add_argument('--n_samples_test',
                         type=int,
-                        default=10)
+                        default=10000)
     parser.add_argument('--data_type',
                         type=str,
-                        default='current',
+                        default='frequency',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
     parser.add_argument('--center',
                         type=float,
-                        default=10)
+                        default=0.5)
     parser.add_argument('--span',
                         type=float,
-                        default=10)
+                        default=1.0)
     parser.add_argument('--sample_size',
                         type=int,
                         default=10)
@@ -135,7 +135,9 @@ if __name__ == "__main__":
                         type=str,
                         choices=['cpu', 'cuda'],
                         default='cpu')
-
+    parser.add_argument('--path_to_dataset',
+                        type=str,
+                        default='dataset')
     args = parser.parse_args()
 
     # Run:
