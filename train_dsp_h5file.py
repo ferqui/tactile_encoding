@@ -66,40 +66,6 @@ def train_classifier(train_dl, test_dl, n_epochs, sample_size, device):
     return acc_list  # return test accuracy of last training epoch, last batch
 
 
-# def sweep_classifier_fft(test_dl, train_dl, n_epochs, name, cmap='Blues', folder_fig='', folder_data='', sample_size=10,
-#                          load=False):
-#     if not load:
-#         matrix = np.zeros((len(centers), len(spans)))
-#         sweep = tqdm.tqdm(total=len(centers) * len(spans), desc=f"{name[0].upper() + name[1:]} Sweeping", position=0,
-#                           leave=True)
-#         epochs = tqdm.trange(n_epochs, desc=f"Classifier", leave=False, position=1)
-#         for c_idx, center in enumerate(centers):
-#             for s_idx, span in enumerate(spans):
-#                 acc = train_classifier(center, span, test_dl, train_dl, n_epochs, sample_size)
-#                 matrix[c_idx, s_idx] = acc
-#                 sweep.update()
-#         np.save(os.path.join(folder_data,
-#                              f'{name}_accuracy_c{centers[0]}_{centers[-1]}_{centers[1] - centers[0]}_s{spans[0]}_{spans[-1]}_{spans[1] - spans[0]}.npy'),
-#                 matrix)
-#     else:
-#         matrix = np.load(os.path.join(folder_data,
-#                                       f'{name}_accuracy_c{centers[0]}_{centers[-1]}_{centers[1] - centers[0]}_s{spans[0]}_{spans[-1]}_{spans[1] - spans[0]}.npy'))
-#     plt.imshow(matrix * 100, aspect='auto', origin='lower', cmap=cmap)
-#     max = np.unravel_index(np.argmax(matrix), matrix.shape)
-#     which_decimal_c = np.max([int(0.99 / (centers[1] - centers[0])), int(0.99 / centers[0])])
-#     which_decimal_s = np.max([int(0.99 / (spans[1] - spans[0])), int(0.99 / spans[0])])
-#     plt.xticks(np.arange(len(spans)), np.round(spans, which_decimal_s).astype(int))
-#     plt.yticks(np.arange(len(centers)), np.round(centers, which_decimal_c))
-#     plt.xlabel('Span')
-#     plt.ylabel('Center')
-#     plt.colorbar()
-#     plt.title(
-#         f'{name[0].upper() + name[1:]} Accuracy(%). Max:{(matrix.max() * 100).astype(int)}%@({np.round(centers[max[0]], which_decimal_c)},{np.round(spans[max[1]], which_decimal_s)})')
-#     plt.tight_layout()
-#     plt.savefig(os.path.join(folder_fig,
-#                              f'{name}_accuracy_c{centers[0]}_{centers[-1]}_{np.round(centers[1] - centers[0], 3)}_s{spans[0]}_{spans[-1]}_{np.round(spans[1] - spans[0], 3)}.pdf'))
-#     return centers[max[0]], spans[max[1]], matrix.max() * 100
-
 def main(args):
     # Device: ----------------------------------------------------------------------------------------------------------
     device = torch.device(args.device)
@@ -125,18 +91,6 @@ def main(args):
 
     # Dataseet: --------------------------------------------------------------------------------------------------------
     generator = set_random_seed(args.seed, add_generator=True, device=device)
-
-    if args.n_samples_train == -1:
-        # use all training samples from MNIST
-        trainset = MNIST(root='data', train=True, download=False)
-        n_samples_train = len(trainset)
-    else:
-        n_samples_train = args.n_samples_train
-    if args.n_samples_test == -1:
-        testset = MNIST(root='data', train=False, download=False)
-        n_samples_test = len(testset)
-    else:
-        n_samples_test = args.n_samples_test
 
     path_to_dataset = Path(args.path_to_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
