@@ -164,8 +164,8 @@ def main(args):
         acc = train_classifier(dict_dataset['train_loader'], dict_dataset['test_loader'], args.n_epochs,
                                train_dataset.sample_size, device)
 
-        df['center'].extend([train_dataset.center] * args.batch_size)
-        df['span'].extend([train_dataset.span] * args.batch_size)
+        df['center'].extend([train_dataset.center] * len(acc))
+        df['span'].extend([train_dataset.span] * len(acc))
         df['accuracy'].extend(acc)
 
         sweep.update()
