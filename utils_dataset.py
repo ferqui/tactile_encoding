@@ -19,6 +19,9 @@ def set_random_seed(seed, add_generator=False, device=torch.device('cpu')):
 
 
 def extract_interval(data, freqs, samples_n, center, span):
+    """
+    Map data to mean of fft centered on center with range = span
+    """
     frange = np.linspace(center - span / 2, center + span / 2, samples_n)
     data_f = torch.zeros(data.shape[0], samples_n)
 
@@ -33,6 +36,20 @@ def extract_interval(data, freqs, samples_n, center, span):
 
     return data_f
 
+def extract_histogram(data, bins_hist, center, span):
+    """
+    Map data to histgram of values centered on center with range = span
+    """
+    bins_coll = []
+    for trial in range(data.shape[0]):
+        datax = data[trial].flatten()
+        bins, edges = np.histogram(datax, bins=bins_hist, range=(center - span / 2,
+                                                                center + span / 2))
+
+        bins_coll.append(bins)
+    data_hist = np.array(bins_coll)
+
+    return data_hist
 
 def get_fft(data, dt, high_pass=True, normalize=True, average=True):
     """
