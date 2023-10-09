@@ -10,7 +10,7 @@ Transform input MNIST samples to current across time (with noise).
 
 import torch
 import argparse
-from utils_dataset import load_dataset, set_random_seed, extract_interval
+from utils_dataset import load_dataset, set_random_seed, extract_interval, extract_histogram
 import numpy as np
 from pathlib import Path
 import h5py
@@ -40,7 +40,7 @@ def main(args):
                                 v_max=args.v_max,
                                 generator=generator,
                                 add_noise=True,
-                                return_fft=args.data_type == 'frequency',
+                                data_type=args.data_type,
                                 n_samples_train=args.n_samples_train,
                                 n_samples_test=args.n_samples_test)
 
@@ -95,25 +95,23 @@ def main(args):
             assert data.shape[2] == dict_dataset['n_inputs']
 
             if args.data_type == 'frequency':
-                # Extract interval with center and span:
-                # (averages across n_inputs, reducing one dimension of data) and
-                # downscales the feature dimension to samples_size
                 data = extract_interval(data, xf, args.sample_size, args.center, args.span)
+                assert data.shape[1] == args.sample_size
+
             elif args.data_type == 'amplitude':
-                # TODO: Add preprocessing
-                pass
+                data = extract_histogram(data, args.bins_hist, args.center, args.span)
+                assert data.shape[1] == args.bins_hist
+
             elif args.data_type == 'slope':
-                # TODO: Add preprocessing
-                pass
+                data = torch.diff(data, dim=1)
+                data = extract_histogram(data, args.bins_hist, args.center, args.span)
+                assert data.shape[1] == args.bins_hist
+
             elif args.data_type == 'current':
                 # no preprocessing
                 pass
 
             assert data.shape[0] == dict_dataset['batch_size']
-            if args.data_type == 'current':
-                pass  # data remains the same
-            else:
-                assert args.sample_size == data.shape[1]
 
             list_values = []
             list_target = []
@@ -182,6 +180,10 @@ if __name__ == '__main__':
                         type=str,
                         default='frequency',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
+    parser.add_argument('--bins_hist',
+                        type=int,
+                        default=100,
+                        help='Bins histogram for datasets of amplitudes and slope')
     parser.add_argument('--home_dataset',
                         type=str,
                         help='Absolute path to output folder where the dataset is stored',
