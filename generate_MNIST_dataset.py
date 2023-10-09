@@ -148,14 +148,14 @@ if __name__ == '__main__':
                         default=10)
     parser.add_argument('--n_samples_train',
                         type=int,
-                        default=-1)
+                        default=20000)
     parser.add_argument('--n_samples_test',
                         type=int,
                         default=-1)
     parser.add_argument('--stim_len_sec',
                         type=float,
                         help='Duration (in sec) of input stimulus',
-                        default=1)
+                        default=3)
     parser.add_argument('--dt_sec',
                         type=float,
                         help='Sampling frequency input current',
@@ -186,8 +186,8 @@ if __name__ == '__main__':
                         help='Bins histogram for datasets of amplitudes and slope')
     parser.add_argument('--home_dataset',
                         type=str,
-                        help='Absolute path to output folder where the dataset is stored',
-                        default='./dataset/')
+                        help='Absolute path to output folder where the output dataset is stored',
+                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')
     args = parser.parse_args()
 
     main(args)
