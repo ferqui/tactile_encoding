@@ -139,12 +139,6 @@ if __name__ == "__main__":
     parser.add_argument('--seed',
                         type=int,
                         default=10)
-    parser.add_argument('--n_samples_train',
-                        type=int,
-                        default=20000)
-    parser.add_argument('--n_samples_test',
-                        type=int,
-                        default=10000)
     parser.add_argument('--data_type',
                         type=str,
                         default='amplitude',
