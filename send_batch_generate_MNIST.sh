@@ -19,7 +19,7 @@
 # set with how many cpu cores it should be running
 #SBATCH --cpus-per-task=6
 # from to (incl) range of iterations, max is 1000 total
-#SBATCH --array=1-4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
+#SBATCH --array=1-4
 # memory requirement - check on your PC first if possible
 #SBATCH --mem=12GB
 # max execution time
@@ -27,7 +27,7 @@
 # choose subcluster (short: up to 30 min, regular: up to 10 days - 128GB RAM?, himem: up tp 10 days - 1TB RAM?)
 #SBATCH --partition=regular
 # job name
-#SBATCH --job-name=texel
+#SBATCH --job-name=generate_mnist_dataset
 
 ## Most importantly check your python script on pg-interactive.hpc.rug.nl first (with reduced load) if you environment works fine.
 
