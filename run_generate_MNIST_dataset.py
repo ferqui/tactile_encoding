@@ -86,7 +86,7 @@ if __name__ == "__main__":
         array_data_types = ['current', 'frequency', 'amplitude', 'slope']
         d = vars(args)  # copy by reference (checked below)
         key = 'data_type'
-        d[key] = array_data_types[args.idx_job_array-1]
+        d[key] = array_data_types.index(args.idx_job_array-1)
         assert (args.__dict__[key] == d[key])
 
         print(f'Running for data type: {d[key]}')
