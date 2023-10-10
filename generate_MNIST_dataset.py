@@ -28,7 +28,13 @@ def create_empty_dataset(h5py_file, list_dataset_names, shape, chunks, dtype):
 
 
 def main(args):
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    #device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cpu")
+    # if device == torch.device("cuda"):
+    #     torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    #     torch.cuda.empty_cache()
+    # else:
+    #     torch.set_default_tensor_type('torch.FloatTensor')
     generator = set_random_seed(args.seed, add_generator=True, device=device)
     shuffle_data = False
 
@@ -40,7 +46,7 @@ def main(args):
                                 v_max=args.v_max,
                                 generator=generator,
                                 add_noise=True,
-                                data_type=args.data_type,
+                                return_fft=args.data_type == 'frequency',
                                 n_samples_train=args.n_samples_train,
                                 n_samples_test=args.n_samples_test)
 
