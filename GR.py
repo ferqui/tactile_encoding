@@ -234,7 +234,8 @@ def main(args):
 
                 l0_spk = torch.stack(l0_spk, dim=1)
 
-                torch.save(l0_spk, folder.joinpath(f'b{batch_idx}.pt'))
+                torch.save(l0_spk, folder.joinpath(f'b{batch_idx}_out.pt'))
+                torch.save(y_local, folder.joinpath(f'b{batch_idx}_label.pt'))
 
     else:
         print(' *** Training model ***')
@@ -602,7 +603,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--path_to_optimal_model",
         type=str,
-        default=None, #"./MN_params",
+        default="./MN_params",#None, #"./MN_params",
         help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
     )
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
