@@ -33,4 +33,4 @@
 
 source ../texel/texel/bin/activate
 
-python run_generate_MNIST_dataset.py --idx_job_array ${SLURM_JOB_ID} --home_dataset './dataset/'
+python run_generate_MNIST_dataset.py --idx_job_array ${SLURM_ARRAY_TASK_ID} --home_dataset './dataset/'
