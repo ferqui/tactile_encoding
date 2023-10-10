@@ -83,7 +83,7 @@ if __name__ == "__main__":
         print('Lunched script with HPC - using job array ID to select data type')
         print(f'idx: {args.idx_job_array}')
         # overwrite input argument --data_type:
-        array_data_types = ['current', 'frequency', 'amplitude', 'slope']
+        array_data_types = ['frequency', 'amplitude', 'slope']
         d = vars(args)  # copy by reference (checked below)
         key = 'data_type'
         d[key] = array_data_types[args.idx_job_array-1]
