@@ -19,7 +19,7 @@
 # set with how many cpu cores it should be running
 #SBATCH --cpus-per-task=6
 # from to (incl) range of iterations, max is 1000 total
-#SBATCH --array=1-4
+#SBATCH --array=1-3
 # memory requirement - check on your PC first if possible
 #SBATCH --mem=12GB
 # max execution time
