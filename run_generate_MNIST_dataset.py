@@ -61,6 +61,9 @@ if __name__ == "__main__":
                         type=str,
                         default='frequency',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
+    parser.add_argument('--idx_job_array',
+                        type=int,
+                        default=None)
     parser.add_argument('--n_samples_train',
                         type=int,
                         default=20000)
@@ -75,6 +78,20 @@ if __name__ == "__main__":
                         type=int,
                         default=5)
     args = parser.parse_args()
+
+    if args.idx_job_array is not None:
+        print('Lunched script with HPC - using job array ID to select data type')
+        # overwrite input argument --data_type:
+        array_data_types = ['current', 'frequency', 'amplitude', 'slope']
+        d = vars(args)  # copy by reference (checked below)
+        key = 'data_type'
+        d[key] = array_data_types[args.idx_job_array-1]
+        assert (args.__dict__[key] == d[key])
+
+        print(f'Running for data type: {d[key]}')
+        print(f' with args: ')
+        for key, value in d.items():
+            print(f'{key}: {value}')
 
     # Run:
     main(args)
