@@ -603,7 +603,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--path_to_optimal_model",
         type=str,
-        default="./MN_params",#None, #"./MN_params",
+        default=None,#None, #"./MN_params",
         help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
     )
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
