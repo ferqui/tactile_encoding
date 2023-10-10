@@ -17,8 +17,11 @@ from utils_dataset import extract_interval
 import json
 
 
-def train_classifier(train_dl, test_dl, n_epochs, sample_size, device):
-    classifier = nn.Sequential(nn.Linear(sample_size, train_dl.dataset.n_classes, )).to(device)
+def train_classifier(train_dl, test_dl, n_epochs, device):
+    examples = enumerate(train_dl)
+    batch_idx, (example_data, example_targets) = next(examples)
+
+    classifier = nn.Sequential(nn.Linear(example_data.shape[1], train_dl.dataset.n_classes, )).to(device)
     optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001)
     epochs = tqdm.trange(n_epochs, desc=f"Classifier", leave=False, position=1)
 
@@ -115,8 +118,7 @@ def main(args):
                                                  shuffle=True,
                                                  generator=generator)
 
-        acc = train_classifier(dict_dataset['train_loader'], dict_dataset['test_loader'], args.n_epochs,
-                               train_dataset.sample_size, device)
+        acc = train_classifier(dict_dataset['train_loader'], dict_dataset['test_loader'], args.n_epochs, device)
 
         df['center'].extend([train_dataset.center] * len(acc))
         df['span'].extend([train_dataset.span] * len(acc))
@@ -145,8 +147,8 @@ if __name__ == "__main__":
                         default=10000)
     parser.add_argument('--data_type',
                         type=str,
-                        default='frequency',
-                        choices=['current', 'frequency', 'amplitude', 'slope'])
+                        default='amplitude',
+                        choices=['frequency', 'amplitude', 'slope'])
     parser.add_argument('--batch_size',
                         type=int,
                         default=128)
@@ -159,7 +161,7 @@ if __name__ == "__main__":
                         default='cpu')
     parser.add_argument('--path_to_dataset',
                         type=str,
-                        default='/media/nicoletta/bics/Nicoletta/tactile_encoding/')
+                        default='./dataset/')
     args = parser.parse_args()
 
     # Run:
