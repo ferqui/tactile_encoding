@@ -101,8 +101,9 @@ def main(args):
             assert data.shape[2] == dict_dataset['n_inputs']
 
             if args.data_type == 'frequency':
-                data = extract_interval(data, xf, args.sample_size, args.center, args.span)
-                assert data.shape[1] == args.sample_size
+                n_bins = 10
+                data = extract_interval(data, xf, n_bins, args.center, args.span)
+                assert data.shape[1] == n_bins
 
             elif args.data_type == 'amplitude':
                 data = extract_histogram(data, args.bins_hist, args.center, args.span)
