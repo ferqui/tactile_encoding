@@ -125,7 +125,7 @@ class ToFft(object):
 
 
 def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None,
-               n_samples_train=None, n_samples_test=None, subset_classes=None, add_noise=True, return_fft=False):
+               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False):
     """
     Load MNIST dataset and return train and test loader.
 
