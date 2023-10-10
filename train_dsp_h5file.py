@@ -70,6 +70,8 @@ def train_classifier(train_dl, test_dl, n_epochs, device):
 
 
 def main(args):
+    print(f'Running with data type on {args.data_type}')
+
     # Device: ----------------------------------------------------------------------------------------------------------
     device = torch.device(args.device)
     if device == torch.device("cuda") and not (torch.cuda.is_available()):
