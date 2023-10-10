@@ -31,6 +31,6 @@
 
 ## Most importantly check your python script on pg-interactive.hpc.rug.nl first (with reduced load) if you environment works fine.
 
-source venv/bin/activate
+source ../texel/texel/bin/activate
 
 python run_generate_MNIST_dataset.py --idx_job_array ${SLURM_JOB_ID} --home_dataset './dataset/'
