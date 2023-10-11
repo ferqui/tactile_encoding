@@ -25,7 +25,7 @@ def train_classifier(train_dl, test_dl, n_epochs, device):
     optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001)
     epochs = tqdm.trange(n_epochs, desc=f"Classifier", leave=False, position=1)
 
-    batches = tqdm.tqdm(train_dl, desc="Epoch", disable=True)
+    batches = tqdm.tqdm(train_dl, desc="Epoch", disable=False)
     loss = nn.CrossEntropyLoss()
     loss_coll = []
     acc_coll = []
