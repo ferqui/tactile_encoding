@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from utils_dataset import set_random_seed, MNISTDataset_features, MNISTDataset_current
+from utils_dataset import set_random_seed, Dataset_features, MNISTDataset_current
 from torch import torch
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
@@ -87,7 +87,7 @@ def main(args):
 
     # Folders: ---------------------------------------------------------------------------------------------------------
     folder = Path('dataset_analysis')
-    folder_run = Path(os.path.join(folder, 'MNIST'))
+    folder_run = Path(os.path.join(folder, args.dataset))
     folder_fig = folder_run.joinpath('fig')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_fig.mkdir(parents=True, exist_ok=True)
@@ -102,14 +102,14 @@ def main(args):
     dict_dataset = {}
 
     df = {'center': [], 'span': [], 'accuracy': []}
-    list_datasets = os.listdir(path_to_dataset.joinpath('MNIST', args.data_type))
+    list_datasets = os.listdir(path_to_dataset.joinpath(args.dataset, args.data_type))
     sweep = tqdm.tqdm(total=len(list_datasets), desc=f"{args.data_type} sweeping", position=0, leave=True)
     for dataset_name in list_datasets:
-        filename_dataset = path_to_dataset.joinpath('MNIST',
+        filename_dataset = path_to_dataset.joinpath(args.dataset,
                                                     args.data_type,
                                                     dataset_name)
-        train_dataset = MNISTDataset_features(h5py.File(filename_dataset.joinpath('train.h5'), 'r'), device=device)
-        test_dataset = MNISTDataset_features(h5py.File(filename_dataset.joinpath('test.h5'), 'r'), device=device)
+        train_dataset = Dataset_features(h5py.File(filename_dataset.joinpath('train.h5'), 'r'), device=device)
+        test_dataset = Dataset_features(h5py.File(filename_dataset.joinpath('test.h5'), 'r'), device=device)
 
         dict_dataset['train_loader'] = DataLoader(train_dataset,
                                                   batch_size=args.batch_size,
@@ -128,7 +128,7 @@ def main(args):
 
         sweep.update()
 
-    with open(path_to_dataset.joinpath('MNIST', f'{args.data_type}.json'), 'w') as f:
+    with open(path_to_dataset.joinpath(args.dataset, f'{args.data_type}.json'), 'w') as f:
         # write the dictionary to the file in JSON format
         json.dump(df, f)
 
@@ -141,6 +141,10 @@ if __name__ == "__main__":
     parser.add_argument('--seed',
                         type=int,
                         default=10)
+    parser.add_argument('--dataset',
+                        type=str,
+                        default='MNIST',
+                        choices=['MNIST', 'Braille'])
     parser.add_argument('--data_type',
                         type=str,
                         default='amplitude',
