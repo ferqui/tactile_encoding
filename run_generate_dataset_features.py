@@ -14,7 +14,7 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
+                cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
                        f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
                 os.system(cmd)
@@ -27,7 +27,7 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
+                cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
                        f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
                 os.system(cmd)
@@ -40,19 +40,26 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
+                cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
                        f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
                 os.system(cmd)
                 sweep.update()
 
     elif args.data_type == 'current':
-        cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
+        try:
+            assert args.dataset == 'MNIST'
+        except:
+            print(f'Data type {args.data_type} not reasonable for {args.dataset} dataset.')
+            raise ValueError
+
+        cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                f'--n_samples_train {args.n_samples_train} --home_dataset {args.home_dataset}')
         os.system(cmd)
 
     else:
         pass
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('dataloader')
@@ -90,7 +97,7 @@ if __name__ == "__main__":
         array_data_types = ['frequency', 'amplitude', 'slope']
         d = vars(args)  # copy by reference (checked below)
         key = 'data_type'
-        d[key] = array_data_types[args.idx_job_array-1]
+        d[key] = array_data_types[args.idx_job_array - 1]
         assert (args.__dict__[key] == d[key])
 
         print(f'Running for data type: {d[key]}')
