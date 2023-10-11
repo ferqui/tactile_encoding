@@ -189,11 +189,12 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     return train_loader, test_loader
 
 
-def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1):
+def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1, gain=10):
     kwargs = {'num_workers': 4, 'pin_memory': True}
 
     # file_name = "data/data_braille_letters_all.pkl"
     data, labels, _, _, _, _ = load_data(data_path, upsample_fac)
+    data *= gain
     nb_channels = data.shape[-1]
 
     x_train, x_test, y_train, y_test = train_test_split(
