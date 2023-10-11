@@ -52,14 +52,14 @@ def main(args):
     if args.dataset == 'MNIST' and args.data_type == 'current':
         filename_dataset = path_to_dataset.joinpath(args.dataset,
                                                     args.data_type,
-                                                    str(len(dict_dataset['train_loader'])) + '_' +
-                                                    str(len(dict_dataset['test_loader'])))
+                                                    str(len(dict_dataset['train_loader'].dataset)) + '_' +
+                                                    str(len(dict_dataset['test_loader'].dataset)))
     else:
         # Name dataset including info about center and span:
         filename_dataset = path_to_dataset.joinpath(args.dataset,
                                                     args.data_type,
-                                                    str(len(dict_dataset['train_loader'])) + '_' +
-                                                    str(len(dict_dataset['test_loader'])) + '_c' +
+                                                    str(len(dict_dataset['train_loader'].dataset)) + '_' +
+                                                    str(len(dict_dataset['test_loader'].dataset)) + '_c' +
                                                     str(args.center) + '_s' +
                                                     str(args.span))
 
@@ -69,7 +69,7 @@ def main(args):
     ids_type = h5py.vlen_dtype(np.dtype('int32'))
 
     for subset in ['train', 'test']:
-        n_tot_samples = len(dict_dataset[subset + '_loader'])
+        n_tot_samples = len(dict_dataset[subset + '_loader'].dataset)
 
         output_filename = str(filename_dataset.joinpath(subset + '.h5'))
         with h5py.File(output_filename, 'w') as out:
@@ -85,14 +85,13 @@ def main(args):
             out.attrs['span'] = args.span
             create_empty_dataset(out, ['values', 'idx_time', 'idx_inputs', 'targets'],
                                  (n_tot_samples,),
-                                 (1,),
+                                 (args.sampling_period,),
                                  ids_type)
 
         xf = rfftfreq(dict_dataset['n_time_steps'], dict_dataset['dt_sec'])
 
         jj = 0
         for i, (data, targets) in enumerate(tqdm(dict_dataset[subset + '_loader'])):
-            assert data.shape[0] == dict_dataset['batch_size']
             assert data.shape[1] == dict_dataset['n_features']
             assert data.shape[2] == dict_dataset['n_inputs']
 
@@ -114,7 +113,8 @@ def main(args):
                 # no preprocessing
                 pass
 
-            assert data.shape[0] == dict_dataset['batch_size']
+            if i < (len(dict_dataset[subset + '_loader']) - 1): # last batch can be smaller than the batch size
+                assert data.shape[0] == dict_dataset['batch_size']
 
             # Reset lists:
             list_values = []
@@ -122,7 +122,7 @@ def main(args):
             list_idx_time = []
             list_idx_inputs = []
 
-            for i_batch in range(dict_dataset['batch_size']):
+            for i_batch in range(data.shape[0]):
                 if args.data_type == 'current':
                     list_values.append(np.array(data[i_batch].to_sparse().values()))
                     list_idx_time.append(np.array(data[i_batch].to_sparse().indices()[0]))
@@ -138,10 +138,10 @@ def main(args):
 
                 if (jj % args.sampling_period) == (args.sampling_period - 1):
                     with h5py.File(output_filename, 'a') as out:
-                        out['values'][i:i + 1] = np.array(list_values, dtype=val_type)
-                        out['idx_time'][i:i + 1] = np.array(list_idx_time, dtype=ids_type)
-                        out['idx_inputs'][i:i + 1] = np.array(list_idx_inputs, dtype=ids_type)
-                        out['targets'][i:i + 1] = np.array(list_target, dtype=ids_type)
+                        out['values'][i:i + len(list_values)] = np.array(list_values, dtype=val_type)
+                        out['idx_time'][i:i + len(list_values)] = np.array(list_idx_time, dtype=ids_type)
+                        out['idx_inputs'][i:i + len(list_values)] = np.array(list_idx_inputs, dtype=ids_type)
+                        out['targets'][i:i + len(list_values)] = np.array(list_target, dtype=ids_type)
 
                     # Reset lists:
                     list_values = []
@@ -161,7 +161,7 @@ if __name__ == '__main__':
                         default=10)
     parser.add_argument('--dataset',
                         type=str,
-                        default='MNIST',
+                        default='Braille',
                         choices=['MNIST', 'Braille'])
     parser.add_argument('--n_samples_train',
                         type=int,
@@ -179,7 +179,7 @@ if __name__ == '__main__':
                         default=1e-2)
     parser.add_argument('--batch_size',
                         type=int,
-                        default=1)
+                        default=100)
     parser.add_argument('--v_max',
                         type=float,
                         help='Parameter used for noise generation',
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     parser.add_argument('--sampling_period',
                         type=int,
                         help='Lenght chunks stored to disk',
-                        default=3000)
+                        default=1)
     parser.add_argument('--data_type',
                         type=str,
                         default='frequency',
