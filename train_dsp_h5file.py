@@ -143,11 +143,11 @@ if __name__ == "__main__":
                         default=10)
     parser.add_argument('--dataset',
                         type=str,
-                        default='MNIST',
+                        default='Braille',
                         choices=['MNIST', 'Braille'])
     parser.add_argument('--data_type',
                         type=str,
-                        default='amplitude',
+                        default='frequency',
                         choices=['frequency', 'amplitude', 'slope'])
     parser.add_argument('--batch_size',
                         type=int,
@@ -161,7 +161,7 @@ if __name__ == "__main__":
                         default='cpu')
     parser.add_argument('--path_to_dataset',
                         type=str,
-                        default='./dataset/')
+                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')
     args = parser.parse_args()
 
     # Run:
