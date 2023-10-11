@@ -16,7 +16,7 @@ def main(args):
             for span in spans:
                 cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
-                       f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
+                       f'--home_dataset {args.home_dataset}')
                 os.system(cmd)
                 sweep.update()
 
@@ -29,7 +29,7 @@ def main(args):
             for span in spans:
                 cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
-                       f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
+                       f'--home_dataset {args.home_dataset}')
                 os.system(cmd)
                 sweep.update()
 
@@ -42,7 +42,7 @@ def main(args):
             for span in spans:
                 cmd = (f'python3 {file_to_run}.py --dataset {args.dataset} --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
-                       f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
+                       f'--home_dataset {args.home_dataset}')
                 os.system(cmd)
                 sweep.update()
 
@@ -78,9 +78,6 @@ if __name__ == "__main__":
     parser.add_argument('--n_samples_train',
                         type=int,
                         default=20000)
-    parser.add_argument('--sample_size',
-                        type=int,
-                        default=10)
     parser.add_argument('--home_dataset',
                         type=str,
                         help='Absolute path to output folder where the dataset is stored',

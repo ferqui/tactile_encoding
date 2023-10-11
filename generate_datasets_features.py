@@ -90,6 +90,7 @@ def main(args):
 
         xf = rfftfreq(dict_dataset['n_time_steps'], dict_dataset['dt_sec'])
 
+        jj = 0
         for i, (data, targets) in enumerate(tqdm(dict_dataset[subset + '_loader'])):
             assert data.shape[0] == dict_dataset['batch_size']
             assert data.shape[1] == dict_dataset['n_features']
@@ -115,10 +116,12 @@ def main(args):
 
             assert data.shape[0] == dict_dataset['batch_size']
 
+            # Reset lists:
             list_values = []
             list_target = []
             list_idx_time = []
             list_idx_inputs = []
+
             for i_batch in range(dict_dataset['batch_size']):
                 if args.data_type == 'current':
                     list_values.append(np.array(data[i_batch].to_sparse().values()))
@@ -133,13 +136,21 @@ def main(args):
                     list_idx_inputs.append(np.array([]))
                 list_target.append(np.array(targets[i_batch].item()))
 
-                with h5py.File(output_filename, 'a') as out:
-                    out['values'][i:i + 1] = np.array(list_values, dtype=val_type)
-                    out['idx_time'][i:i + 1] = np.array(list_idx_time, dtype=ids_type)
-                    out['idx_inputs'][i:i + 1] = np.array(list_idx_inputs, dtype=ids_type)
-                    out['targets'][i:i + 1] = np.array(list_target, dtype=ids_type)
-                list_values = []
-                list_target = []
+                if (jj % args.sampling_period) == (args.sampling_period - 1):
+                    with h5py.File(output_filename, 'a') as out:
+                        out['values'][i:i + 1] = np.array(list_values, dtype=val_type)
+                        out['idx_time'][i:i + 1] = np.array(list_idx_time, dtype=ids_type)
+                        out['idx_inputs'][i:i + 1] = np.array(list_idx_inputs, dtype=ids_type)
+                        out['targets'][i:i + 1] = np.array(list_target, dtype=ids_type)
+
+                    # Reset lists:
+                    list_values = []
+                    list_target = []
+                    list_idx_time = []
+                    list_idx_inputs = []
+
+                # Increase counter samples
+                jj += 1
 
 
 if __name__ == '__main__':
@@ -179,6 +190,10 @@ if __name__ == '__main__':
     parser.add_argument('--span',
                         type=float,
                         default=0.1)
+    parser.add_argument('--sampling_period',
+                        type=int,
+                        help='Lenght chunks stored to disk',
+                        default=3000)
     parser.add_argument('--data_type',
                         type=str,
                         default='frequency',
@@ -190,7 +205,7 @@ if __name__ == '__main__':
     parser.add_argument('--home_dataset',
                         type=str,
                         help='Absolute path to output folder where the output dataset is stored',
-                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')#'./dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
+                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')  # './dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
     args = parser.parse_args()
 
     main(args)
