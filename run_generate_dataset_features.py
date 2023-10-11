@@ -6,7 +6,7 @@ import tqdm
 
 
 def main(args):
-
+    file_to_run = 'generate_datasets_features'
     if args.data_type == 'frequency':
         centers = np.linspace(10, 20, args.n_samples_sweep)
         spans = np.linspace(10, 20, args.n_samples_sweep)
@@ -14,7 +14,7 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = (f'python3 generate_MNIST_dataset.py --data_type {args.data_type} '
+                cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
                        f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
                 os.system(cmd)
@@ -27,7 +27,7 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = (f'python3 generate_MNIST_dataset.py --data_type {args.data_type} '
+                cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
                        f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
                 os.system(cmd)
@@ -40,14 +40,14 @@ def main(args):
 
         for center in centers:
             for span in spans:
-                cmd = (f'python3 generate_MNIST_dataset.py --data_type {args.data_type} '
+                cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
                        f'--center {center} --span {span} --n_samples_train {args.n_samples_train} '
                        f'--sample_size {args.sample_size} --home_dataset {args.home_dataset}')
                 os.system(cmd)
                 sweep.update()
 
     elif args.data_type == 'current':
-        cmd = (f'python3 generate_MNIST_dataset.py --data_type {args.data_type} '
+        cmd = (f'python3 {file_to_run}.py --data_type {args.data_type} '
                f'--n_samples_train {args.n_samples_train} --home_dataset {args.home_dataset}')
         os.system(cmd)
 
@@ -57,6 +57,10 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('dataloader')
 
+    parser.add_argument('--dataset',
+                        type=str,
+                        default='MNIST',
+                        choices=['MNIST', 'Braille'])
     parser.add_argument('--data_type',
                         type=str,
                         default='frequency',

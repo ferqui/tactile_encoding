@@ -10,7 +10,7 @@ Transform input MNIST samples to current across time (with noise).
 
 import torch
 import argparse
-from utils_dataset import load_dataset, set_random_seed, extract_interval, extract_histogram
+from utils_dataset import load_dataset, set_random_seed, extract_interval, extract_histogram, create_empty_dataset
 import numpy as np
 from pathlib import Path
 import h5py
@@ -19,48 +19,44 @@ import os
 from numpy.fft import rfft, rfftfreq
 
 
-def create_empty_dataset(h5py_file, list_dataset_names, shape, chunks, dtype):
-    """
-    Initialize input file with empty dataset.
-    """
-    for field in list_dataset_names:
-        h5py_file.create_dataset(field, shape=shape, chunks=chunks, dtype=dtype)
-
-
 def main(args):
-    #device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     device = torch.device("cpu")
-    # if device == torch.device("cuda"):
-    #     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    #     torch.cuda.empty_cache()
-    # else:
-    #     torch.set_default_tensor_type('torch.FloatTensor')
     generator = set_random_seed(args.seed, add_generator=True, device=device)
-    shuffle_data = False
 
     # Load dataset:
-    dict_dataset = load_dataset('MNIST',
-                                batch_size=args.batch_size,
-                                stim_len_sec=args.stim_len_sec,
-                                dt_sec=args.dt_sec,
-                                v_max=args.v_max,
-                                generator=generator,
-                                add_noise=True,
-                                return_fft=args.data_type == 'frequency',
-                                n_samples_train=args.n_samples_train,
-                                n_samples_test=args.n_samples_test)
+    if args.dataset == 'Braille':
+        dict_dataset = load_dataset('Braille',
+                                    batch_size=args.batch_size,
+                                    generator=generator,
+                                    upsample_fac=1,
+                                    data_path="data/data_braille_letters_all.pkl",
+                                    return_fft=False,
+                                    sampling_freq_hz=100.0,
+                                    v_max=-1)
+    elif args.dataset == 'MNIST':
+        dict_dataset = load_dataset('MNIST',
+                                    batch_size=args.batch_size,
+                                    stim_len_sec=args.stim_len_sec,
+                                    dt_sec=args.dt_sec,
+                                    v_max=args.v_max,
+                                    generator=generator,
+                                    add_noise=True,
+                                    return_fft=args.data_type == 'frequency',
+                                    n_samples_train=args.n_samples_train,
+                                    n_samples_test=args.n_samples_test)
 
     path_to_dataset = Path(args.home_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
 
-    if args.data_type == 'current':
-        filename_dataset = path_to_dataset.joinpath('MNIST',
+    if args.dataset == 'MNIST' and args.data_type == 'current':
+        filename_dataset = path_to_dataset.joinpath(args.dataset,
                                                     args.data_type,
                                                     str(len(dict_dataset['train_loader'])) + '_' +
                                                     str(len(dict_dataset['test_loader'])))
     else:
         # Name dataset including info about center and span:
-        filename_dataset = path_to_dataset.joinpath('MNIST',
+        filename_dataset = path_to_dataset.joinpath(args.dataset,
                                                     args.data_type,
                                                     str(len(dict_dataset['train_loader'])) + '_' +
                                                     str(len(dict_dataset['test_loader'])) + '_c' +
@@ -77,7 +73,6 @@ def main(args):
 
         output_filename = str(filename_dataset.joinpath(subset + '.h5'))
         with h5py.File(output_filename, 'w') as out:
-            out.attrs['batch_size'] = dict_dataset['batch_size']
             out.attrs['n_time_steps'] = dict_dataset['n_time_steps']
             out.attrs['n_freq_steps'] = dict_dataset['n_freq_steps']
             out.attrs['n_features'] = dict_dataset['n_features']
@@ -85,7 +80,7 @@ def main(args):
             out.attrs['n_inputs'] = dict_dataset['n_inputs']
             out.attrs['dt_sec'] = dict_dataset['dt_sec']
             out.attrs['v_max'] = dict_dataset['v_max']
-            out.attrs['sample_size'] = args.sample_size
+            out.attrs['batch_size'] = dict_dataset['batch_size']
             out.attrs['center'] = args.center
             out.attrs['span'] = args.span
             create_empty_dataset(out, ['values', 'idx_time', 'idx_inputs', 'targets'],
@@ -153,6 +148,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed',
                         type=int,
                         default=10)
+    parser.add_argument('--dataset',
+                        type=str,
+                        default='MNIST',
+                        choices=['MNIST', 'Braille'])
     parser.add_argument('--n_samples_train',
                         type=int,
                         default=20000)
@@ -180,9 +179,6 @@ if __name__ == '__main__':
     parser.add_argument('--span',
                         type=float,
                         default=0.1)
-    parser.add_argument('--sample_size',
-                        type=int,
-                        default=10)
     parser.add_argument('--data_type',
                         type=str,
                         default='frequency',
@@ -194,7 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('--home_dataset',
                         type=str,
                         help='Absolute path to output folder where the output dataset is stored',
-                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')
+                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')#'./dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
     args = parser.parse_args()
 
     main(args)

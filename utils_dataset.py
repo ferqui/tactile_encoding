@@ -5,6 +5,8 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 from scipy import signal
 from numpy.fft import rfft, rfftfreq
+from datasets import load_data
+from sklearn.model_selection import train_test_split
 
 
 def set_random_seed(seed, add_generator=False, device=torch.device('cpu')):
@@ -36,6 +38,7 @@ def extract_interval(data, freqs, samples_n, center, span):
 
     return data_f
 
+
 def extract_histogram(data, bins_hist, center, span):
     """
     Map data to histgram of values centered on center with range = span
@@ -44,12 +47,13 @@ def extract_histogram(data, bins_hist, center, span):
     for trial in range(data.shape[0]):
         datax = data[trial].flatten()
         bins, edges = np.histogram(datax, bins=bins_hist, range=(center - span / 2,
-                                                                center + span / 2))
+                                                                 center + span / 2))
 
         bins_coll.append(bins)
     data_hist = np.array(bins_coll)
 
     return data_hist
+
 
 def get_fft(data, dt, high_pass=True, normalize=True, average=True):
     """
@@ -123,6 +127,12 @@ class ToFft(object):
 
         return yf
 
+def create_empty_dataset(h5py_file, list_dataset_names, shape, chunks, dtype):
+    """
+    Initialize input file with empty dataset.
+    """
+    for field in list_dataset_names:
+        h5py_file.create_dataset(field, shape=shape, chunks=chunks, dtype=dtype)
 
 def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None,
                n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False):
@@ -140,11 +150,10 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     :param add_noise:
     :param return_fft
     """
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     # TODO: num_workers > 0 and pin_memory True does not work on pytorch 1.12
     # try pytorch 1.13 with CUDA > 1.3
     kwargs = {'num_workers': 4, 'pin_memory': True}
-    # kwargs = {}
 
     if return_fft:
         # Return data in frequency domain:
@@ -180,17 +189,54 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     return train_loader, test_loader
 
 
+def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1):
+    kwargs = {'num_workers': 4, 'pin_memory': True}
+
+    # file_name = "data/data_braille_letters_all.pkl"
+    data, labels, _, _, _, _ = load_data(data_path, upsample_fac)
+    nb_channels = data.shape[-1]
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        data, labels, test_size=0.2, shuffle=True, stratify=labels
+    )
+
+    ds_train = TensorDataset(x_train, y_train)
+    ds_test = TensorDataset(x_test, y_test)
+    n_classes = len(np.unique(y_train))
+
+    test_loader = DataLoader(ds_test,
+                             batch_size=batch_size,
+                             shuffle=True,
+                             generator=generator,
+                             **kwargs)
+
+    train_loader = DataLoader(ds_train,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              generator=generator,
+                              **kwargs)
+
+    return train_loader, test_loader, n_classes
+
+
 def load_dataset(dataset_name, **kwargs):
     if dataset_name == 'MNIST':
         train_loader, test_loader = load_MNIST(**kwargs)
+        dt = kwargs['dt_sec']
+        n_classes = len(train_loader.dataset.classes)
+    elif dataset_name == 'Braille':
+        dt = (1 / kwargs['sampling_freq_hz']) / kwargs['upsample_fac']
+        train_loader, test_loader, n_classes = load_Braille(data_path=kwargs['data_path'],
+                                                            batch_size=kwargs['batch_size'],
+                                                            generator=kwargs['generator'],
+                                                            upsample_fac=kwargs['upsample_fac'])
     else:
         pass
 
     examples = enumerate(train_loader)
     batch_idx, (example_data, example_targets) = next(examples)
     batch_size, n_features, n_inputs = example_data.shape
-    n_classes = len(train_loader.dataset.classes)
-    dt = kwargs['dt_sec']
+
     if kwargs['return_fft']:
         # Data is the frequency spectrum of the signal
         n_time_steps = int(kwargs['stim_len_sec'] / dt)
@@ -256,6 +302,7 @@ class MNISTDataset_features(Dataset):
 
     def __len__(self):
         return len(self.file['targets'])
+
 
 class MNISTDataset_current(Dataset):
     """
