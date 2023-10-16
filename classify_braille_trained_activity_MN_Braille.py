@@ -6,6 +6,8 @@ Braille letters classification.
 The spike_classifier with NNI-optimized parameters
 and pre-trained weights is used.
 
+BRAILLE DATA AS INPUT FOR THE SPIKING ACTIVITY.
+
 Settings to be accounted for:
     experiment_name
     experiment_id
@@ -126,7 +128,9 @@ experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 ### 2) data loading ############################################################
 
-braille_activity_path = "./data/Braille_trained_activity"
+task_activity = "Braille_classification"
+
+braille_activity_path = "./data/Braille_trained_activity/{}".format(task_activity)
 
 braille_activity_df = load_BrailleTrained_activity(braille_activity_path)
 
@@ -180,6 +184,7 @@ else:
                         datefmt='%Y%m%d_%H%M%S')
 LOG = logging.getLogger(experiment_name)
 LOG.setLevel(logging.DEBUG)
+LOG.debug("Activity classification from task: {}\n".format(task_activity))
 LOG.debug("Experiment started on: {}-{}-{} {}:{}:{}\n".format(
     experiment_datetime[:4],
     experiment_datetime[4:6],
