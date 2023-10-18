@@ -69,7 +69,9 @@ def main(args):
     ids_type = h5py.vlen_dtype(np.dtype('int32'))
 
     for subset in ['train', 'test']:
+
         n_tot_samples = len(dict_dataset[subset + '_loader'].dataset)
+        print(f'N samples {subset}: {n_tot_samples}')
 
         output_filename = str(filename_dataset.joinpath(subset + '.h5'))
         with h5py.File(output_filename, 'w') as out:
@@ -91,6 +93,12 @@ def main(args):
         xf = rfftfreq(dict_dataset['n_time_steps'], dict_dataset['dt_sec'])
 
         jj = 0
+        start = 0
+        # Reset lists:
+        list_values = []
+        list_target = []
+        list_idx_time = []
+        list_idx_inputs = []
         for i, (data, targets) in enumerate(tqdm(dict_dataset[subset + '_loader'])):
             assert data.shape[1] == dict_dataset['n_features']
             assert data.shape[2] == dict_dataset['n_inputs']
@@ -116,12 +124,6 @@ def main(args):
             if i < (len(dict_dataset[subset + '_loader']) - 1): # last batch can be smaller than the batch size
                 assert data.shape[0] == dict_dataset['batch_size']
 
-            # Reset lists:
-            list_values = []
-            list_target = []
-            list_idx_time = []
-            list_idx_inputs = []
-
             for i_batch in range(data.shape[0]):
                 if args.data_type == 'current':
                     list_values.append(np.array(data[i_batch].to_sparse().values()))
@@ -134,15 +136,18 @@ def main(args):
                     list_values.append(np.array(data[i_batch]))
                     list_idx_time.append(np.array([]))
                     list_idx_inputs.append(np.array([]))
+                    assert len(data[i_batch])>0
+
                 list_target.append(np.array(targets[i_batch].item()))
 
                 if (jj % args.sampling_period) == (args.sampling_period - 1):
                     with h5py.File(output_filename, 'a') as out:
-                        out['values'][i:i + len(list_values)] = np.array(list_values, dtype=val_type)
-                        out['idx_time'][i:i + len(list_values)] = np.array(list_idx_time, dtype=ids_type)
-                        out['idx_inputs'][i:i + len(list_values)] = np.array(list_idx_inputs, dtype=ids_type)
-                        out['targets'][i:i + len(list_values)] = np.array(list_target, dtype=ids_type)
-
+                        #start = (jj // args.sampling_period) * args.sampling_period
+                        out['values'][start:start + len(list_values)] = np.array(list_values, dtype=val_type)
+                        out['idx_time'][start:start + len(list_values)] = np.array(list_idx_time, dtype=ids_type)
+                        out['idx_inputs'][start:start + len(list_values)] = np.array(list_idx_inputs, dtype=ids_type)
+                        out['targets'][start:start + len(list_values)] = np.array(list_target, dtype=ids_type)
+                    start += len(list_values)
                     # Reset lists:
                     list_values = []
                     list_target = []
@@ -205,7 +210,7 @@ if __name__ == '__main__':
     parser.add_argument('--home_dataset',
                         type=str,
                         help='Absolute path to output folder where the output dataset is stored',
-                        default='/media/p308783/bics/Nicoletta/tactile_encoding/')  # './dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
+                        default='/media/p308783/bics2/Nicoletta/tactile_encoding/')  # './dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
     args = parser.parse_args()
 
     main(args)
