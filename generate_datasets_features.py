@@ -185,7 +185,7 @@ if __name__ == '__main__':
                         default=1e-2)
     parser.add_argument('--batch_size',
                         type=int,
-                        default=100)
+                        default=128)
     parser.add_argument('--v_max',
                         type=float,
                         help='Parameter used for noise generation',
