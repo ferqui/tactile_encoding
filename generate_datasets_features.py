@@ -33,7 +33,8 @@ def main(args):
                                     data_path="data/data_braille_letters_all.pkl",
                                     return_fft=False,
                                     sampling_freq_hz=100.0,
-                                    v_max=-1)
+                                    v_max=-1,
+                                    shuffle=True)
     elif args.dataset == 'MNIST':
         dict_dataset = load_dataset('MNIST',
                                     batch_size=args.batch_size,
@@ -44,7 +45,8 @@ def main(args):
                                     add_noise=True,
                                     return_fft=args.data_type == 'frequency',
                                     n_samples_train=args.n_samples_train,
-                                    n_samples_test=args.n_samples_test)
+                                    n_samples_test=args.n_samples_test,
+                                    shuffle=True)
 
     path_to_dataset = Path(args.home_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
@@ -104,9 +106,8 @@ def main(args):
             assert data.shape[2] == dict_dataset['n_inputs']
 
             if args.data_type == 'frequency':
-                n_bins = 10
-                data = extract_interval(data, xf, n_bins, args.center, args.span)
-                assert data.shape[1] == n_bins
+                data = extract_interval(data, xf, args.bins_hist, args.center, args.span)
+                assert data.shape[1] == args.bins_hist
 
             elif args.data_type == 'amplitude':
                 data = extract_histogram(data, args.bins_hist, args.center, args.span)
@@ -166,14 +167,14 @@ if __name__ == '__main__':
                         default=10)
     parser.add_argument('--dataset',
                         type=str,
-                        default='Braille',
+                        default='MNIST',
                         choices=['MNIST', 'Braille'])
     parser.add_argument('--n_samples_train',
                         type=int,
-                        default=20000)
+                        default=6480)
     parser.add_argument('--n_samples_test',
                         type=int,
-                        default=-1)
+                        default=1620)
     parser.add_argument('--stim_len_sec',
                         type=float,
                         help='Duration (in sec) of input stimulus',
