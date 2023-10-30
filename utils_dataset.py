@@ -167,7 +167,23 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     # Train:
     trainset = MNIST(root='data', train=True, download=True,
                      transform=transforms.Compose(list_transforms))
+
+    # Measure number of samples per class:
+    n_occ = torch.zeros(10)
+    for i in range(10):
+        n_occ[i] = len(torch.where(trainset.targets == i)[0])
+    print('N samples per class:', n_occ)
+
+    # Extract subset of samples:
     trainset = extract_samples(trainset, n_samples_train, subset_classes)
+
+    # Measure number of samples per class:
+    n_occ = torch.zeros(10)
+    for i in range(10):
+        n_occ[i] = len(torch.where(trainset.targets == i)[0])
+    print('N samples per class:', n_occ)
+
+    # Create data loader:
     train_loader = DataLoader(trainset,
                               batch_size=batch_size,
                               shuffle=shuffle,
@@ -178,7 +194,23 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     # Test:
     testset = MNIST(root='data', train=False, download=True,
                     transform=transforms.Compose(list_transforms))
+
+    # Measure number of samples per class:
+    n_occ = torch.zeros(10)
+    for i in range(10):
+        n_occ[i] = len(torch.where(testset.targets == i)[0])
+    print('N samples per class:', n_occ)
+
+    # Extract subset of samples:
     testset = extract_samples(testset, n_samples_test, subset_classes)
+
+    # Measure number of samples per class:
+    n_occ = torch.zeros(10)
+    for i in range(10):
+        n_occ[i] = len(torch.where(testset.targets == i)[0])
+    print('N samples per class:', n_occ)
+
+    # Create data loader:
     test_loader = DataLoader(testset,
                              batch_size=batch_size,
                              shuffle=shuffle,
@@ -261,7 +293,8 @@ def load_dataset(dataset_name, **kwargs):
 
 def extract_samples(set, n_samples, subset_classes):
     if n_samples > 0:
-        print('Extracting a subset of samples')
+        #
+        print(f'Extracting a subset of {n_samples} samples')
         set.data = set.data[range(n_samples)]
         set.targets = set.targets[range(n_samples)]
     if subset_classes is not None:
