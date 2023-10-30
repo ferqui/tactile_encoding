@@ -134,7 +134,7 @@ def create_empty_dataset(h5py_file, list_dataset_names, shape, chunks, dtype):
     for field in list_dataset_names:
         h5py_file.create_dataset(field, shape=shape, chunks=chunks, dtype=dtype)
 
-def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None,
+def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None, shuffle=True,
                n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False):
     """
     Load MNIST dataset and return train and test loader.
@@ -170,7 +170,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     trainset = extract_samples(trainset, n_samples_train, subset_classes)
     train_loader = DataLoader(trainset,
                               batch_size=batch_size,
-                              shuffle=True,
+                              shuffle=shuffle,
                               generator=generator,
                               **kwargs)
     print(f'N samples training: {len(trainset.data)}')
@@ -181,7 +181,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     testset = extract_samples(testset, n_samples_test, subset_classes)
     test_loader = DataLoader(testset,
                              batch_size=batch_size,
-                             shuffle=True,
+                             shuffle=shuffle,
                              generator=generator,
                              **kwargs)
     print(f'N samples test: {len(testset.data)}')
@@ -189,7 +189,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     return train_loader, test_loader
 
 
-def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1, gain=10):
+def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1, gain=10, shuffle=True):
     kwargs = {'num_workers': 4, 'pin_memory': True}
 
     # file_name = "data/data_braille_letters_all.pkl"
@@ -207,13 +207,13 @@ def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1
 
     test_loader = DataLoader(ds_test,
                              batch_size=batch_size,
-                             shuffle=True,
+                             shuffle=shuffle,
                              generator=generator,
                              **kwargs)
 
     train_loader = DataLoader(ds_train,
                               batch_size=batch_size,
-                              shuffle=True,
+                              shuffle=shuffle,
                               generator=generator,
                               **kwargs)
 
@@ -230,7 +230,8 @@ def load_dataset(dataset_name, **kwargs):
         train_loader, test_loader, n_classes = load_Braille(data_path=kwargs['data_path'],
                                                             batch_size=kwargs['batch_size'],
                                                             generator=kwargs['generator'],
-                                                            upsample_fac=kwargs['upsample_fac'])
+                                                            upsample_fac=kwargs['upsample_fac'],
+                                                            shuffle=kwargs['shuffle'])
     else:
         pass
 
@@ -295,6 +296,7 @@ class Dataset_features(Dataset):
 
     def __getitem__(self, idx):
         values = self.file['values'][idx]
+        assert(len(values)>0)
         target = self.file['targets'][idx]
 
         data = values
