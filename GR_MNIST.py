@@ -209,12 +209,14 @@ def main(args):
     dict_dataset['train_loader'] = DataLoader(train_dataset,
                                               batch_size=batch_size,
                                               shuffle=True,
-                                              generator=generator)
+                                              generator=generator,
+                                              num_workers=8)
 
     dict_dataset['test_loader'] = DataLoader(test_dataset,
                                              batch_size=batch_size,
                                              shuffle=True,
-                                             generator=generator)
+                                             generator=generator,
+                                             num_workers=8)
     # nb_channels = dataMN.data.shape[1] * dataMN.data.shape[2]
 
     # limited_samples = 100
