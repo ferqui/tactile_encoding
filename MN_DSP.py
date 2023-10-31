@@ -48,6 +48,9 @@ MNclasses = {
    # 'Braille':{"A1": -0.015625353902578354, "G": 45.24007797241211, "a": 2.6239240169525146, "A2": -1.0590057373046875, "k2": 20.0, "b": 12.77495288848877, "R2": -1.1421641111373901, "R1": 0.3858567178249359, "k1": 200.0}
 }
 
+# default_ranges {
+#
+# }
 # ranges = {
 #     'ampli':[np.linspace(1, 6, 10)],#,np.linspace(1, 100, 10),np.linspace(1, 1000, 10)],
 #     'freq_pos':[np.linspace(10,200,10)],#,np.linspace(10,500,10),np.linspace(10,1000,10)],
@@ -386,7 +389,7 @@ def train(dl_train, neuron, params, device,rank_NMF,optimizer,model,criterion,wr
         optimizer.zero_grad()
         outputs = model(x_local)
         # outputs_norm = (outputs - label_min) / (label_diff)
-        loss = criterion(outputs[:,0], y_local)
+        loss = criterion(outputs, y_local)
         # get gradients w.r.t to parameters
         loss.backward()
         list_epoch_loss.append(loss.item())
@@ -400,14 +403,17 @@ def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch):
 
     list_epoch_loss_test = []
     list_epoch_MI = []
+    list_epoch_accuracy = []
     with torch.no_grad():
         for x_local, y_local in dl_test:
             predicted = model(x_local)
-            loss_test = criterion(predicted[:,0], y_local)
+
+            loss_test = criterion(predicted, y_local)
             #
+
             label = y_local
             label_unique = torch.unique(label)
-            predicted_int = predicted.type(torch.int)
+            predicted_int = torch.argmax(predicted,dim=1)
             predicted_range = torch.unique(predicted_int)
             # print(predicted_range)
             pdf_x1x2 = torch.zeros([len(label_unique), len(predicted_range)])
@@ -429,6 +435,7 @@ def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch):
                         (pdf_x1x2[el1_idx, el2_idx] / (pdf_x1_el * pdf_x2_el)) + 1E-10)
             list_epoch_MI.append(mi.item())
             list_epoch_loss_test.append(loss_test.item())
+            list_epoch_accuracy.append(torch.sum(predicted_int == label).item() / len(label))
         # print('Epoch: {}. MSE test: {}. '.format(epoch, mi.item()))
 
         # fig1, axis1 = plt.subplots()
@@ -447,8 +454,8 @@ def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch):
         # # writer.add_scalar('MSE/train', torch.mean(torch.tensor(list_epoch_loss)).cpu().numpy(), e)
         # writer.add_scalar('MSE/test', torch.mean(torch.tensor(list_epoch_loss_test)).cpu().numpy(), epoch)
 
-    return torch.mean(torch.tensor(list_epoch_MI)).cpu().numpy(), torch.mean(torch.tensor(list_epoch_loss_test)).cpu().numpy()
-def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MNclass,data,labels,dt_sec,name):
+    return torch.mean(torch.tensor(list_epoch_MI)).cpu().numpy(), torch.mean(torch.tensor(list_epoch_loss_test)).cpu().numpy(), torch.mean(torch.tensor(list_epoch_accuracy)).cpu().numpy()
+def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MNclass,data,labels,dt_sec,name,args):
     # Set results folder:
     iscuda = torch.cuda.is_available()
     # # Forcing CPU
@@ -480,15 +487,15 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     ###########################################
     ##                Dataset                ##
     ###########################################
-
+    label_u, labels_idx = np.unique(labels, return_inverse=True)
+    label_n = len(label_u)
     x_train, x_test, y_train, y_test = train_test_split(
-        data.cpu(), labels, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
-
+        data.cpu(), labels_idx, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
     ds_train = TensorDataset(x_train, torch.tensor(y_train).to_dense().to(torch.float32))
     ds_test = TensorDataset(x_test, torch.tensor(y_test).to_dense().to(torch.float32))
-    ds_4nmf = TensorDataset(data.cpu(), torch.tensor(labels).to_dense().to(torch.float32))
+    ds_4nmf = TensorDataset(data.cpu(), torch.tensor(labels_idx).to_dense())
     params['nb_channels'] = 1
-    params['labels'] = labels
+    params['labels'] = labels_idx
 
     params['nb_channels'] = 1
     params['data_steps'] = dt_sec
@@ -538,7 +545,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     # neuron_id = int(params['neuron_id'])
 
     rank_NMF = int(params['rank_NMF'])
-    model = linearRegression(rank_NMF, 1)
+    model = torch.nn.Linear(rank_NMF,label_n)
 
     # TODO: Check this
     if iscuda:
@@ -556,7 +563,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     dl_4nmf = DataLoader(ds_4nmf, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                             generator=torch.Generator(device=device))
     # pbar = trange(nb_epochs)
-    criterion = torch.nn.MSELoss()
+    criterion = torch.nn.CrossEntropyLoss()
     # optimizer = torch.optim.SGD(model.parameters(), lr=learningRate)
     optimizer = torch.optim.Adamax(model.parameters(), lr=learningRate)
     params['optimizer'] = optimizer.__class__.__name__
@@ -642,7 +649,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         #writer = SummaryWriter(comment="Enc" + encoding_method + "Stim" + str(name_param_sweeped) + "_Range" + str(
         #    extremes_sweep) + "_MN_class" + str(MNclass))
         pbar = trange(nb_epochs)
-        results_dir = set_results_folder([exp_id,MNclass, name_param_sweeped, str(np.round(getattr(args, name_param_sweeped + '_center'),2)) + str(np.round(getattr(args, name_param_sweeped + '_span'),2)),encoding_method])
+        results_dir = set_results_folder([exp_id,MNclass, name_param_sweeped, str(np.round(getattr(args, name_param_sweeped + '_center'),2)) + str(np.round(getattr(args, name_param_sweeped + '_span'),2)),encoding_method,str(args.seed)])
         results_dir += '/'
         # Filename metadata:
         metadatafilename = results_dir + '/metadata.txt'
@@ -704,7 +711,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
             ax4[h].set_title(MNclass)
 
         x_train, x_test, y_train, y_test = train_test_split(
-            nmf_samples.cpu(), nmf_labels, test_size=0.2, shuffle=True, stratify=labels)
+            nmf_samples.cpu(), nmf_labels, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
         dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
@@ -727,6 +734,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         list_loss = []
         list_mi = []
         list_mse_test = []
+        list_acc_test = []
         for e in pbar:
             list_epoch_loss = []
             list_epoch_MI = []
@@ -736,9 +744,10 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
 
                     # get gradients w.r.t to parameters
                     # update parameters
-            mi_test, mse_test = eval(epoch=e, model=model, criterion=criterion, dl_test=dl_test, device=device,rank_NMF=rank_NMF, writer=writer,neuron=neuron,params=params)
+            mi_test, mse_test,acc_test = eval(epoch=e, model=model, criterion=criterion, dl_test=dl_test, device=device,rank_NMF=rank_NMF, writer=writer,neuron=neuron,params=params)
             list_mi.append(mi_test.item())
             list_mse_test.append(mse_test.item())
+            list_acc_test.append(acc_test.item())
             # list_mi.append(torch.mean(torch.tensor(list_epoch_mi)).cpu().numpy())
             # print('plotting')
             # fig1,axis1 = plt.subplots()
@@ -750,6 +759,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         # print('Saving results')
         torch.save(list_loss, results_dir + 'Loss.pt')
         torch.save(list_mi, results_dir + 'MI.pt')
+        torch.save(list_acc_test, results_dir + 'Accuracy.pt')
         torch.save(list_mse_test, results_dir + 'MSE.pt')
         torch.save(spike_count, results_dir + 'Spike_Count.pt')
 from multiprocessing import Process
@@ -763,19 +773,19 @@ def run_in_parallel(*fns):
     for p in proc:
         p.join()
 
-def calculate_MI_class(stimuli_type, range_val, MNclass,data, labels,dt_sec,name):
+def calculate_MI_class(stimuli_type, range_val, MNclass,data, labels,dt_sec,name,args):
     print('-------------------------------------------')
-    print('Class {}, Stimuli {}, Range center {} span {}, Encoding {}'.format(MNclass, stimuli_type, np.round(getattr(args, stimuli_type + '_center'),2),
+    print('Class {}, Stimuli {}, Range center {} span {}, Encoding {}, Seed {}'.format(MNclass, stimuli_type, np.round(getattr(args, stimuli_type + '_center'),2),
                                                                       np.round(getattr(args, stimuli_type + '_span'),
-                                                                               2),name))
+                                                                               2),name,args.seed))
     # Generate dictionary with parameter values:
     dict_keys = generate_dict('a', [MNclasses[MNclass]['a']], force_param_dict=MNclasses[MNclass])
     # Run mutual information analysis
-    MI_neuron_params(dict_keys, stimuli_type, range_val, MNclass, data, labels, dt_sec=dt_sec, name=name)
+    MI_neuron_params(dict_keys, stimuli_type, range_val, MNclass, data, labels, dt_sec=dt_sec, name=name,args = args)
     print('-------------------------------------------')
-    print('DONE. Class {}, Stimuli {}, Range center {} span {}, Encoding {}'.format(MNclass, stimuli_type, np.round(getattr(args, stimuli_type + '_center'),2),
+    print('DONE. Class {}, Stimuli {}, Range center {} span {}, Encoding {}, Seed {}'.format(MNclass, stimuli_type, np.round(getattr(args, stimuli_type + '_center'),2),
                                                                       np.round(getattr(args, stimuli_type + '_span'),
-                                                                               2),name))
+                                                                               2),name,args.seed))
     sema.release()
 
 from multiprocessing import Semaphore,Process
@@ -792,6 +802,8 @@ if __name__ == "__main__":
     parser.add_argument('--load_range', type=str, default='Braille')
     parser.add_argument('--encoding_methods',type=str,default='spike')
     parser.add_argument('--load_neuron', type=str, default='')
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed_n', type=int, default=100)
 
 
 
@@ -804,6 +816,7 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
+
 
     if args.load_neuron == '':
         pass
@@ -820,6 +833,9 @@ if __name__ == "__main__":
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
     folder_run = Path('dataset_analysis')
+    folder_stimuli = Path('stimuli')
+    folder_run.mkdir(parents=True, exist_ok=True)
+    folder_stimuli.mkdir(parents=True, exist_ok=True)
     # folder_fig = folder_run.joinpath('fig')
     # folder_data = folder_run.joinpath('data')
     # folder_fig.mkdir(parents=True, exist_ok=True)
@@ -830,75 +846,92 @@ if __name__ == "__main__":
     stimuli_types = []
     if args.load_range == '':
         pass
-    elif ',' in args.load_range:
-        args.load_range = args.load_range.split(',')
+    else:
+        if (',' in args.load_range) == False:
+            args.load_range = [args.load_range]
+        elif ',' in args.load_range:
+            args.load_range = args.load_range.split(',')
 
         for range_ds in args.load_range:
             json_range = json.load(open(f'{folder_run}/{range_ds}/data/opt.json'))
             for range_name in ranges_possible:
                 try:
-                    setattr(args, range_ds+range_name+'_center', json_range[range_name]['center'])
-                    setattr(args, range_ds+range_name+'_span', json_range[range_name]['span'])
-                    setattr(args, range_ds+range_name+'_n_steps', json_range[range_name]['n_steps'])
+                    setattr(args, range_ds+'_'+range_name+'_center', json_range[range_name]['center'])
+                    setattr(args, range_ds+'_'+range_name+'_span', json_range[range_name]['span'])
+                    setattr(args, range_ds+'_'+range_name+'_n_steps', json_range[range_name]['n_steps'])
 
                     stimuli_types.append(range_name)
-                    ranges[range_ds + range_name] = [np.linspace(
-                        getattr(args, range_ds + range_name + '_center') - getattr(args,
-                                                                                   range_ds + range_name + '_span') / 2,
-                        getattr(args, range_ds + range_name + '_center') + getattr(args,
-                                                                                   range_ds + range_name + '_span') / 2,
-                        getattr(args, range_ds + range_name + '_n_steps'))]
+                    ranges[range_ds +'_'+ range_name] = [np.linspace(
+                        getattr(args, range_ds + '_'+range_name + '_center') - getattr(args,
+                                                                                   range_ds + '_'+range_name + '_span') / 2,
+                        getattr(args, range_ds + '_'+range_name + '_center') + getattr(args,
+                                                                                   range_ds + '_'+range_name + '_span') / 2,
+                        getattr(args, range_ds + '_'+range_name + '_n_steps'))]
                 except KeyError:
                     pass
-    stimuli_types = np.unique(stimuli_types)
-    for ds in args.load_range:
-        for stimuli_type in stimuli_types:
-                stimuli = ds+stimuli_type
-                for range_val in ranges[stimuli]:
-                    # upsample_fac = 5
-                    n_time_bins = int(np.floor(args.stim_length_sec / args.dt_sec))
-                    # amplitudes = np.linspace(1, 10, 10)
-                    if stimuli_type == 'amplitude':
-                        data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                               stim_length_sec=args.stim_length_sec, sig=args.noise, debug_plot=args.debug_plot)
-                    elif stimuli_type == 'amplitude_neg':
-                        data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                               stim_length_sec=args.stim_length_sec, sig=args.noise, debug_plot=args.debug_plot)
-                        data = -data
-                    elif stimuli_type == 'frequency':
-                        data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                    offset=0, amplitude_100=40, fs=1/args.dt_sec, target_snr_db=20,
-                                                                    debug_plot=args.debug_plot, add_noise=args.noise > 0)
-                        # data[data < 0] = 0
-                    elif stimuli_type == 'frequency_pos':
-                        data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                    offset=0, amplitude_100=4, fs=1 / args.dt_sec,
-                                                                    target_snr_db=20,
-                                                                    debug_plot=args.debug_plot, add_noise=args.noise > 0
-                                                                    , stim_length_sec= args.stim_length_sec)
-                        data[data < 0] = 0
-                        # plt.figure()
-                        # plt.plot(data[0, :, :])
-                        # plt.show()
 
-                    elif stimuli_type == 'frequency_neg':
-                        data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                    offset=0, amplitude_100=40, fs=1 / args.dt_sec,
-                                                                    target_snr_db=20,
-                                                                    debug_plot=args.debug_plot, add_noise=args.noise > 0)
-                        data[data < 0] = 0
-                        data = -data
-                    elif stimuli_type == 'slope':
-                        data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
-                                                    last=args.last, first=0, sig=args.noise,debug_plot=args.debug_plot)
-                    else:
-                        raise ValueError('Stimuli type not recognized')
-                    data = data[0, :, :].T
-                    concurrency = 1
-                    sema = Semaphore(concurrency)
-                    all_processes = []
-                    for MNclass in MNclasses:
-                        calculate_MI_class(stimuli, range_val, MNclass,data, labels,args.dt_sec,name)
+    stimuli_types = np.unique(stimuli_types)
+    for seed_here in range(args.seed_n):
+        seed = seed_here
+        args.seed = seed
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.backends.cudnn.deterministic = True
+        for ds in args.load_range:
+            for stimuli_type in stimuli_types:
+                    stimuli = ds+'_'+stimuli_type
+                    for range_val in ranges[stimuli]:
+                        # upsample_fac = 5
+                        n_time_bins = int(np.floor(args.stim_length_sec / args.dt_sec))
+                        # amplitudes = np.linspace(1, 10, 10)
+                        if stimuli_type == 'amplitude':
+                            data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise, debug_plot=args.debug_plot)
+                        elif stimuli_type == 'amplitude_neg':
+                            data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise, debug_plot=args.debug_plot)
+                            data = -data
+
+                        elif stimuli_type == 'frequency':
+                            data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                                        offset=0, amplitude_100=40, fs=1/args.dt_sec, target_snr_db=20,
+                                                                        debug_plot=args.debug_plot, add_noise=args.noise > 0)
+                            # data[data < 0] = 0
+
+                        elif stimuli_type == 'frequency_pos':
+                            data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                                        offset=0, amplitude_100=4, fs=1 / args.dt_sec,
+                                                                        target_snr_db=20,
+                                                                        debug_plot=args.debug_plot, add_noise=args.noise > 0
+                                                                        , stim_length_sec= args.stim_length_sec)
+                            data[data < 0] = 0
+                            # plt.figure()
+                            # plt.plot(data[0, :, :])
+                            # plt.show()
+
+                        elif stimuli_type == 'frequency_neg':
+                            data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                                        offset=0, amplitude_100=40, fs=1 / args.dt_sec,
+                                                                        target_snr_db=20,
+                                                                        debug_plot=args.debug_plot, add_noise=args.noise > 0)
+                            data[data < 0] = 0
+                            data = -data
+                        elif stimuli_type == 'slope':
+                            data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
+                                                        last=args.last, first=0, sig=args.noise,debug_plot=args.debug_plot)
+
+                        else:
+                            raise ValueError('Stimuli type not recognized')
+                        torch.save(data, f'{folder_stimuli}/{stimuli}_data.pt')
+
+                        data = data[0, :, :].T
+                        concurrency = 1
+                        sema = Semaphore(concurrency)
+                        all_processes = []
+                        for MNclass in MNclasses:
+                            # pass
+                            calculate_MI_class(stimuli, range_val, MNclass,data, labels,args.dt_sec,name,args)
 
 
 plt.show()
