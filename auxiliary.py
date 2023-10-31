@@ -19,14 +19,20 @@ def plot_voltages(voltage, idx=0):
 
 
 @torch.no_grad()
-def compute_classification_accuracy(dataset, network, early, device):
+def compute_classification_accuracy(dataset, network, early, device, fast=True, batch=None, time=None):
     accs = []
     multi_accs = []
     ttc = None
+    if batch is None:
+        pass
+    else:
+        batch.set_description('Testing')
+        batch.reset(total=len(dataset))
     for x_local, y_local in dataset:
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(
             device, non_blocking=True
         )
+        y_local = y_local[:, 0]
 
         for layer in network:
             if hasattr(layer.__class__, "reset"):
@@ -39,30 +45,51 @@ def compute_classification_accuracy(dataset, network, early, device):
         mn_mem = []
         lif1_mem = []
         lif2_mem = []
+        if time is None:
+            pass
+        else:
+            time.reset(total=x_local.shape[1])
         for t in range(x_local.shape[1]):
             out = network(x_local[:, t])
 
             # Get the spikes and voltages from the MN neuron encoder
-            mn_spk.append(network[1].state.spk)
-            mn_mem.append(network[1].state.V)
+            if not fast:
+                mn_spk.append(network[1].state.spk)
+
+                mn_mem.append(network[1].state.V)
 
             # Get the spikes and voltages from the first LIF
-            lif1_spk.append(network[2].state.S)
-            lif1_mem.append(network[2].state.mem)
+
+            if not fast:
+                lif1_spk.append(network[2].state.S)
+                lif1_mem.append(network[2].state.mem)
 
             # Get the spikes and voltages from the second LIF
-            lif2_spk.append(network[3].state.S)
-            lif2_mem.append(network[3].state.mem)
-        mn_spk = torch.stack(mn_spk, dim=1)
-        mn_mem = torch.stack(mn_mem, dim=1)
-        lif1_spk = torch.stack(lif1_spk, dim=1)
-        lif1_mem = torch.stack(lif1_mem, dim=1)
-        lif2_spk = torch.stack(lif2_spk, dim=1)
-        lif2_mem = torch.stack(lif2_mem, dim=1)
+            lif2_spk.append(network[3].state.S.to_sparse())
+
+            if not fast:
+                lif2_mem.append(network[3].state.mem)
+            else:
+                if t == 0:
+                    lif2_sum = network[3].state.S
+                else:
+                    lif2_sum += network[3].state.S
+            if time is not None:
+                time.update()
+        if not fast:
+            mn_spk = torch.stack(mn_spk, dim=1)
+            mn_mem = torch.stack(mn_mem, dim=1)
+        if not fast:
+            lif1_spk = torch.stack(lif1_spk, dim=1)
+            lif1_mem = torch.stack(lif1_mem, dim=1)
+        lif2_spk = torch.stack(lif2_spk, dim=1).to_dense()
+
+        if not fast:
+            lif2_mem = torch.stack(lif2_mem, dim=1)
+            lif2_sum = torch.sum(lif2_spk, 1)  # sum over time
 
         # with output spikes
-        m = torch.sum(lif2_spk, 1)  # sum over time
-        _, am = torch.max(m, 1)  # argmax over output units
+        _, am = torch.max(lif2_sum, 1)  # argmax over output units
         # compare to labels
         tmp = np.mean((y_local == am).detach().cpu().numpy())
         accs.append(tmp)
@@ -77,7 +104,8 @@ def compute_classification_accuracy(dataset, network, early, device):
                 tmp_early = np.mean((y_local == am_early).detach().cpu().numpy())
                 accs_early.append(tmp_early)
             multi_accs.append(accs_early)
-
+        if batch is not None:
+            batch.update()
     if early:
         max_time = int(54 * 25)  # ms
         time_bin_size = int(1)  # ms
@@ -104,6 +132,15 @@ def compute_classification_accuracy(dataset, network, early, device):
 
     return np.mean(accs), ttc, mn_spk, lif1_spk, lif2_spk, mn_mem, lif1_mem, lif2_mem
 
+def set_random_seed(seed, add_generator=False, device=torch.device('cpu')):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    if add_generator:
+        generator = torch.Generator(device=device).manual_seed(seed)
+        return generator
+    else:
+        return None
 @torch.no_grad()
 def compute_classification_accuracy_nomn(dataset, network, early, device):
     accs = []
