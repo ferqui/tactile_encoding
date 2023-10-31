@@ -444,7 +444,7 @@ def main(args):
                 ###########################################
                 ##                Logging                ##
                 ###########################################
-                if args.nni_opt:
+                if args.nni:
                     nni.report_intermediate_result(test_acc)
 
                 writer.add_scalar("Accuracy/test", test_acc, global_step=e)
