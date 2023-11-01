@@ -65,13 +65,13 @@ def get_fft(data, dt, high_pass=True, normalize=True, average=True):
     x = data
     if high_pass:
         b, a = signal.butter(3, 0.1, 'high')
-        x = signal.filtfilt(b, a, x, axis=0)
+        x = signal.filtfilt(b, a, x, axis=1)
     n_samples = x.shape[0]
     xf = rfftfreq(n_samples, dt)
-    yf = rfft(x, axis=0)
+    yf = rfft(x, axis=1)
     yf = np.abs(yf)
     if average:
-        yf = np.mean(yf, axis=1)
+        yf = np.mean(yf, axis=2)
     if normalize:
         yf = yf / np.max(yf)
 
@@ -172,7 +172,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     n_occ = torch.zeros(10)
     for i in range(10):
         n_occ[i] = len(torch.where(trainset.targets == i)[0])
-    print('N samples per class:', n_occ)
+    # print('N samples per class:', n_occ)
 
     # Extract subset of samples:
     trainset = extract_samples(trainset, n_samples_train, subset_classes)
@@ -181,7 +181,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     n_occ = torch.zeros(10)
     for i in range(10):
         n_occ[i] = len(torch.where(trainset.targets == i)[0])
-    print('N samples per class:', n_occ)
+    # print('N samples per class:', n_occ)
 
     # Create data loader:
     train_loader = DataLoader(trainset,
@@ -189,7 +189,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
                               shuffle=shuffle,
                               generator=generator,
                               **kwargs)
-    print(f'N samples training: {len(trainset.data)}')
+    # print(f'N samples training: {len(trainset.data)}')
 
     # Test:
     testset = MNIST(root='data', train=False, download=True,
@@ -199,7 +199,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     n_occ = torch.zeros(10)
     for i in range(10):
         n_occ[i] = len(torch.where(testset.targets == i)[0])
-    print('N samples per class:', n_occ)
+    # print('N samples per class:', n_occ)
 
     # Extract subset of samples:
     testset = extract_samples(testset, n_samples_test, subset_classes)
@@ -208,7 +208,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     n_occ = torch.zeros(10)
     for i in range(10):
         n_occ[i] = len(torch.where(testset.targets == i)[0])
-    print('N samples per class:', n_occ)
+    # print('N samples per class:', n_occ)
 
     # Create data loader:
     test_loader = DataLoader(testset,
@@ -216,7 +216,7 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
                              shuffle=shuffle,
                              generator=generator,
                              **kwargs)
-    print(f'N samples test: {len(testset.data)}')
+    # print(f'N samples test: {len(testset.data)}')
 
     return train_loader, test_loader
 
@@ -294,11 +294,11 @@ def load_dataset(dataset_name, **kwargs):
 def extract_samples(set, n_samples, subset_classes):
     if n_samples > 0:
         #
-        print(f'Extracting a subset of {n_samples} samples')
+        # print(f'Extracting a subset of {n_samples} samples')
         set.data = set.data[range(n_samples)]
         set.targets = set.targets[range(n_samples)]
     if subset_classes is not None:
-        print('Extracting a subset of classes')
+        # print('Extracting a subset of classes')
         idx_to_extract = []
         for c in subset_classes:
             idx_to_extract.extend(torch.where(set.targets == c)[0])
