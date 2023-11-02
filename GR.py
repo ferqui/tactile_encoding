@@ -234,8 +234,8 @@ def main(args):
 
                 l0_spk = torch.stack(l0_spk, dim=1)
 
-                torch.save(l0_spk, folder.joinpath(f'b{batch_idx}_out.pt'))
-                torch.save(y_local, folder.joinpath(f'b{batch_idx}_label.pt'))
+                torch.save(l0_spk, folder.joinpath(f'GR_Braille_b{batch_idx}_out.pt'))
+                torch.save(y_local, folder.joinpath(f'GR_Braille_b{batch_idx}_label.pt'))
 
     else:
         print(' *** Training model ***')

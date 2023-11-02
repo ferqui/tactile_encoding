@@ -4,7 +4,8 @@ import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 import os
-
+from pathlib import Path
+import json
 # import torchviz
 import matplotlib.pyplot as plt
 
@@ -96,11 +97,6 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
             if hasattr(layer.__class__, "reset"):
                 layer.reset()
 
-        # Simulate the network
-        # we are going to record the hidden layer
-        # spikes for regularization purposes
-        loss_local = 0
-
         l0_spk = []
         lif1_spk = []
         lif2_spk = []
@@ -111,7 +107,7 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         time.reset(total=x_local.shape[1])
         if not args.fast:
             for t in range(x_local.shape[1]):
-               out = network(x_local[:, t])
+               _ = network(x_local[:, t])
                l0_spk.append(network[1].state.spk)
                l0_mem.append(network[1].state.V)
                lif1_spk.append(network[2].state.S)
@@ -121,31 +117,21 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
                time.update()
         else:
             for t in range(x_local.shape[1]):
-                out = network(x_local[:, t])
+                _ = network(x_local[:, t])
                 lif1_spk.append(network[2].state.S)
                 lif2_spk.append(network[3].state.S)
                 time.update()
 
         if not args.fast:
                 l0_spk = torch.stack(l0_spk, dim=1)
-                # l0_events = np.where(l0_spk[0, :, :].cpu().detach().numpy())
-                # plt.scatter(l0_events[0], l0_events[1], s=0.1)
                 l0_mem = torch.stack(l0_mem, dim=1)
         lif1_spk = torch.stack(lif1_spk, dim=1)
-        # l1_events = np.where(lif1_spk[0, :, :].cpu().detach().numpy())
-        # plt.figure()
-        # plt.scatter(l1_events[0], l1_events[1], s=0.1)
         if not args.fast:
                 lif1_mem = torch.stack(lif1_mem, dim=1)
         lif2_spk = torch.stack(lif2_spk, dim=1)
-        # plt.figure()
-        # l2_events = np.where(lif2_spk[0, :, :].cpu().detach().numpy())
-        # plt.scatter(l2_events[0], l2_events[1], s=0.1)
-        # plt.show()
         if not args.fast:
                 lif2_mem = torch.stack(lif2_mem, dim=1)
         m = torch.sum(lif2_spk, 1)  # sum over time
-        # print('lif2_sum',m)
 
         log_p_y = log_softmax_fn(m)
 
@@ -159,10 +145,12 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
 
         # Here we combine supervised loss and the regularizer
         loss_val = loss_fn(log_p_y, y_local) + reg_loss
-
+        print(loss_val)
         optimizer.zero_grad()
         # loss_val.backward()
+
         loss_val.backward(create_graph=True)  # backpropagation of original loss
+        print('ciao')
         loss_DB = args.gr * sum(
             [
                 torch.abs(kv[1]["param"].grad).sum()
@@ -172,6 +160,8 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         loss_DB.backward()  # backpropagation of GR ter
         optimizer.step()
         #local_loss.append()
+        for kv in filter(lambda kv: kv[1]["train"], dict_param.items()):
+            kv[1]["param"].grad = None
 
         with torch.no_grad():
             # compare to labels
@@ -217,22 +207,6 @@ def main(args):
                                              shuffle=True,
                                              generator=generator,
                                              num_workers=8)
-    # nb_channels = dataMN.data.shape[1] * dataMN.data.shape[2]
-
-    # limited_samples = 100
-    # time_length = 300
-    # data =dataMN.data[:limited_samples*2].flatten(start_dim=1,end_dim=2).unsqueeze(1).repeat(1, time_length, 1)
-    # data = data*1e-3 + torch.randint_like(data,high=10)*2e-2
-    # labels = dataMN.targets[:limited_samples*2]
-    # print(data.shape)
-    # print(labels.shape)
-    # xtrain,xtest,ytrain,ytest = train_test_split(data,labels, test_size=0.2,stratify=labels,random_state=args.seed)
-    # if args.nni:
-    #     xtrain,xtest,ytrain,ytest = train_test_split(xtrain,ytrain, test_size=0.2,stratify=ytrain,random_state=args.seed)
-
-    # ds_train = TensorDataset(xtrain, ytrain)
-    # ds_test = TensorDataset(xtest, ytest)
-
     # Network parameters
     nb_input_copies = args.expansion
     nb_inputs = test_dataset.n_inputs * nb_input_copies
@@ -268,7 +242,7 @@ def main(args):
     else:
         dict_param = MN_dict_param
     C = 1
-    print(dict_param)
+
 
     if args.shared_params:
         for param in dict_param:
@@ -284,7 +258,19 @@ def main(args):
             dict_param[param]["param"].data.uniform_(
                 dict_param[param]["ini"] * 0.9, dict_param[param]["ini"] * 1.1
             )
-    # torch.autograd.set_detect_anomaly(True)
+    if args.path_to_optimal_model is not None:
+        # Load MN params from file:
+        with open(Path(args.path_to_optimal_model).joinpath('GR_MNIST_opt.json'), 'r') as f:
+            loaded_data = json.load(f)
+        for param in dict_param:
+            dict_param[param]["param"] = nn.Parameter(
+                torch.Tensor([loaded_data[param]]),
+                requires_grad=False,
+            )
+    for param in dict_param:
+        dict_param[param]["param"].to(device)
+    torch.autograd.set_detect_anomaly(True)
+    print(dict_param)
     if args.ALIF == True:
         l0 = ALIF_neuron(
                  nb_inputs=nb_inputs,
@@ -313,193 +299,219 @@ def main(args):
                 R2=dict_param["R2"]["param"],
                 C=C,
             )
-    network = nn.Sequential(
-        Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
-        l0,
-        LIF_neuron(
-            nb_inputs,
-            nb_hidden,
-            alpha,
-            beta,
-            is_recurrent=True,
-            fwd_weight_scale=fwd_weight_scale,
-            rec_weight_scale=rec_weight_scale,
-        ),
-        LIF_neuron(
-            nb_hidden,
-            nb_outputs,
-            alpha,
-            beta,
-            is_recurrent=False,
-            fwd_weight_scale=fwd_weight_scale,
-            rec_weight_scale=rec_weight_scale,
-        ),
-    ).to(device)
+
+    e0 = Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies)
+
+    l1 = LIF_neuron(
+        nb_inputs,
+        nb_hidden,
+        alpha,
+        beta,
+        is_recurrent=True,
+        fwd_weight_scale=fwd_weight_scale,
+        rec_weight_scale=rec_weight_scale,
+    )
+    l2 = LIF_neuron(
+        nb_hidden,
+        nb_outputs,
+        alpha,
+        beta,
+        is_recurrent=False,
+        fwd_weight_scale=fwd_weight_scale,
+        rec_weight_scale=rec_weight_scale,
+    )
+    # e0 = torch.compile(e0)
+    # l0 = torch.compile(l0)
+    # l1 = torch.compile(l1)
+    # l2 = torch.compile(l2)
+    network = nn.Sequential(e0,l0,l1,l2).to(device)
     print(network)
 
-    for param in dict_param:
-        dict_param[param]["param"].to(device)
+    # torch.autograd.set_detect_anomaly(True)
 
-    ###########################################
-    ##               Training                ##
-    ###########################################
-    batch_size = args.batch_size
+    if args.path_to_optimal_model is not None:
+        print(' *** Recording activity post training ***')
+        output_folder = Path('MN_output')
+        output_folder.mkdir(parents=True, exist_ok=True)
 
-    ## Add the parameters from the LIF layers (2 and 3)
-    my_list = ["2.", "3."]
-    weight_params = [
-        kv[1]
-        for kv in filter(
-            lambda kv: any([ele for ele in my_list if (ele in kv[0])]),
-            network.named_parameters(),
-        )
-    ]
-    param_list = [{"params": weight_params}]
-    ## Add parameters form dict_param
-    for param in dict_param:
-        custom_param = [
+        dl = {'train': None, 'test': []}
+        dl['train'] = dl_train
+        dl['test'] = dl_test
+        for subset in dl.keys():
+            folder = output_folder.joinpath('MNIST', subset)
+            folder.mkdir(parents=True, exist_ok=True)
+            for batch_idx, (x_local, y_local) in enumerate(dl[subset]):
+                # Reset all the layers in the network
+                for layer in network:
+                    if hasattr(layer.__class__, "reset"):
+                        layer.reset()
+
+                l0_spk = []
+
+                for t in range(x_local.shape[1]):
+                    _ = network(x_local[:, t])
+                    # Get the spikes and voltages from the MN neuron encoder
+                    l0_spk.append(network[1].state.spk)
+
+                l0_spk = torch.stack(l0_spk, dim=1)
+                print(torch.where(l0_spk))
+                torch.save(l0_spk, folder.joinpath(f'GR_MNIST_b{batch_idx}_out.pt'))
+                torch.save(y_local, folder.joinpath(f'GR_MNIST_b{batch_idx}_label.pt'))
+    else:
+        ###########################################
+        ##               Training                ##
+        ###########################################
+        batch_size = args.batch_size
+
+        ## Add the parameters from the LIF layers (2 and 3)
+        my_list = ["2.", "3."]
+        weight_params = [
             kv[1]
             for kv in filter(
-                lambda kv: any([ele for ele in [param] if (ele in kv[0])]),
+                lambda kv: any([ele for ele in my_list if (ele in kv[0])]),
                 network.named_parameters(),
             )
         ]
-        if dict_param[param]["custom_lr"] is not None:
-            param_list.append(
-                {"params": custom_param, "lr": dict_param[param]["custom_lr"]}
-            )
-        else:
-            param_list.append({"params": custom_param})
-
-
-    ## Create optimizer
-    optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-    #     optimizer,
-    #     T_0=75,  # Number of iterations for the first restart
-    #     T_mult=1,  # A factor increases TiTi​ after a restart
-    #     eta_min=0,
-    # )  # Minimum learning rate
-    log_softmax_fn = nn.LogSoftmax(dim=1)
-    loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
-
-    ttc_hist = []
-    loss_hist = []
-    accs_hist = [[], []]
-
-    if args.log:
-        #writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
-        if args.nni:
-            log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
-            writer = SummaryWriter(log_dir=log_dir, comment="GR_MNIST")
-        else:
-            writer = SummaryWriter(comment="GR_MNIST")
-
-
-    pbar = trange(nb_epochs,desc='Simulating')
-    batches = trange(len(dl_train),desc='Training',leave=False)
-    time = trange(1,desc='Time',leave=False)
-    for e in pbar:
-        local_loss = []
-        accs = []  # accs: mean training accuracies for each batch
-        for batch_idx, (x_local, y_local) in enumerate(dl_train):
-            y_local = y_local[:,0]
-            loss,acc = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time)
-            local_loss.append(loss)
-            accs.append(acc)
-            batches.update()
-
-        # scheduler.step()
-        mean_loss = np.mean(local_loss)
-        loss_hist.append(mean_loss)
-        # mean_accs: mean training accuracy of current epoch (average over all batches)
-        mean_accs = np.mean(accs)
-        accs_hist[0].append(mean_accs)
-        with torch.no_grad():
-            # Calculate test accuracy in each epoch on the testing dataset
-            (
-                test_acc,
-                test_ttc,
-                l0_spk,
-                lif1_spk,
-                lif2_spk,
-                l0_mem,
-                lif1_mem,
-                lif2_mem,
-            ) = compute_classification_accuracy(dl_test, network, True, device,args.fast,batches,time)
-            accs_hist[1].append(test_acc)  # only safe best test
-            ttc_hist.append(test_ttc)
-
-            if args.log:
-                ###########################################
-                ##               Plotting                ##
-                ###########################################
-
-                # fig1 = plot_spikes(mn_spk.cpu())
-                # fig2 = plot_spikes(lif1_spk.cpu())
-                # fig3 = plot_spikes(lif2_spk.cpu())
-                #
-                # fig4 = plot_voltages(mn_mem.cpu())
-                # fig5 = plot_voltages(lif1_mem.cpu())
-                # fig6 = plot_voltages(lif2_mem.cpu())
-
-                ###########################################
-                ##                Logging                ##
-                ###########################################
-                if args.nni:
-                    nni.report_intermediate_result(test_acc)
-
-                writer.add_scalar("Accuracy/test", test_acc, global_step=e)
-                writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
-                # writer.add_scalar("lr", scheduler.get_last_lr()[0], global_step=e)
-                # for idx, lr in enumerate(scheduler.get_last_lr()):
-                #     writer.add_scalar(f"lr{idx}", lr, global_step=e)
-                # writer.add_scalar("a", a, global_step=e)
-                writer.add_scalar("Loss", mean_loss, global_step=e)
-                if args.shared_params:
-                    for param in dict_param:
-                        writer.add_scalar(
-                            param, dict_param[param]["param"], global_step=e
-                        )
-                else:
-                    for param in dict_param:
-                        writer.add_histogram(
-                            param, dict_param[param]["param"], global_step=e
-                        )
-
-                # writer.add_histogram("w1", network[-2].weight, global_step=e)
-                # writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
-                # writer.add_histogram("w2", network[-1].weight, global_step=e)
-
-        pbar.set_postfix_str(
-            "Train accuracy: "
-            + str(np.round(accs_hist[0][-1] * 100, 2))
-            + "%. Test accuracy: "
-            + str(np.round(accs_hist[1][-1] * 100, 2))
-            + "%, Loss: "
-            + str(np.round(mean_loss, 2))
-        )
-
-    if args.log:
-        nni.report_final_result(test_acc)
-        args_dict = args.__dict__
-        args_dict.pop("log")
-        args_dict.pop("data_path")
+        param_list = [{"params": weight_params}]
+        ## Add parameters form dict_param
         for param in dict_param:
-            for element in dict_param[param]:
-                if (element in ["ini", "train", "custom_lr"]) & (
-                    dict_param[param][element] != None
-                ):
-                    args_dict[param + "_" + element] = dict_param[param][element]
-        writer.add_hparams(
-            args_dict,
-            {
-                "hparam/Accuracy/test": np.max(accs_hist[1]),
-                "hparam/Accuracy/train": np.max(accs_hist[0]),
-                "hparam/loss": np.min(loss_hist),
-            },
-            run_name=".",
-        )
+            custom_param = [
+                kv[1]
+                for kv in filter(
+                    lambda kv: any([ele for ele in [param] if (ele in kv[0])]),
+                    network.named_parameters(),
+                )
+            ]
+            if dict_param[param]["custom_lr"] is not None:
+                param_list.append(
+                    {"params": custom_param, "lr": dict_param[param]["custom_lr"]}
+                )
+            else:
+                param_list.append({"params": custom_param})
+
+
+        ## Create optimizer
+        optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
+        log_softmax_fn = nn.LogSoftmax(dim=1)
+        loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
+
+        ttc_hist = []
+        loss_hist = []
+        accs_hist = [[], []]
+
+        if args.log:
+            #writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
+            if args.nni:
+                log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
+                writer = SummaryWriter(log_dir=log_dir, comment="GR_MNIST")
+            else:
+                writer = SummaryWriter(comment="GR_MNIST")
+
+
+        pbar = trange(nb_epochs,desc='Simulating')
+        batches = trange(len(dl_train),desc='Training',leave=False)
+        time = trange(1,desc='Time',leave=False)
+        for e in pbar:
+            local_loss = []
+            accs = []  # accs: mean training accuracies for each batch
+            for batch_idx, (x_local, y_local) in enumerate(dl_train):
+                y_local = y_local[:,0]
+                loss,acc = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time)
+                local_loss.append(loss)
+                accs.append(acc)
+                batches.update()
+
+            # scheduler.step()
+            mean_loss = np.mean(local_loss)
+            loss_hist.append(mean_loss)
+            # mean_accs: mean training accuracy of current epoch (average over all batches)
+            mean_accs = np.mean(accs)
+            accs_hist[0].append(mean_accs)
+            with torch.no_grad():
+                # Calculate test accuracy in each epoch on the testing dataset
+                (
+                    test_acc,
+                    test_ttc,
+                    l0_spk,
+                    lif1_spk,
+                    lif2_spk,
+                    l0_mem,
+                    lif1_mem,
+                    lif2_mem,
+                ) = compute_classification_accuracy(dl_test, network, True, device,args.fast,batches,time)
+                accs_hist[1].append(test_acc)  # only safe best test
+                ttc_hist.append(test_ttc)
+
+                if args.log:
+                    ###########################################
+                    ##               Plotting                ##
+                    ###########################################
+
+                    # fig1 = plot_spikes(mn_spk.cpu())
+                    # fig2 = plot_spikes(lif1_spk.cpu())
+                    # fig3 = plot_spikes(lif2_spk.cpu())
+                    #
+                    # fig4 = plot_voltages(mn_mem.cpu())
+                    # fig5 = plot_voltages(lif1_mem.cpu())
+                    # fig6 = plot_voltages(lif2_mem.cpu())
+
+                    ###########################################
+                    ##                Logging                ##
+                    ###########################################
+                    if args.nni:
+                        nni.report_intermediate_result(test_acc)
+
+                    writer.add_scalar("Accuracy/test", test_acc, global_step=e)
+                    writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
+                    # writer.add_scalar("lr", scheduler.get_last_lr()[0], global_step=e)
+                    # for idx, lr in enumerate(scheduler.get_last_lr()):
+                    #     writer.add_scalar(f"lr{idx}", lr, global_step=e)
+                    # writer.add_scalar("a", a, global_step=e)
+                    writer.add_scalar("Loss", mean_loss, global_step=e)
+                    if args.shared_params:
+                        for param in dict_param:
+                            writer.add_scalar(
+                                param, dict_param[param]["param"], global_step=e
+                            )
+                    else:
+                        for param in dict_param:
+                            writer.add_histogram(
+                                param, dict_param[param]["param"], global_step=e
+                            )
+
+                    # writer.add_histogram("w1", network[-2].weight, global_step=e)
+                    # writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
+                    # writer.add_histogram("w2", network[-1].weight, global_step=e)
+
+            pbar.set_postfix_str(
+                "Train accuracy: "
+                + str(np.round(accs_hist[0][-1] * 100, 2))
+                + "%. Test accuracy: "
+                + str(np.round(accs_hist[1][-1] * 100, 2))
+                + "%, Loss: "
+                + str(np.round(mean_loss, 2))
+            )
+
+        if args.log:
+            nni.report_final_result(test_acc)
+            args_dict = args.__dict__
+            args_dict.pop("log")
+            args_dict.pop("data_path")
+            for param in dict_param:
+                for element in dict_param[param]:
+                    if (element in ["ini", "train", "custom_lr"]) & (
+                        dict_param[param][element] != None
+                    ):
+                        args_dict[param + "_" + element] = dict_param[param][element]
+            writer.add_hparams(
+                args_dict,
+                {
+                    "hparam/Accuracy/test": np.max(accs_hist[1]),
+                    "hparam/Accuracy/train": np.max(accs_hist[0]),
+                    "hparam/loss": np.min(loss_hist),
+                },
+                run_name=".",
+            )
 
 
 if __name__ == "__main__":
@@ -626,6 +638,12 @@ if __name__ == "__main__":
         "--fast",
         action="store_true",
         help="skip saving mems",
+    )
+    parser.add_argument(
+        "--path_to_optimal_model",
+        type=str,
+        default=None,#None, #"./MN_params",
+        help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
     )
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")

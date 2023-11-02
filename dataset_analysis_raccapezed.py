@@ -419,7 +419,7 @@ def classifier_processed(dict_dataset,epochs,data_type,center,span,args,xf=None)
         epochs.set_postfix_str(f"Loss: {np.mean(loss_list):.3f}, Acc: {np.mean(acc_list):.3f}")
         epochs.update()
     return loss_coll, acc_coll
-def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data='',dataset_name='',cmaps='viridis',args=None):
+def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data='',dataset_name='',args=None):
     opt = {}
 
     epochs = None
@@ -444,40 +444,19 @@ def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data=''
             np.save(os.path.join(folder_data,
                                  f'{data_type}_accuracy_c{centers[data_type][0]}_{centers[data_type][-1]}_{centers[data_type][1] - centers[data_type][0]}_s{spans[data_type][0]}_{spans[data_type][-1]}_{spans[data_type][1] - spans[data_type][0]}.npy'),
                     matrix)
-            plt.imshow(matrix * 100, aspect='auto', origin='lower', cmap=cmaps[data_type])
-            max = np.unravel_index(np.argmax(matrix), matrix.shape)
-            which_decimal_c = np.max(
-                [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))), len(str(int(0.99 / (centers[data_type][0]))))])
-            which_decimal_s = np.max(
-                [len(str(int(0.99 / (spans[data_type][1] - spans[data_type][0])))), len(str(int(0.99 / (spans[data_type][0]))))])
-            plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s), rotation=90)
-            plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
-            plt.xlabel('Span')
-            plt.ylabel('Center')
-            plt.colorbar()
-            plt.title(
-                f'{data_type[0].upper() + data_type[1:]} Accuracy(%). Max:{(matrix.max() * 100).astype(int)}%@({np.round(centers[data_type][max[0]], which_decimal_c)},{np.round(spans[data_type][max[1]], which_decimal_s)})')
-            plt.tight_layout()
-            plt.savefig(os.path.join(folder_fig,
-                                     f'{data_type}_accuracy_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
-            plot_dict = pd.DataFrame(plot_dict)
-            plot_dict.head()
-            plt.figure()
-            g = sns.PairGrid(data=plot_dict[plot_dict['data_type'] == data_type], y_vars=["accuracy"],
-                             x_vars=["center", "span"], height=4)
-            g.map(sns.regplot)
-            g.map(corrfunc)
-            g.fig.subplots_adjust(top=0.8)  # adjust the Figure in rp
-            N = len(centers[data_type])
-            g.fig.suptitle(f'feature: {data_type}')
-            plt.savefig(os.path.join(folder_fig,
-                                     f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
-            opt[data_type] = {'center': centers[data_type][max[0]],
-                                'span': spans[data_type][max[1]],
-                                'n_steps': 10,
-                                'acc': matrix.max() * 100}
-    if args.sim_id<0:
-        json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
+
+def retrieve_analysis(analysis,centers,spans,folder_data='',args=None):
+    plot_dicts = []
+    for d_idx,data_type in enumerate(analysis):
+        print(data_type)
+        for c_idx,center in enumerate(centers[data_type]):
+            for s_idx,span in enumerate(spans[data_type]):
+                # print(data_type,center,span)
+                id = s_idx*30 + c_idx*3 + d_idx
+                # print(id)
+                plot_dict = np.load(os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{id}.npy'),allow_pickle=True).item()
+                plot_dicts.append(plot_dict)
+    return plot_dicts
 def main(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     cmaps = {
@@ -499,10 +478,10 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis')
-    if args.sim_id >= 0:
-        folder = folder.joinpath(f'sim_id_{args.sim_id}')
-        folder.mkdir(parents=True, exist_ok=True)
+    folder = Path('dataset_analysis_hb')
+    if (args.sim_id >= 0) & (args.load == False):
+        # folder = folder.joinpath(f'sim_id_{args.sim_id}')
+        # folder.mkdir(parents=True, exist_ok=True)
         sim_id_analysis = args.sim_id % len(args.analysis)
         remaining = args.sim_id // len(args.analysis)
         sim_id_center = remaining % len(centers[args.analysis[sim_id_analysis]])
@@ -513,49 +492,112 @@ def main(args):
         spans = {analysis[0]:[spans[analysis[0]][sim_id_span]]}
     else:
         analysis = args.analysis
-    if 'Braille' in args.dataset:
-        print('Braille')
-        folder_run = Path(os.path.join(folder,'Braille'))
-        folder_fig = folder_run.joinpath('fig')
-        folder_data = folder_run.joinpath('data')
-        folder_fig.mkdir(parents=True, exist_ok=True)
-        folder_data.mkdir(parents=True, exist_ok=True)
-        folder_fig = str(folder_fig)
-        folder_data = str(folder_data)
-        dict_dataset = load_dataset('Braille',
-                                    batch_size=args.batch_size,
-                                    generator=generator,
-                                    upsample_fac=1,
-                                    data_path="data/data_braille_letters_all.pkl",
-                                    return_fft=False,
-                                    sampling_freq_hz=100.0,
-                                    v_max=-1,
-                                    shuffle=True)
-        do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,args=args,dataset_name='Braille',cmaps=cmaps)
+    if args.load == False:
+        if 'Braille' in args.dataset:
+            print('Braille')
+            folder_run = Path(os.path.join(folder,'Braille'))
+            folder_fig = folder_run.joinpath('fig')
+            folder_data = folder_run.joinpath('data')
+            folder_fig.mkdir(parents=True, exist_ok=True)
+            folder_data.mkdir(parents=True, exist_ok=True)
+            folder_fig = str(folder_fig)
+            folder_data = str(folder_data)
+            dict_dataset = load_dataset('Braille',
+                                        batch_size=args.batch_size,
+                                        generator=generator,
+                                        upsample_fac=1,
+                                        data_path="data/data_braille_letters_all.pkl",
+                                        return_fft=False,
+                                        sampling_freq_hz=100.0,
+                                        v_max=-1,
+                                        shuffle=True)
+            do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
 
 
-    if 'MNIST' in args.dataset:
-        print('MNIST')
-        folder_fig = folder_run.joinpath('fig')
-        folder_data = folder_run.joinpath('data')
-        folder_fig.mkdir(parents=True, exist_ok=True)
-        folder_data.mkdir(parents=True, exist_ok=True)
-        folder_fig = str(folder_fig)
-        folder_data = str(folder_data)
-        dict_dataset = load_dataset('MNIST',
-                                    batch_size=args.batch_size,
-                                    stim_len_sec=3,
-                                    dt_sec=1/100,
-                                    v_max=0.2,
-                                    generator=generator,
-                                    add_noise=True,
-                                    return_fft=False,
-                                    n_samples_train=6480,
-                                    n_samples_test=1620,
-                                    shuffle=True)
-        do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,args=args,dataset_name='MNIST',cmaps=cmaps)
 
+        if 'MNIST' in args.dataset:
+            print('MNIST')
+            folder_run = Path(os.path.join(folder,'MNIST'))
 
+            folder_fig = folder_run.joinpath('fig')
+            folder_data = folder_run.joinpath('data')
+            folder_fig.mkdir(parents=True, exist_ok=True)
+            folder_data.mkdir(parents=True, exist_ok=True)
+            folder_fig = str(folder_fig)
+            folder_data = str(folder_data)
+            dict_dataset = load_dataset('MNIST',
+                                        batch_size=args.batch_size,
+                                        stim_len_sec=3,
+                                        dt_sec=1/100,
+                                        v_max=0.2,
+                                        generator=generator,
+                                        add_noise=True,
+                                        return_fft=False,
+                                        n_samples_train=6480,
+                                        n_samples_test=1620,
+                                        shuffle=True)
+            do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,args=args,dataset_name='MNIST')
+    else:
+        pd_datasets = []
+        for dataset in args.dataset:
+            folder_run = folder.joinpath(dataset)
+            folder_data = folder_run.joinpath('data')
+
+            matrixes = retrieve_analysis(analysis,centers,spans,folder_data=str(folder_data),args=args)
+            df1 = pd.DataFrame.from_dict(matrixes[0])
+            for matrix in matrixes[1:]:
+                df2 = pd.DataFrame.from_dict(matrix)
+                df1=pd.concat([df1, df2])
+            pd_datasets.append(df1)
+
+        plot_dict = pd.concat(pd_datasets)
+        plot_dict.head()
+        for dataset in args.dataset:
+            folder_run = folder.joinpath(dataset)
+            folder_fig = folder_run.joinpath('fig')
+            folder_fig.mkdir(parents=True, exist_ok=True)
+            folder_data = folder_run.joinpath('data')
+            opt = {}
+            for data_type in analysis:
+                plot_dict_sel = plot_dict[(plot_dict['data_type'] == data_type) & (plot_dict['dataset']==dataset)]
+                plt.figure()
+                g = sns.PairGrid(data=plot_dict_sel, y_vars=["accuracy"],
+                                 x_vars=["center", "span"], height=4)
+                g.map(sns.regplot)
+                g.map(corrfunc)
+                g.fig.subplots_adjust(top=0.8)  # adjust the Figure in rp
+                N = len(centers[data_type])
+                g.fig.suptitle(f'dataset {dataset}, feature: {data_type}')
+                which_decimal_c = np.max(
+                    [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))),
+                     len(str(int(0.99 / (centers[data_type][0]))))])
+                which_decimal_s = np.max(
+                    [len(str(int(0.99 / (spans[data_type][1] - spans[data_type][0])))),
+                     len(str(int(0.99 / (spans[data_type][0]))))])
+                print(folder_fig)
+                plt.savefig(os.path.join(folder_fig,
+                                         f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+                plt.savefig(os.path.join(folder_fig,
+                                         f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
+                # plt.close()
+                plt.figure()
+                plot_dict_hm = plot_dict_sel.pivot(index="center", columns="span", values="accuracy")
+                plot_dict_hm_np = np.array(plot_dict_hm)
+                max_here = np.unravel_index(np.argmax(plot_dict_hm_np), plot_dict_hm_np.shape)
+                sns.heatmap(plot_dict_hm)
+                plt.title(f'dataset {dataset}, feature: {data_type}')
+                plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
+                plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
+                plt.savefig(os.path.join(folder_fig,
+                                         f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+                plt.savefig(os.path.join(folder_fig,
+                                         f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
+
+                opt[data_type] = {'center': centers[data_type][max_here[0]],
+                                  'span': spans[data_type][max_here[1]],
+                                  'n_steps': 10,
+                                  'acc': plot_dict_hm_np.max() * 100}
+            json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
 
 
 if __name__ == "__main__":
