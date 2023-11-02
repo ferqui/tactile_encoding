@@ -564,13 +564,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reg_spikes",
         type=float,
-        default=parameters_thenc["reg_spikes"],
+        default=0.004137932487125182,
         help="reg_spikes",
     )
     parser.add_argument(
         "--reg_neurons",
         type=float,
-        default=parameters_thenc["reg_neurons"],
+        default=0.0000012554070087612182,
         help="reg_neurons",
     )
 
@@ -604,7 +604,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gr",
         type=float,
-        default=1.0,
+        default=0.2006232276576734,
         help="Gradient regularization",
     )
     parser.add_argument(
