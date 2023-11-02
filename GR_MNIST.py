@@ -326,6 +326,7 @@ def main(args):
     # l2 = torch.compile(l2)
     network = nn.Sequential(e0,l0,l1,l2).to(device)
     print(network)
+    #network = torch.compile(network)
 
     # torch.autograd.set_detect_anomaly(True)
 
