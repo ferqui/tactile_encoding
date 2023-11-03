@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from torch.utils.data import TensorDataset, DataLoader, Dataset
+from torch.utils.data import TensorDataset, DataLoader, Dataset, Subset
 from torchvision.datasets import MNIST
 from torchvision import transforms
 from scipy import signal
@@ -133,9 +133,14 @@ def create_empty_dataset(h5py_file, list_dataset_names, shape, chunks, dtype):
     """
     for field in list_dataset_names:
         h5py_file.create_dataset(field, shape=shape, chunks=chunks, dtype=dtype)
-
+def train_val_dataset(dataset, val_split=0.25):
+    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
+    # datasets = {}
+    train_val = Subset(dataset, train_idx)
+    val_val = Subset(dataset, val_idx)
+    return train_val, val_val
 def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None, shuffle=True,
-               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False):
+               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False,train_val_split=0.2):
     """
     Load MNIST dataset and return train and test loader.
 
@@ -217,11 +222,21 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
                              generator=generator,
                              **kwargs)
     # print(f'N samples test: {len(testset.data)}')
+    train_val, val_val = train_val_dataset(trainset, val_split=train_val_split)
+    train_val_loader = DataLoader(train_val,
+                             batch_size=batch_size,
+                             shuffle=shuffle,
+                             generator=generator,
+                             **kwargs)
+    val_loader = DataLoader(val_val,
+                                batch_size=batch_size,
+                                shuffle=shuffle,
+                                generator=generator,
+                                **kwargs)
+    return train_loader, test_loader, train_val_loader, val_loader
 
-    return train_loader, test_loader
 
-
-def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1, gain=10, shuffle=True):
+def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1, gain=10, shuffle=True,train_val_split=0.2):
     kwargs = {'num_workers': 4, 'pin_memory': True}
 
     # file_name = "data/data_braille_letters_all.pkl"
@@ -248,24 +263,34 @@ def load_Braille(data_path=None, batch_size=None, generator=None, upsample_fac=1
                               shuffle=shuffle,
                               generator=generator,
                               **kwargs)
-
-    return train_loader, test_loader, n_classes
+    train_val, val_val = train_val_dataset(ds_train, val_split=train_val_split)
+    train_val_loader = DataLoader(train_val,
+                             batch_size=batch_size,
+                             shuffle=shuffle,
+                             generator=generator,
+                             **kwargs)
+    val_loader = DataLoader(val_val,
+                                batch_size=batch_size,
+                                shuffle=shuffle,
+                                generator=generator,
+                                **kwargs)
+    return train_loader, test_loader, train_val_loader, val_loader, n_classes
 
 
 def load_dataset(dataset_name, **kwargs):
     if dataset_name == 'MNIST':
-        train_loader, test_loader = load_MNIST(**kwargs)
+        train_loader, test_loader,train_val_loader,val_loader = load_MNIST(**kwargs)
         dt = kwargs['dt_sec']
         n_classes = len(train_loader.dataset.classes)
     elif dataset_name == 'Braille':
         dt = (1 / kwargs['sampling_freq_hz']) / kwargs['upsample_fac']
-        train_loader, test_loader, n_classes = load_Braille(data_path=kwargs['data_path'],
+        train_loader, test_loader,train_val_loader,val_loader, n_classes = load_Braille(data_path=kwargs['data_path'],
                                                             batch_size=kwargs['batch_size'],
                                                             generator=kwargs['generator'],
                                                             upsample_fac=kwargs['upsample_fac'],
                                                             shuffle=kwargs['shuffle'])
     else:
-        pass
+        raise ValueError(f'Dataset {dataset_name} not supported')
 
     examples = enumerate(train_loader)
     batch_idx, (example_data, example_targets) = next(examples)
@@ -281,6 +306,8 @@ def load_dataset(dataset_name, **kwargs):
         n_freq_steps = -1
     return {'train_loader': train_loader,
             'test_loader': test_loader,
+            'train_val_loader':train_val_loader,
+            'val_loader':val_loader,
             'batch_size': batch_size,
             'n_freq_steps': n_freq_steps,
             'n_time_steps': n_time_steps,

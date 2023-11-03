@@ -21,6 +21,7 @@ from auxiliary import compute_classification_accuracy, set_random_seed
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Subset
 from torchvision.datasets import MNIST
 class MNISTDataset_current(torch.utils.data.dataset.Dataset):
     """
@@ -49,7 +50,7 @@ class MNISTDataset_current(torch.utils.data.dataset.Dataset):
         data = torch.sparse_coo_tensor(idx, values, (self.n_time_steps, self.n_inputs)).to_dense()
 
         return data, target
-
+    # def getsubset(self, indices):
     def __len__(self):
         return len(self.file['targets'])
 parameters_thenc = {}
@@ -179,6 +180,12 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
             tmp = np.mean((y_local == am).detach().cpu().numpy())
             #accs.append(tmp)
         return loss_val.item(),tmp
+def train_val_dataset(dataset, val_split=0.25):
+    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
+    datasets = {}
+    datasets['train'] = Subset(dataset, train_idx)
+    datasets['val'] = Subset(dataset, val_idx)
+    return datasets
 def main(args):
     device = torch.device("cuda:0") if (torch.cuda.is_available() & args.gpu) else torch.device("cpu")
     print(device)
@@ -203,8 +210,15 @@ def main(args):
     seed = 42
     generator = set_random_seed(seed, add_generator=True, device='cpu')
     path_to_dataset = os.path.join(os.getcwd(), 'data','MNIST_time_dataloader')
-    train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'train.h5'), mode='r'), device='cpu')
-    test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'test.h5'), mode='r'), device='cpu')
+
+    if args.nni_opt:
+        train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'train_val.h5'), mode='r'),
+                                             device='cpu')
+        test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'val.h5'), mode='r'), device='cpu')
+    else:
+        train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'train.h5'), mode='r'),
+                                             device='cpu')
+        test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'test.h5'), mode='r'), device='cpu')
 
     dict_dataset['train_loader'] = DataLoader(train_dataset,
                                               batch_size=batch_size,
@@ -227,7 +241,7 @@ def main(args):
     # print(data.shape)
     # print(labels.shape)
     # xtrain,xtest,ytrain,ytest = train_test_split(data,labels, test_size=0.2,stratify=labels,random_state=args.seed)
-    # if args.nni:
+    # if args.nni_opt:
     #     xtrain,xtest,ytrain,ytest = train_test_split(xtrain,ytrain, test_size=0.2,stratify=ytrain,random_state=args.seed)
 
     # ds_train = TensorDataset(xtrain, ytrain)
@@ -373,7 +387,7 @@ def main(args):
 
 
     ## Create optimizer
-    optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
+    optimizer = torch.optim.Adamax(param_list, lr=args.lr, betas=(0.9, 0.995))
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     #     optimizer,
     #     T_0=75,  # Number of iterations for the first restart
@@ -389,7 +403,7 @@ def main(args):
 
     if args.log:
         #writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
-        if args.nni:
+        if args.nni_opt:
             log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
             writer = SummaryWriter(log_dir=log_dir, comment="GR_MNIST")
         else:
@@ -446,7 +460,7 @@ def main(args):
                 ###########################################
                 ##                Logging                ##
                 ###########################################
-                if args.nni:
+                if args.nni_opt:
                     nni.report_intermediate_result(test_acc)
 
                 writer.add_scalar("Accuracy/test", test_acc, global_step=e)
@@ -618,7 +632,7 @@ if __name__ == "__main__":
         help="Use GPU",
     )
     parser.add_argument(
-        "--nni",
+        "--nni_opt",
         action="store_true",
         help="run with nni",
     )
@@ -627,6 +641,11 @@ if __name__ == "__main__":
         action="store_true",
         help="skip saving mems",
     )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=0.005,
+    )
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
@@ -634,7 +653,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
 
-    if args.nni:
+    if args.nni_opt:
         PARAMS = nni.get_next_parameter()
         print(PARAMS)
         # Replace default args with new set

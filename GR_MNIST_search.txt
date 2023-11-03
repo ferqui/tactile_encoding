@@ -1,0 +1,10 @@
+{
+    "reg_neurons": {"_type": "loguniform",
+           "_value": [1e-7,1e-3]},
+    "reg_spikes": {"_type": "loguniform",
+           "_value": [1e-7,1e-3]},
+    "gr": {"_type": "loguniform",
+                "_value": [1e-5,1]},
+    "lr": {"_type": "loguniform",
+                "_value": [1e-5,1]}
+}
