@@ -37,13 +37,16 @@ class MNISTDataset_current(torch.utils.data.dataset.Dataset):
     (frequency values, amplitudes and slopes).
     """
 
-    def __init__(self, hdf5_file, device=None):
+    def __init__(self, hdf5_file, device=None,gain=None):
         """
             :param data_file: Path to h5 file with dataset.
         """
         self.file = hdf5_file
         self.device = device
-
+        if gain is None:
+            self.gain = gain
+        else:
+            self.gain = 1
         for attr in self.file.attrs.keys():
             eval_str = "self.{}".format(attr) + " = " + str(self.file.attrs[attr])
             exec(eval_str)
@@ -388,6 +391,7 @@ def classifier_processed(dict_dataset,epochs,data_type,center,span,args,xf=None)
         batches.reset()
         batches.set_description('Training')
         for i, (data, target) in enumerate(dict_dataset['train_loader']):
+            # data *= dict_dataset['train_loader'].gain
             # print('data_before',data.shape)
             data = extract_feature(data, dict_dataset, data_type, center, span, args.bins, args, i, xf=xf)
             data = torch.tensor(data).to(device)
@@ -405,6 +409,7 @@ def classifier_processed(dict_dataset,epochs,data_type,center,span,args,xf=None)
         batches.set_description('Testing')
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(dict_dataset['test_loader']):
+
                 data = extract_feature(data, dict_dataset, data_type, center, span, args.bins, args, batch_idx, xf=xf)
                 data = torch.tensor(data).to(device)
                 data = data.float()
@@ -510,7 +515,8 @@ def main(args):
                                         return_fft=False,
                                         sampling_freq_hz=100.0,
                                         v_max=-1,
-                                        shuffle=True)
+                                        shuffle=True,
+                                        gain = args.gain_Braille)
             do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
 
 
@@ -535,7 +541,8 @@ def main(args):
                                         return_fft=False,
                                         n_samples_train=6480,
                                         n_samples_test=1620,
-                                        shuffle=True)
+                                        shuffle=True,
+                                        gain = args.gain_MNIST)
             do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,args=args,dataset_name='MNIST')
     else:
         pd_datasets = []
@@ -613,6 +620,8 @@ if __name__ == "__main__":
     parser.add_argument('--bins',  type=int, default=100)
     parser.add_argument('--sim_id',  type=int, default=-1)
     parser.add_argument('--stim_len_sec',  type=int, default=300)
+    parser.add_argument('--gain_Braille', type=float, default=10)
+    parser.add_argument('--gain_MNIST', type=float, default=1)
     args = parser.parse_args()
     if ',' in args.dataset:
         args.dataset = args.dataset.split(',')

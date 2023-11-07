@@ -23,6 +23,7 @@ from auxiliary import compute_classification_accuracy, set_random_seed
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Subset
 from torchvision.datasets import MNIST
 class MNISTDataset_current(torch.utils.data.dataset.Dataset):
     """
@@ -51,7 +52,7 @@ class MNISTDataset_current(torch.utils.data.dataset.Dataset):
         data = torch.sparse_coo_tensor(idx, values, (self.n_time_steps, self.n_inputs)).to_dense()
 
         return data, target
-
+    # def getsubset(self, indices):
     def __len__(self):
         return len(self.file['targets'])
 parameters_thenc = {}
@@ -187,7 +188,13 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
             _, am = torch.max(m, 1)  # argmax over output units
             accuracy = np.mean((y_local == am).detach().cpu().numpy())
             #accs.append(tmp)
-        return loss_val.item(),accuracy,loss_DB.item(),grad_dict,m,recorder
+        return loss_val.item(),tmp
+def train_val_dataset(dataset, val_split=0.25):
+    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
+    datasets = {}
+    datasets['train'] = Subset(dataset, train_idx)
+    datasets['val'] = Subset(dataset, val_idx)
+    return datasets
 def main(args):
     device = torch.device("cuda:0") if (torch.cuda.is_available() & args.gpu) else torch.device("cpu")
     print(device)
@@ -212,8 +219,15 @@ def main(args):
     seed = args.seed
     generator = set_random_seed(seed, add_generator=True, device='cpu')
     path_to_dataset = os.path.join(os.getcwd(), 'data','MNIST_time_dataloader')
-    train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'train.h5'), mode='r'), device='cpu')
-    test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'test.h5'), mode='r'), device='cpu')
+
+    if args.nni_opt:
+        train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'train_val.h5'), mode='r'),
+                                             device='cpu')
+        test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'val.h5'), mode='r'), device='cpu')
+    else:
+        train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'train.h5'), mode='r'),
+                                             device='cpu')
+        test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'test.h5'), mode='r'), device='cpu')
 
     dict_dataset['train_loader'] = DataLoader(train_dataset,
                                               batch_size=batch_size,
@@ -236,7 +250,7 @@ def main(args):
     # print(data.shape)
     # print(labels.shape)
     # xtrain,xtest,ytrain,ytest = train_test_split(data,labels, test_size=0.2,stratify=labels,random_state=args.seed)
-    # if args.nni:
+    # if args.nni_opt:
     #     xtrain,xtest,ytrain,ytest = train_test_split(xtrain,ytrain, test_size=0.2,stratify=ytrain,random_state=args.seed)
 
     # ds_train = TensorDataset(xtrain, ytrain)
@@ -404,8 +418,127 @@ def main(args):
                 network.named_parameters(),
             )
         ]
-        param_list = [{"params": weight_params}]
-        ## Add parameters form dict_param
+        if dict_param[param]["custom_lr"] is not None:
+            param_list.append(
+                {"params": custom_param, "lr": dict_param[param]["custom_lr"]}
+            )
+        else:
+            param_list.append({"params": custom_param})
+
+
+    ## Create optimizer
+    optimizer = torch.optim.Adamax(param_list, lr=args.lr, betas=(0.9, 0.995))
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+    #     optimizer,
+    #     T_0=75,  # Number of iterations for the first restart
+    #     T_mult=1,  # A factor increases TiTi​ after a restart
+    #     eta_min=0,
+    # )  # Minimum learning rate
+    log_softmax_fn = nn.LogSoftmax(dim=1)
+    loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
+
+    ttc_hist = []
+    loss_hist = []
+    accs_hist = [[], []]
+
+    if args.log:
+        #writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
+        if args.nni_opt:
+            log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
+            writer = SummaryWriter(log_dir=log_dir, comment="GR_MNIST")
+        else:
+            writer = SummaryWriter(comment="GR_MNIST")
+
+
+    pbar = trange(nb_epochs,desc='Simulating')
+    batches = trange(len(dl_train),desc='Training',leave=False)
+    time = trange(1,desc='Time',leave=False)
+    for e in pbar:
+        local_loss = []
+        accs = []  # accs: mean training accuracies for each batch
+        for batch_idx, (x_local, y_local) in enumerate(dl_train):
+            y_local = y_local[:,0]
+            loss,acc = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time)
+            local_loss.append(loss)
+            accs.append(acc)
+            batches.update()
+
+        # scheduler.step()
+        mean_loss = np.mean(local_loss)
+        loss_hist.append(mean_loss)
+        # mean_accs: mean training accuracy of current epoch (average over all batches)
+        mean_accs = np.mean(accs)
+        accs_hist[0].append(mean_accs)
+        with torch.no_grad():
+            # Calculate test accuracy in each epoch on the testing dataset
+            (
+                test_acc,
+                test_ttc,
+                l0_spk,
+                lif1_spk,
+                lif2_spk,
+                l0_mem,
+                lif1_mem,
+                lif2_mem,
+            ) = compute_classification_accuracy(dl_test, network, True, device,args.fast,batches,time)
+            accs_hist[1].append(test_acc)  # only safe best test
+            ttc_hist.append(test_ttc)
+
+            if args.log:
+                ###########################################
+                ##               Plotting                ##
+                ###########################################
+
+                # fig1 = plot_spikes(mn_spk.cpu())
+                # fig2 = plot_spikes(lif1_spk.cpu())
+                # fig3 = plot_spikes(lif2_spk.cpu())
+                #
+                # fig4 = plot_voltages(mn_mem.cpu())
+                # fig5 = plot_voltages(lif1_mem.cpu())
+                # fig6 = plot_voltages(lif2_mem.cpu())
+
+                ###########################################
+                ##                Logging                ##
+                ###########################################
+                if args.nni_opt:
+                    nni.report_intermediate_result(test_acc)
+
+                writer.add_scalar("Accuracy/test", test_acc, global_step=e)
+                writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
+                # writer.add_scalar("lr", scheduler.get_last_lr()[0], global_step=e)
+                # for idx, lr in enumerate(scheduler.get_last_lr()):
+                #     writer.add_scalar(f"lr{idx}", lr, global_step=e)
+                # writer.add_scalar("a", a, global_step=e)
+                writer.add_scalar("Loss", mean_loss, global_step=e)
+                if args.shared_params:
+                    for param in dict_param:
+                        writer.add_scalar(
+                            param, dict_param[param]["param"], global_step=e
+                        )
+                else:
+                    for param in dict_param:
+                        writer.add_histogram(
+                            param, dict_param[param]["param"], global_step=e
+                        )
+
+                # writer.add_histogram("w1", network[-2].weight, global_step=e)
+                # writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
+                # writer.add_histogram("w2", network[-1].weight, global_step=e)
+
+        pbar.set_postfix_str(
+            "Train accuracy: "
+            + str(np.round(accs_hist[0][-1] * 100, 2))
+            + "%. Test accuracy: "
+            + str(np.round(accs_hist[1][-1] * 100, 2))
+            + "%, Loss: "
+            + str(np.round(mean_loss, 2))
+        )
+
+    if args.log:
+        nni.report_final_result(test_acc)
+        args_dict = args.__dict__
+        args_dict.pop("log")
+        args_dict.pop("data_path")
         for param in dict_param:
             custom_param = [
                 kv[1]
@@ -682,7 +815,7 @@ if __name__ == "__main__":
         help="Use GPU",
     )
     parser.add_argument(
-        "--nni",
+        "--nni_opt",
         action="store_true",
         help="run with nni",
     )
@@ -695,21 +828,7 @@ if __name__ == "__main__":
         "--lr",
         type=float,
         default=0.005,
-        help="Learning Rate",
     )
-    parser.add_argument(
-        "--path_to_optimal_model",
-        type=str,
-        default=None,  # None, #"./MN_params",
-        help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
-    )
-    parser.add_argument(
-        "--gain",
-        type=float,
-        default=0.02,  # None, #"./MN_params",
-        help="Scaling dataset to neuron",
-    )
-
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
@@ -717,7 +836,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
 
-    if args.nni:
+    if args.nni_opt:
         PARAMS = nni.get_next_parameter()
         print(PARAMS)
         # Replace default args with new set

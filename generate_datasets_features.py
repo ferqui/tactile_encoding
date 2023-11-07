@@ -17,7 +17,8 @@ import h5py
 from tqdm import tqdm
 import os
 from numpy.fft import rfft, rfftfreq
-
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Subset, DataLoader as Dataloader
 
 def main(args):
     # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -47,7 +48,8 @@ def main(args):
                                     n_samples_train=args.n_samples_train,
                                     n_samples_test=args.n_samples_test,
                                     shuffle=True)
-
+    else:
+        raise NotImplementedError
     path_to_dataset = Path(args.home_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
 
@@ -70,7 +72,7 @@ def main(args):
     val_type = h5py.vlen_dtype(np.dtype('float32'))
     ids_type = h5py.vlen_dtype(np.dtype('int32'))
 
-    for subset in ['train', 'test']:
+    for subset in ['train', 'test','train_val','val']:
 
         n_tot_samples = len(dict_dataset[subset + '_loader'].dataset)
         print(f'N samples {subset}: {n_tot_samples}')
@@ -202,7 +204,7 @@ if __name__ == '__main__':
                         default=1)
     parser.add_argument('--data_type',
                         type=str,
-                        default='frequency',
+                        default='current',
                         choices=['current', 'frequency', 'amplitude', 'slope'])
     parser.add_argument('--bins_hist',
                         type=int,
@@ -211,7 +213,7 @@ if __name__ == '__main__':
     parser.add_argument('--home_dataset',
                         type=str,
                         help='Absolute path to output folder where the output dataset is stored',
-                        default='/media/p308783/bics2/Nicoletta/tactile_encoding/')  # './dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
+                        default='home/mast/Progetti/tactile_encoding/data')  # './dataset/')#'/media/p308783/bics/Nicoletta/tactile_encoding/')
     args = parser.parse_args()
 
     main(args)
