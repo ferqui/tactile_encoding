@@ -86,7 +86,7 @@ class ToCurrent(object):
 
     """
 
-    def __init__(self, stim_len_sec, dt_sec=1e-2, v_max=0.2, add_noise=True):
+    def __init__(self, stim_len_sec, dt_sec=1e-2, v_max=0.2, add_noise=True,gain = 1.):
         """
         :param sitm_length_sec: stimulus duration (in sec)
         :param dt_sec: stimulus dt (in sec)
@@ -97,6 +97,7 @@ class ToCurrent(object):
         self.n_time_steps = int(self.stim_len_sec / self.dt_sec)
         self.add_noise = add_noise
         self.v_max = v_max
+        self.gain = gain
 
     def __call__(self, sample):
         # Map 2D input image to 2D tensor with px ids and current:
@@ -104,7 +105,7 @@ class ToCurrent(object):
         sample = sample.flatten(start_dim=1, end_dim=2).unsqueeze(1).repeat(1, self.n_time_steps, 1)
         if self.add_noise:
             # TODO: Check how to add noise
-            sample = sample.to(torch.float) + torch.randint_like(sample, high=10) / 10 * self.v_max
+            sample = (sample.to(torch.float) + torch.randint_like(sample, high=10) / 10 * self.v_max)*self.gain
 
         # Return tensor without channel dimension (only grayscale samples)
         return sample[0]
@@ -140,7 +141,7 @@ def train_val_dataset(dataset, val_split=0.25):
     val_val = Subset(dataset, val_idx)
     return train_val, val_val
 def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None, shuffle=True,
-               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False,train_val_split=0.2):
+               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False,train_val_split=0.2,gain=0.1):
     """
     Load MNIST dataset and return train and test loader.
 
@@ -163,12 +164,12 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
     if return_fft:
         # Return data in frequency domain:
         list_transforms = [transforms.PILToTensor(),
-                           ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise),
+                           ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain),
                            ToFft(dt_sec)]
     else:
         # Return samples in time:
         list_transforms = [transforms.PILToTensor(),
-                           ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise)]
+                           ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain)]
     # Train:
     trainset = MNIST(root='data', train=True, download=True,
                      transform=transforms.Compose(list_transforms))
@@ -288,7 +289,8 @@ def load_dataset(dataset_name, **kwargs):
                                                             batch_size=kwargs['batch_size'],
                                                             generator=kwargs['generator'],
                                                             upsample_fac=kwargs['upsample_fac'],
-                                                            shuffle=kwargs['shuffle'])
+                                                            shuffle=kwargs['shuffle'],
+                                                            gain = kwargs['gain'])
     else:
         raise ValueError(f'Dataset {dataset_name} not supported')
 
