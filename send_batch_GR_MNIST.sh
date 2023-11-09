@@ -17,8 +17,9 @@
 ## please adapt the following to your need:
 
 # from to (incl) range of iterations, max is 1000 total
-#SBATCH --gpus-per-node=1
+
 # memory requirement - check on your PC first if possible
+#SBATCH --gpus-per-node=1
 #SBATCH --mem=50GB
 # max execution time
 #SBATCH --time=3-00:00:00
@@ -31,4 +32,4 @@
 source spll_venv/bin/activate
 cd tactile_encoding2
 
-python3 GR_MNIST.py --shared_params --gpu --log --train --lr=$*
+python3 GR_MNIST.py --shared_params --log --train --lr=$*
