@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import os
 import json
 from pathlib import Path
+import pickle
 
 # import torchviz
 import matplotlib.pyplot as plt
@@ -19,11 +20,10 @@ from datasets import load_data
 
 from parameters.MN_params import MNparams_dict, INIT_MODE
 from models import Encoder, LIF_neuron, MN_neuron_sp, ALIF_neuron
-from auxiliary import compute_classification_accuracy, set_random_seed
+from auxiliary import set_random_seed
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import TensorDataset, DataLoader
-from torch.utils.data import Subset
 from torchvision.datasets import MNIST
 class MNISTDataset_current(torch.utils.data.dataset.Dataset):
     """
@@ -52,7 +52,7 @@ class MNISTDataset_current(torch.utils.data.dataset.Dataset):
         data = torch.sparse_coo_tensor(idx, values, (self.n_time_steps, self.n_inputs)).to_dense()
 
         return data, target
-    # def getsubset(self, indices):
+
     def __len__(self):
         return len(self.file['targets'])
 parameters_thenc = {}
@@ -170,13 +170,16 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         optimizer.zero_grad()
         # loss_val.backward()
         loss_val.backward(create_graph=True)  # backpropagation of original loss
+        grad_dict = {}
+
+        for param in dict_param:
+            grad_dict[param+'b4gr'] = dict_param[param]["param"].grad
         loss_DB = args.gr * sum(
             [
                 torch.abs(kv[1]["param"].grad).sum()
                 for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
             ]
         )  # computing GR term
-        grad_dict = {}
         for param in dict_param:
             grad_dict[param] = dict_param[param]["param"].grad
         loss_DB.backward()  # backpropagation of GR ter
@@ -188,13 +191,121 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
             _, am = torch.max(m, 1)  # argmax over output units
             accuracy = np.mean((y_local == am).detach().cpu().numpy())
             #accs.append(tmp)
-        return loss_val.item(),tmp
-def train_val_dataset(dataset, val_split=0.25):
-    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
-    datasets = {}
-    datasets['train'] = Subset(dataset, train_idx)
-    datasets['val'] = Subset(dataset, val_idx)
-    return datasets
+        return loss_val.item(),accuracy,loss_DB.item(),grad_dict,m,recorder
+
+@torch.no_grad()
+def compute_classification_accuracy(dataset, network, early, device, args,fast=True, batch=None, time=None):
+    accs = []
+    multi_accs = []
+    ttc = None
+    if batch is None:
+        pass
+    else:
+        batch.set_description('Testing')
+        batch.reset(total=len(dataset))
+    for x_local, y_local in dataset:
+        x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(
+            device, non_blocking=True
+        )
+        y_local = y_local[:, 0]
+
+        for layer in network:
+            if hasattr(layer.__class__, "reset"):
+                layer.reset()
+
+        mn_spk = []
+        lif1_spk = []
+        lif2_spk = []
+
+        mn_mem = []
+        lif1_mem = []
+        lif2_mem = []
+        if time is None:
+            pass
+        else:
+            time.reset(total=x_local.shape[1])
+        for t in range(x_local.shape[1]):
+            out = network(x_local[:, t]*args.gain)
+
+            # Get the spikes and voltages from the MN neuron encoder
+            if not fast:
+                mn_spk.append(network[1].state.spk)
+
+                mn_mem.append(network[1].state.V)
+
+            # Get the spikes and voltages from the first LIF
+
+            if not fast:
+                lif1_spk.append(network[2].state.S)
+                lif1_mem.append(network[2].state.mem)
+
+            # Get the spikes and voltages from the second LIF
+            lif2_spk.append(network[3].state.S.to_sparse())
+
+            if not fast:
+                lif2_mem.append(network[3].state.mem)
+            else:
+                if t == 0:
+                    lif2_sum = network[3].state.S
+                else:
+                    lif2_sum += network[3].state.S
+            if time is not None:
+                time.update()
+        if not fast:
+            mn_spk = torch.stack(mn_spk, dim=1)
+            mn_mem = torch.stack(mn_mem, dim=1)
+        if not fast:
+            lif1_spk = torch.stack(lif1_spk, dim=1)
+            lif1_mem = torch.stack(lif1_mem, dim=1)
+        lif2_spk = torch.stack(lif2_spk, dim=1).to_dense()
+
+        if not fast:
+            lif2_mem = torch.stack(lif2_mem, dim=1)
+            lif2_sum = torch.sum(lif2_spk, 1)  # sum over time
+
+        # with output spikes
+        _, am = torch.max(lif2_sum, 1)  # argmax over output units
+        # compare to labels
+        tmp = np.mean((y_local == am).detach().cpu().numpy())
+        accs.append(tmp)
+
+        if early:
+            accs_early = []
+            for t in range(lif2_spk.shape[1] - 1):
+                # with spiking output layer
+                m_early = torch.sum(lif2_spk[:, : t + 1, :], 1)  # sum over time
+                _, am_early = torch.max(m_early, 1)  # argmax over output units
+                # compare to labels
+                tmp_early = np.mean((y_local == am_early).detach().cpu().numpy())
+                accs_early.append(tmp_early)
+            multi_accs.append(accs_early)
+        if batch is not None:
+            batch.update()
+    if early:
+        max_time = int(54 * 25)  # ms
+        time_bin_size = int(1)  # ms
+        time = range(0, max_time, time_bin_size)
+
+        mean_multi = np.mean(multi_accs, axis=0)
+        if np.max(mean_multi) > mean_multi[-1]:
+            if mean_multi[-2] == mean_multi[-1]:
+                flattening = []
+                for ii in range(len(mean_multi) - 2, 1, -1):
+                    if mean_multi[ii] != mean_multi[ii - 1]:
+                        flattening.append(ii)
+                # time to classify
+                try:
+                    ttc = time[flattening[0]]
+                except:
+                    ttc = time[-1]
+            else:
+                # time to classify
+                ttc = time[-1]
+        else:
+            # time to classify
+            ttc = time[np.argmax(mean_multi)]
+
+    return np.mean(accs), ttc, mn_spk, lif1_spk, lif2_spk, mn_mem, lif1_mem, lif2_mem
 def main(args):
     device = torch.device("cuda:0") if (torch.cuda.is_available() & args.gpu) else torch.device("cpu")
     print(device)
@@ -219,15 +330,8 @@ def main(args):
     seed = args.seed
     generator = set_random_seed(seed, add_generator=True, device='cpu')
     path_to_dataset = os.path.join(os.getcwd(), 'data','MNIST_time_dataloader')
-
-    if args.nni_opt:
-        train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'train_val.h5'), mode='r'),
-                                             device='cpu')
-        test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'val.h5'), mode='r'), device='cpu')
-    else:
-        train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'train.h5'), mode='r'),
-                                             device='cpu')
-        test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset, 'test.h5'), mode='r'), device='cpu')
+    train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'train.h5'), mode='r'), device='cpu')
+    test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'test.h5'), mode='r'), device='cpu')
 
     dict_dataset['train_loader'] = DataLoader(train_dataset,
                                               batch_size=batch_size,
@@ -250,7 +354,7 @@ def main(args):
     # print(data.shape)
     # print(labels.shape)
     # xtrain,xtest,ytrain,ytest = train_test_split(data,labels, test_size=0.2,stratify=labels,random_state=args.seed)
-    # if args.nni_opt:
+    # if args.nni:
     #     xtrain,xtest,ytrain,ytest = train_test_split(xtrain,ytrain, test_size=0.2,stratify=ytrain,random_state=args.seed)
 
     # ds_train = TensorDataset(xtrain, ytrain)
@@ -418,127 +522,8 @@ def main(args):
                 network.named_parameters(),
             )
         ]
-        if dict_param[param]["custom_lr"] is not None:
-            param_list.append(
-                {"params": custom_param, "lr": dict_param[param]["custom_lr"]}
-            )
-        else:
-            param_list.append({"params": custom_param})
-
-
-    ## Create optimizer
-    optimizer = torch.optim.Adamax(param_list, lr=args.lr, betas=(0.9, 0.995))
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-    #     optimizer,
-    #     T_0=75,  # Number of iterations for the first restart
-    #     T_mult=1,  # A factor increases TiTi​ after a restart
-    #     eta_min=0,
-    # )  # Minimum learning rate
-    log_softmax_fn = nn.LogSoftmax(dim=1)
-    loss_fn = nn.NLLLoss()  # The negative log likelihood loss function
-
-    ttc_hist = []
-    loss_hist = []
-    accs_hist = [[], []]
-
-    if args.log:
-        #writer = SummaryWriter(comment="MN_WITH_GR_L1_MNIST")  # For logging purpose
-        if args.nni_opt:
-            log_dir = os.path.join(os.environ["NNI_OUTPUT_DIR"], 'tensorboard')
-            writer = SummaryWriter(log_dir=log_dir, comment="GR_MNIST")
-        else:
-            writer = SummaryWriter(comment="GR_MNIST")
-
-
-    pbar = trange(nb_epochs,desc='Simulating')
-    batches = trange(len(dl_train),desc='Training',leave=False)
-    time = trange(1,desc='Time',leave=False)
-    for e in pbar:
-        local_loss = []
-        accs = []  # accs: mean training accuracies for each batch
-        for batch_idx, (x_local, y_local) in enumerate(dl_train):
-            y_local = y_local[:,0]
-            loss,acc = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time)
-            local_loss.append(loss)
-            accs.append(acc)
-            batches.update()
-
-        # scheduler.step()
-        mean_loss = np.mean(local_loss)
-        loss_hist.append(mean_loss)
-        # mean_accs: mean training accuracy of current epoch (average over all batches)
-        mean_accs = np.mean(accs)
-        accs_hist[0].append(mean_accs)
-        with torch.no_grad():
-            # Calculate test accuracy in each epoch on the testing dataset
-            (
-                test_acc,
-                test_ttc,
-                l0_spk,
-                lif1_spk,
-                lif2_spk,
-                l0_mem,
-                lif1_mem,
-                lif2_mem,
-            ) = compute_classification_accuracy(dl_test, network, True, device,args.fast,batches,time)
-            accs_hist[1].append(test_acc)  # only safe best test
-            ttc_hist.append(test_ttc)
-
-            if args.log:
-                ###########################################
-                ##               Plotting                ##
-                ###########################################
-
-                # fig1 = plot_spikes(mn_spk.cpu())
-                # fig2 = plot_spikes(lif1_spk.cpu())
-                # fig3 = plot_spikes(lif2_spk.cpu())
-                #
-                # fig4 = plot_voltages(mn_mem.cpu())
-                # fig5 = plot_voltages(lif1_mem.cpu())
-                # fig6 = plot_voltages(lif2_mem.cpu())
-
-                ###########################################
-                ##                Logging                ##
-                ###########################################
-                if args.nni_opt:
-                    nni.report_intermediate_result(test_acc)
-
-                writer.add_scalar("Accuracy/test", test_acc, global_step=e)
-                writer.add_scalar("Accuracy/train", mean_accs, global_step=e)
-                # writer.add_scalar("lr", scheduler.get_last_lr()[0], global_step=e)
-                # for idx, lr in enumerate(scheduler.get_last_lr()):
-                #     writer.add_scalar(f"lr{idx}", lr, global_step=e)
-                # writer.add_scalar("a", a, global_step=e)
-                writer.add_scalar("Loss", mean_loss, global_step=e)
-                if args.shared_params:
-                    for param in dict_param:
-                        writer.add_scalar(
-                            param, dict_param[param]["param"], global_step=e
-                        )
-                else:
-                    for param in dict_param:
-                        writer.add_histogram(
-                            param, dict_param[param]["param"], global_step=e
-                        )
-
-                # writer.add_histogram("w1", network[-2].weight, global_step=e)
-                # writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
-                # writer.add_histogram("w2", network[-1].weight, global_step=e)
-
-        pbar.set_postfix_str(
-            "Train accuracy: "
-            + str(np.round(accs_hist[0][-1] * 100, 2))
-            + "%. Test accuracy: "
-            + str(np.round(accs_hist[1][-1] * 100, 2))
-            + "%, Loss: "
-            + str(np.round(mean_loss, 2))
-        )
-
-    if args.log:
-        nni.report_final_result(test_acc)
-        args_dict = args.__dict__
-        args_dict.pop("log")
-        args_dict.pop("data_path")
+        param_list = [{"params": weight_params}]
+        ## Add parameters form dict_param
         for param in dict_param:
             custom_param = [
                 kv[1]
@@ -586,23 +571,32 @@ def main(args):
             local_loss = []
             local_loss_GR = []
             local_spk_count = []
-            accs = []  # accs: mean training accuracies for each batch
+            accs = []
+            grad_dict_coll = []# accs: mean training accuracies for each batch
             for batch_idx, (x_local, y_local) in enumerate(dl_train):
                 y_local = y_local[:,0]
                 loss,acc,loss_GR,grad_dict,spk_count,recorder = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time)
                 local_loss.append(loss)
                 accs.append(acc)
                 local_loss_GR.append(loss_GR)
-                local_spk_count.append(spk_count.cpu())
+                local_spk_count.append(spk_count.detach().cpu().numpy())
+                grad_dict_coll.append(grad_dict)
                 batches.update()
+                if batch_idx > 3:
+                    break
 
                 if np.logical_or.reduce([torch.isnan(grad_dict[param]).cpu().numpy() for param in grad_dict if grad_dict[param] is not None]):
-                    json.dump(recorder, open("neuron_state_at_nan.json", "w"))
+                    with open('filename.pickle', 'wb') as handle:
+                        pickle.dump(recorder, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
             # scheduler.step()
             mean_loss = np.mean(local_loss)
             mean_loss_gr = np.mean(local_loss_GR)
-            mean_spk_count = np.mean(local_spk_count)
+            for key in grad_dict:
+                if grad_dict[key] is not None:
+                    grad_dict[key] = np.mean([grad_dict_coll[i][key].detach().cpu().numpy() for i in range(len(grad_dict_coll))])
+            mean_spk_count = np.mean(np.concatenate(local_spk_count,axis=0))
+            # mean_spk_count = -10
             loss_hist.append(mean_loss)
             # mean_accs: mean training accuracy of current epoch (average over all batches)
             mean_accs = np.mean(accs)
@@ -618,7 +612,7 @@ def main(args):
                     l0_mem,
                     lif1_mem,
                     lif2_mem,
-                ) = compute_classification_accuracy(dl_test, network, True, device,args.fast,batches,time)
+                ) = compute_classification_accuracy(dl_test, network, True, device,args,args.fast,batches,time)
                 accs_hist[1].append(test_acc)  # only safe best test
                 ttc_hist.append(test_ttc)
 
@@ -815,7 +809,7 @@ if __name__ == "__main__":
         help="Use GPU",
     )
     parser.add_argument(
-        "--nni_opt",
+        "--nni",
         action="store_true",
         help="run with nni",
     )
@@ -828,7 +822,21 @@ if __name__ == "__main__":
         "--lr",
         type=float,
         default=0.005,
+        help="Learning Rate",
     )
+    parser.add_argument(
+        "--path_to_optimal_model",
+        type=str,
+        default=None,  # None, #"./MN_params",
+        help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
+    )
+    parser.add_argument(
+        "--gain",
+        type=float,
+        default=0.02,  # None, #"./MN_params",
+        help="Scaling dataset to neuron",
+    )
+
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
@@ -836,7 +844,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
 
-    if args.nni_opt:
+    if args.nni:
         PARAMS = nni.get_next_parameter()
         print(PARAMS)
         # Replace default args with new set

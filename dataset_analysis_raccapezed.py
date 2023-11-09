@@ -207,7 +207,7 @@ def classifier(data,labels,epochs=None):
         epochs.set_postfix_str(f"Loss: {np.mean(loss_list):.3f}, Acc: {np.mean(acc_list):.3f}")
         epochs.update()
     return loss_coll,acc_coll
-def plt_amplitude(data,labels,label_ascii,folder_fig = ''):
+def plt_amplitude(dataloader,label_ascii,folder_fig = ''):
     plt.figure()
     idx_letters, indices = np.unique(labels, return_index=True)
     colors = sns.color_palette("husl", len(idx_letters))
@@ -349,8 +349,79 @@ def plt_frequency(data,labels,label_ascii,folder_fig=''):
     ax.spines['left'].set_visible(False)
     plt.xlabel('Frequency (Hz)')
     plt.savefig(os.path.join(folder_fig,'Frequency.pdf'), format='pdf', dpi=300)
+def plt_signal(dict_dataset,dataset_name,folder_fig=''):
+    data_coll = []
+    for i, (data, target) in enumerate(dict_dataset['train_loader']):
+        data = extract_feature(data, dict_dataset, 'mean_amplitude', 0, 0, 0, args, i,target=target)
+        data_coll.append(data)
+    data_lump = {}
+    for key in range(dict_dataset['n_classes']):
+        for data in data_coll:
+            if key not in data_lump.keys():
+                data_lump[key] = []
+            if key in data.keys():
+                data_lump[key].append(data[key])
+    plt.figure()
+    for key in data_lump.keys():
+        data_lump[key] = torch.mean(torch.stack(data_lump[key]),dim=0)
+        plt.plot(data_lump[key][:,:].cpu().numpy(),color=sns.color_palette("husl", dict_dataset['n_classes'])[key])
+    from matplotlib.lines import Line2D
 
-def extract_feature(data, dict_dataset, data_type,center,span,bins,args, i, xf=None):
+    custom_lines = [Line2D([0], [0], color=sns.color_palette("husl", dict_dataset['n_classes'])[key], lw=4) for key in data_lump.keys()]
+    labels = [str(key) for key in data_lump.keys()]
+    cols = len(labels)//10
+    plt.legend(custom_lines, [str(key) for key in data_lump.keys()],ncol=cols)
+    # plt.legend()
+    plt.title('Mean Amplitude '+dataset_name)
+    plt.savefig(os.path.join(folder_fig,'mean_amplitude.png'))
+def plt_fft(dict_dataset,dataset_name,folder_fig='',f_min=5):
+    data_coll = []
+    for i, (data, target) in enumerate(dict_dataset['train_loader']):
+        data,xf = extract_feature(data, dict_dataset, 'mean_fft', 0, 0, 0, args, i,target=target)
+        data_coll.append(data)
+    data_lump = {}
+    for key in range(dict_dataset['n_classes']):
+        for data in data_coll:
+            if key not in data_lump.keys():
+                data_lump[key] = []
+            if key in data.keys():
+                data_lump[key].append(data[key])
+    plt.figure()
+    xf_where = xf >= f_min
+    for key in data_lump.keys():
+        data_lump[key] = torch.mean(torch.stack(data_lump[key]),dim=0)
+        plt.plot(xf[xf_where],data_lump[key][xf_where,:].cpu().numpy(),color=sns.color_palette("husl", dict_dataset['n_classes'])[key])
+    from matplotlib.lines import Line2D
+
+    custom_lines = [Line2D([0], [0], color=sns.color_palette("husl", dict_dataset['n_classes'])[key], lw=4) for key in data_lump.keys()]
+    labels = [str(key) for key in data_lump.keys()]
+    cols = len(labels)//10
+    plt.legend(custom_lines, [str(key) for key in data_lump.keys()],ncol=cols)
+    # plt.legend()
+    plt.title('Mean FFT '+dataset_name)
+    plt.savefig(os.path.join(folder_fig,'mean_fft.png'))
+def plt_best(opt,dict_dataset,data_type,xf=None,dataset_name = '',folder_fig=''):
+    center = opt[data_type]['center']
+    span = opt[data_type]['span']
+    data_coll = {}
+    for label in range(dict_dataset['n_classes']):
+        data_coll[label] = []
+    for i, (data, target) in enumerate(dict_dataset['train_loader']):
+        data = extract_feature(data, dict_dataset, data_type, center, span, args.bins, args, i, xf=xf)
+        data = torch.tensor(data).to(torch.float)
+        for label in range(dict_dataset['n_classes']):
+            data_coll[label].append(data[target==label])
+    plt.figure()
+    for label in range(dict_dataset['n_classes']):
+        # print(data_coll[label])
+
+        data_coll[label] = torch.mean(torch.concatenate(data_coll[label]),dim=0)
+        plt.plot(data_coll[label].cpu().numpy(),color=sns.color_palette("husl", dict_dataset['n_classes'])[label])
+    plt.title('Best '+data_type + ' '+dataset_name)
+    plt.savefig(os.path.join(folder_fig,'best_'+data_type+'.png'))
+    # plt.show()
+
+def extract_feature(data, dict_dataset, data_type,center,span,bins,args, i, xf=None,target= None):
     assert data.shape[1] == dict_dataset['n_features']
     assert data.shape[2] == dict_dataset['n_inputs']
     # print(data_type)
@@ -370,6 +441,27 @@ def extract_feature(data, dict_dataset, data_type,center,span,bins,args, i, xf=N
         data = torch.diff(data, dim=1)
         data = extract_histogram(data, bins, center, span)
         assert data.shape[1] == bins
+
+    elif data_type == 'mean_amplitude':
+        # print(data.shape)
+        data_mean = {}
+        for t in target.unique():
+            data_s = data[target == t]
+            # print(data_s.shape)
+
+            data_mean[t.item()] = torch.mean(data_s, dim=0)
+        # print(data_mean)
+        return data_mean
+    elif data_type == 'mean_fft':
+        data_mean = {}
+        for t in target.unique():
+            data_s = data[target == t]
+            data_s_fft = torch.abs(torch.fft.rfft(data_s, dim=1))
+            xf = rfftfreq(data_s.shape[1], 1/100)
+            data_mean[t.item()] = torch.mean(data_s_fft,dim=0)
+        return data_mean,xf
+
+
     return data
 def classifier_processed(dict_dataset,epochs,data_type,center,span,args,xf=None):
     classifier = nn.Sequential(
@@ -497,8 +589,8 @@ def main(args):
         spans = {analysis[0]:[spans[analysis[0]][sim_id_span]]}
     else:
         analysis = args.analysis
-    if args.load == False:
-        if 'Braille' in args.dataset:
+    for dataset in args.dataset:
+        if 'Braille' == dataset:
             print('Braille')
             folder_run = Path(os.path.join(folder,'Braille'))
             folder_fig = folder_run.joinpath('fig')
@@ -517,11 +609,12 @@ def main(args):
                                         v_max=-1,
                                         shuffle=True,
                                         gain = args.gain_Braille)
-            do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
+            if args.load == False:
+                do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
 
 
 
-        if 'MNIST' in args.dataset:
+        elif 'MNIST' == dataset:
             print('MNIST')
             folder_run = Path(os.path.join(folder,'MNIST'))
 
@@ -543,10 +636,15 @@ def main(args):
                                         n_samples_test=1620,
                                         shuffle=True,
                                         gain = args.gain_MNIST)
-            do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,args=args,dataset_name='MNIST')
-    else:
-        pd_datasets = []
-        for dataset in args.dataset:
+            if args.load == False:
+                do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST')
+        else:
+            raise ValueError('dataset not found')
+        if args.load:
+            plt_signal(dict_dataset,dataset,folder_fig=folder_fig)
+            plt_fft(dict_dataset,dataset,folder_fig=folder_fig)
+            pd_datasets = []
+
             folder_run = folder.joinpath(dataset)
             folder_data = folder_run.joinpath('data')
 
@@ -557,9 +655,9 @@ def main(args):
                 df1=pd.concat([df1, df2])
             pd_datasets.append(df1)
 
-        plot_dict = pd.concat(pd_datasets)
-        plot_dict.head()
-        for dataset in args.dataset:
+            plot_dict = pd.concat(pd_datasets)
+            plot_dict.head()
+
             folder_run = folder.joinpath(dataset)
             folder_fig = folder_run.joinpath('fig')
             folder_fig.mkdir(parents=True, exist_ok=True)
@@ -567,26 +665,26 @@ def main(args):
             opt = {}
             for data_type in analysis:
                 plot_dict_sel = plot_dict[(plot_dict['data_type'] == data_type) & (plot_dict['dataset']==dataset)]
-                plt.figure()
-                g = sns.PairGrid(data=plot_dict_sel, y_vars=["accuracy"],
-                                 x_vars=["center", "span"], height=4)
-                g.map(sns.regplot)
-                g.map(corrfunc)
-                g.fig.subplots_adjust(top=0.8)  # adjust the Figure in rp
-                N = len(centers[data_type])
-                g.fig.suptitle(f'dataset {dataset}, feature: {data_type}')
+                # plt.figure()
+                # g = sns.PairGrid(data=plot_dict_sel, y_vars=["accuracy"],
+                #                  x_vars=["center", "span"], height=4)
+                # g.map(sns.regplot)
+                # g.map(corrfunc)
+                # g.fig.subplots_adjust(top=0.8)  # adjust the Figure in rp
+                # N = len(centers[data_type])
+                # g.fig.suptitle(f'dataset {dataset}, feature: {data_type}')
                 which_decimal_c = np.max(
                     [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))),
                      len(str(int(0.99 / (centers[data_type][0]))))])
                 which_decimal_s = np.max(
                     [len(str(int(0.99 / (spans[data_type][1] - spans[data_type][0])))),
                      len(str(int(0.99 / (spans[data_type][0]))))])
-                print(folder_fig)
-                plt.savefig(os.path.join(folder_fig,
-                                         f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
-                plt.savefig(os.path.join(folder_fig,
-                                         f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
-                # plt.close()
+                # print(folder_fig)
+                # plt.savefig(os.path.join(folder_fig,
+                #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+                # plt.savefig(os.path.join(folder_fig,
+                #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
+                # # plt.close()
                 plt.figure()
                 plot_dict_hm = plot_dict_sel.pivot(index="center", columns="span", values="accuracy")
                 plot_dict_hm_np = np.array(plot_dict_hm)
@@ -604,6 +702,8 @@ def main(args):
                                   'span': spans[data_type][max_here[1]],
                                   'n_steps': 10,
                                   'acc': plot_dict_hm_np.max() * 100}
+                plt_best(opt,dict_dataset,data_type,dataset_name = dataset,folder_fig=folder_fig)
+
             json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
 
 
@@ -621,7 +721,7 @@ if __name__ == "__main__":
     parser.add_argument('--sim_id',  type=int, default=-1)
     parser.add_argument('--stim_len_sec',  type=int, default=300)
     parser.add_argument('--gain_Braille', type=float, default=10)
-    parser.add_argument('--gain_MNIST', type=float, default=1)
+    parser.add_argument('--gain_MNIST', type=float, default=0.02)
     args = parser.parse_args()
     if ',' in args.dataset:
         args.dataset = args.dataset.split(',')

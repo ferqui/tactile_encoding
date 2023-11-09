@@ -291,6 +291,7 @@ def sweep_frequency_oscillations(frequencies=np.arange(20, 30), n_trials=10, off
         t = np.arange(int(fs*stim_length_sec)) / fs
         n_time_bins = len(t)
         amplitude = area*np.pi*f
+        amplitude=10
         for n in range(n_trials):
 
             x = amplitude * np.sin(2 * np.pi * f * t) + offset
@@ -348,58 +349,22 @@ def train_nmf(V_save, Y_save,rank_NMF):
     net.fit(V_save,verbose=False)
     Y_save = torch.concat(Y_save)
     H_save = net.H.clone().detach()
-    # plt.figure()
-    # eee = torch.argsort(Y_save)
-    # plt.imshow(V_save[eee,:].cpu(),aspect='auto',interpolation='none',cmap='Greens')
-    # plt.figure()
-    # plt.imshow(H_save[eee,:].cpu(),aspect='auto',interpolation='none',cmap='Blues')
-    # plt.show()
     return H_save,Y_save
 
-def train(dl_train, neuron, params, device,rank_NMF,optimizer,model,criterion,writer,epoch):
+def train(dl_train, neuron, params, device,rank_NMF,optimizer,model,criterion,writer,epoch,name=''):
     list_epoch_loss = []
     for x_local, y_local in dl_train:
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
-        # params['nb_channels'] = x_local.shape[0]
-        # neuron.N = params['nb_channels']
-        # neuron.reset()
-        #
-        # s_out_rec = []
-        # for t in range(x_local.shape[1]):
-        #     out = neuron(
-        #         x_local[None,:, t])  # shape: n_batches x 1 fanout x n_param_values x n_channels
-        #     s_out_rec.append(out)
-        # s_out_rec_train = torch.stack(s_out_rec, dim=1)
-        # # indexes = torch.argsort(y_local)
-        # # aaa = torch.where(s_out_rec_train[0,:,indexes])
-        # # plt.scatter(aaa[0].cpu(), aaa[1].cpu(),)
-        # # plt.show()
-        # # s_out_rec_train = torch.permute(s_out_rec_train, (3, 0, 2, 4, 1))
-        #
-        # ### s_out_rec_train shape:  trial x variable x fanout x channels x time
-        # s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
-        # # H = torch.zeros([s_out_rec_train.shape[2], s_out_rec_train.shape[0], rank_NMF])
-        # V_matrix = s_out_rec_train.T
-        # net = NMF(V_matrix.shape, rank=rank_NMF)
-        # net.fit(V_matrix)
-        # # H[0] = net.H
-        # eee = torch.argsort(y_local)
-        # plt.imshow(net.H[eee,:].detach().cpu(), aspect='auto')
-        # plt.show()
         optimizer.zero_grad()
         outputs = model(x_local)
-        # outputs_norm = (outputs - label_min) / (label_diff)
         loss = criterion(outputs, y_local)
-        # get gradients w.r.t to parameters
         loss.backward()
         list_epoch_loss.append(loss.item())
-        # update parameters
         optimizer.step()
-    # writer.add_scalar('MSE/train', torch.mean(torch.tensor(list_epoch_loss)).cpu().numpy(), epoch)
+    writer.add_scalar('Loss/train', torch.mean(torch.tensor(list_epoch_loss)).clone().cpu().numpy(), epoch)
     return torch.mean(torch.tensor(list_epoch_loss)).clone().cpu().numpy()
-        # print('Epoch: {}. MSE train: {}. '.format(e, loss.item()))
 
-def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch):
+def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch,name=''):
 
     list_epoch_loss_test = []
     list_epoch_MI = []
@@ -407,24 +372,17 @@ def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch):
     with torch.no_grad():
         for x_local, y_local in dl_test:
             predicted = model(x_local)
-
             loss_test = criterion(predicted, y_local)
-            #
-
             label = y_local
             label_unique = torch.unique(label)
             predicted_int = torch.argmax(predicted,dim=1)
             predicted_range = torch.unique(predicted_int)
-            # print(predicted_range)
             pdf_x1x2 = torch.zeros([len(label_unique), len(predicted_range)])
-            # print(predicted_range)
             for trial_idx in range(len(predicted_int)):
                 lab_pos = torch.where(label_unique == label[trial_idx])[0]
                 pred_pos = torch.where(predicted_range == predicted_int[trial_idx])[0]
                 pdf_x1x2[lab_pos, pred_pos] += 1
             num_occ = torch.sum(pdf_x1x2)
-
-            # plt.show()
             pdf_x1 = torch.sum(pdf_x1x2, dim=1) / num_occ  # to check
             pdf_x2 = torch.sum(pdf_x1x2, dim=0) / num_occ
             pdf_x1x2 = pdf_x1x2 / num_occ
@@ -436,49 +394,16 @@ def eval(dl_test, neuron, params, device,rank_NMF,model,criterion,writer,epoch):
             list_epoch_MI.append(mi.item())
             list_epoch_loss_test.append(loss_test.item())
             list_epoch_accuracy.append(torch.sum(predicted_int == label).item() / len(label))
-        # print('Epoch: {}. MSE test: {}. '.format(epoch, mi.item()))
-
-        # fig1, axis1 = plt.subplots()
-        # fig2, axis2 = plt.subplots()
-        # pcm = axis1.imshow([predicted.cpu().numpy(), label[:, None].cpu().numpy()], aspect='auto')
-        # # axis1.colorbar()
-        # fig1.colorbar(pcm, ax=axis1)
-        # pcm2 = axis2.imshow(pdf_x1x2.cpu().numpy(), aspect='auto')
-        # fig2.colorbar(pcm2, ax=axis2)
-        # eee = torch.argsort(y_local)
-        # aaa = torch.where(s_out_rec_test[:,eee])
-        # axis3.scatter(aaa[1].cpu().numpy(),aaa[0].cpu().numpy())
-        # writer.add_figure(figure=fig1, global_step=epoch, tag='test_resp')
-        # writer.add_figure(figure=fig2, global_step=epoch, tag='test_mi')
-        # writer.add_scalar('MI', torch.mean(torch.tensor(list_epoch_MI)).cpu().numpy(), epoch)
-        # # writer.add_scalar('MSE/train', torch.mean(torch.tensor(list_epoch_loss)).cpu().numpy(), e)
-        # writer.add_scalar('MSE/test', torch.mean(torch.tensor(list_epoch_loss_test)).cpu().numpy(), epoch)
-
+            writer.add_scalar('MI', torch.mean(torch.tensor(list_epoch_MI)).cpu().numpy(), epoch)
+            writer.add_scalar('Accuracy_test', torch.mean(torch.tensor(list_epoch_accuracy)).cpu().numpy(), epoch)
+            writer.add_scalar('Loss/test', torch.mean(torch.tensor(list_epoch_loss_test)).cpu().numpy(), epoch)
     return torch.mean(torch.tensor(list_epoch_MI)).cpu().numpy(), torch.mean(torch.tensor(list_epoch_loss_test)).cpu().numpy(), torch.mean(torch.tensor(list_epoch_accuracy)).cpu().numpy()
-def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MNclass,data,labels,dt_sec,name,args):
-    # Set results folder:
-    iscuda = torch.cuda.is_available()
-    # # Forcing CPU
-    iscuda = False
-    # print('NOTE: Forced CPU')
+def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MNclass,data,labels,dt_sec,name,writer,args):
 
-    # if run_with_fake_input:
-    #     results_dir = 'results/controlled_stim/'
-    #     if not (os.path.isdir(results_dir)):
-    #         os.mkdir(results_dir)
-    # else:
-    #     results_dir = set_results_folder([exp_id,name,MNclass, name_param_sweeped, str(extremes_sweep)])
-    #     results_dir += '/'
-    #
-    # # Filename metadata:
-    # metadatafilename = results_dir + '/metadata.txt'
-    #
-    # # Create file with metadata
-    # addHeaderToMetadata(metadatafilename, 'Simulation')
-
+    iscuda = (torch.cuda.is_available()) and args.gpu
     device = torch.device(
         'cuda') if iscuda else torch.device('cpu')
-    torch.manual_seed(0)
+    torch.manual_seed(args.seed)
 
     cuda = iscuda
     if cuda:
@@ -491,41 +416,20 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     label_n = len(label_u)
     x_train, x_test, y_train, y_test = train_test_split(
         data.cpu(), labels_idx, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
-    ds_train = TensorDataset(x_train, torch.tensor(y_train).to_dense().to(torch.float32))
-    ds_test = TensorDataset(x_test, torch.tensor(y_test).to_dense().to(torch.float32))
     ds_4nmf = TensorDataset(data.cpu(), torch.tensor(labels_idx).to_dense())
     params['nb_channels'] = 1
     params['labels'] = labels_idx
-
-    params['nb_channels'] = 1
     params['data_steps'] = dt_sec
 
     # Network parameters
     # Learning parameters
-    nb_epochs = int(50)
+    nb_epochs = int(args.n_epochs)
     ###########################################
     ##                Network                ##
     ###########################################
-
-    n_param_values = params['n_param_values']
-
     tensor_params = dict.fromkeys(neuron_param_values.keys(), None)
     for key in tensor_params.keys():
         tensor_params[key] = torch.Tensor(neuron_param_values[key]).to(device)
-
-    # varying_element = tensor_params[name_param_sweeped]
-
-    # a = torch.Tensor(neuron_param_values['a']).to(device)
-    # # nn.init.normal_(
-    # #     a, mean=MNparams_dict['A2B'][0], std=fwd_weight_scale / np.sqrt(nb_inputs))
-    #
-    # A1 = torch.Tensor(neuron_param_values['A1']).to(device)
-    #
-    # A2 = torch.Tensor(neuron_param_values['A2']).to(device)
-
-    # fanout = 1  # number of output neurons from the linear expansion
-    # TODO: Change input parameters list
-    # print(tensor_params)
     neuron = models.MN_neuron(1, {},
                                  a=tensor_params['a'],
                                  A1=tensor_params['A1'],
@@ -536,31 +440,20 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
                                  k2=tensor_params['k2'],
                                  train=False,dt=dt_sec)
 
-    batch_size = int(100)
-
-    # inputDim = 1  # takes variable 'x'
-    # outputDim = 1  # takes variable 'y'
-    learningRate = params['learningRate']  # 10#0.01
+    batch_size = args.batch_size
+    learningRate = args.lr
 
     # neuron_id = int(params['neuron_id'])
 
-    rank_NMF = int(params['rank_NMF'])
+    rank_NMF = args.rank_NMF
     model = torch.nn.Linear(rank_NMF,label_n)
-
-    # TODO: Check this
-    if iscuda:
-        pin_memory = True
-        num_workers = 0
-    else:
-        pin_memory = False
-        num_workers = 0
 
     # The log softmax function across output units
     # dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
     #                       generator=torch.Generator(device=device))
     # dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=num_workers,
     #                      generator=torch.Generator(device=device))
-    dl_4nmf = DataLoader(ds_4nmf, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+    dl_4nmf = DataLoader(ds_4nmf, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers,
                             generator=torch.Generator(device=device))
     # pbar = trange(nb_epochs)
     criterion = torch.nn.CrossEntropyLoss()
@@ -591,65 +484,56 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
             s_out_rec.append(out)
 
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
-        #spike train is now channels(1) x time x batch
-
-
-        #for spike meas
         s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
-        spike_count = torch.sum(s_out_rec_train, dim=0)
-        #for count meas
-        bins = s_out_rec_train.shape[0]
-        counter = 0
-        count = torch.zeros(rank_NMF, s_out_rec_train.shape[1])
-
-        for i in range(s_out_rec_train.shape[1]):
-            count[:, i] = torch.histogram(s_out_rec_train[:, i], bins=torch.linspace(0,1,rank_NMF+1))[0]
-            if y_local[i] == counter:
-                # print(torch.sum(s_out_rec_train[:, i]))
-                # print(count[0,i],count[-1, i])
-                counter += 1
-                # print(counter)
-        # uuu = torch.where(s_out_rec_train[:, y_local == 0])
-        # plt.scatter(uuu[0].cpu(), uuu[1].cpu())
-        # plt.show()
-        # plt.figure()
-        # plt.plot(x_local[:20,:].T.cpu())
-        # plt.show()
-        #for hist meas
-        hist = torch.zeros(bins, s_out_rec_train.shape[1])
-        for i in range(s_out_rec_train.shape[1]):
-            aaa = torch.diff(torch.where(s_out_rec_train[:, i])[0])
-            hist[:,i] = torch.histogram(aaa.to(torch.float), bins=bins)[0]
-
-        hist_nonmf = torch.zeros(rank_NMF, s_out_rec_train.shape[1])
-        for i in range(s_out_rec_train.shape[1]):
-            aaa = torch.diff(torch.where(s_out_rec_train[:, i])[0])
-            hist_nonmf[:,i] = torch.histogram(aaa.to(torch.float), bins=rank_NMF)[0]
-
+        # spike_count = torch.sum(s_out_rec_train, dim=0)
 
         Y_save.append(y_local)
-
-        V_matrix_count = count.T
-        V_save_count.append(V_matrix_count)
-
         V_matrix_spike = s_out_rec_train.T
         V_save_spike.append(V_matrix_spike)
+        counter = 0
+        count = torch.zeros(rank_NMF, s_out_rec_train.shape[1])
+        for i in range(s_out_rec_train.shape[1]):
+                count[:, i] = torch.histogram(s_out_rec_train[:, i], bins=torch.linspace(0,1,rank_NMF+1))[0]
+                if y_local[i] == counter:
 
-        V_matrix_isi = hist.T
-        V_save_isi.append(V_matrix_isi)
-
-        V_matrix_isi_nonmf = hist_nonmf.T
-        V_save_isi_nonmf.append(V_matrix_isi_nonmf)
-
+                    counter += 1
+        V_matrix_count = count.T
+        V_save_count.append(V_matrix_count)
+        if 'isi' in args.encoding_methods:
+            bins = s_out_rec_train.shape[0]
+            hist = torch.zeros(bins, s_out_rec_train.shape[1])
+            for i in range(s_out_rec_train.shape[1]):
+                aaa = torch.diff(torch.where(s_out_rec_train[:, i])[0])
+                hist[:,i] = torch.histogram(aaa.to(torch.float), bins=bins)[0]
+            V_matrix_isi = hist.T
+            V_save_isi.append(V_matrix_isi)
+        if 'isi_nonmf' in args.encoding_methods:
+            hist_nonmf = torch.zeros(rank_NMF, s_out_rec_train.shape[1])
+            for i in range(s_out_rec_train.shape[1]):
+                aaa = torch.diff(torch.where(s_out_rec_train[:, i])[0])
+                hist_nonmf[:,i] = torch.histogram(aaa.to(torch.float), bins=rank_NMF)[0]
+            V_matrix_isi_nonmf = hist_nonmf.T
+            V_save_isi_nonmf.append(V_matrix_isi_nonmf)
     V_save_spike = torch.vstack(V_save_spike)
     V_save_count = torch.vstack(V_save_count)
-    V_save_isi = torch.vstack(V_save_isi)
-    V_save_isi_nonmf = torch.vstack(V_save_isi_nonmf)
+    if 'isi' in args.encoding_methods:
+        V_save_isi = torch.vstack(V_save_isi)
+    if 'isi_nonmf' in args.encoding_methods:
+        V_save_isi_nonmf = torch.vstack(V_save_isi_nonmf)
     for encoding_method in args.encoding_methods:
-        #writer = SummaryWriter(comment="Enc" + encoding_method + "Stim" + str(name_param_sweeped) + "_Range" + str(
-        #    extremes_sweep) + "_MN_class" + str(MNclass))
+        name = os.path.join(name_param_sweeped, str(np.round(getattr(args,
+                                                                     name_param_sweeped + '_center'), 2)) + str(
+            np.round(getattr(args, name_param_sweeped + '_span'),
+                     2)), encoding_method, MNclass,str(args.seed))
+        if args.debug_plot:
+            writer = SummaryWriter(log_dir='MN_DSP/runs/'+exp_id+"/"+name,comment=name)
+        else:
+            writer = SummaryWriter(log_dir='MN_DSP/runs/'+exp_id+"/"+name,comment=name)
         pbar = trange(nb_epochs)
-        results_dir = set_results_folder([exp_id,MNclass, name_param_sweeped, str(np.round(getattr(args, name_param_sweeped + '_center'),2)) + str(np.round(getattr(args, name_param_sweeped + '_span'),2)),encoding_method,str(args.seed)])
+
+        results_dir = set_results_folder([exp_id,MNclass, name_param_sweeped, str(np.round(getattr(args,
+            name_param_sweeped + '_center'),2)) + str(np.round(getattr(args, name_param_sweeped + '_span'),
+                                                               2)),encoding_method,str(args.seed)])
         results_dir += '/'
         # Filename metadata:
         metadatafilename = results_dir + '/metadata.txt'
@@ -665,103 +549,58 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
             addToNetMetadata(metadatafilename, key, neuron_param_values[key], header=header)
             header = ''
         if encoding_method == 'count':
-
-            # nmf_samples,nmf_labels = train_nmf(V_save_count,Y_save,rank_NMF)
-            nmf_samples, nmf_labels = V_save_count,torch.hstack(Y_save)
-            if args.debug_plot:
-                fig1, axis1 = plt.subplots(1, 1)
-                eee = torch.argsort(nmf_labels)
-                axis1.imshow(V_save_count[eee, :].cpu().numpy(),aspect='auto')
-                fig5,axis5 = plt.subplots(1,1)
-                axis5.imshow(nmf_samples[eee,:].cpu().numpy(),aspect='auto',interpolation='none')
-            # plt.show()
+            input_var = V_save_count
+            labels = torch.hstack(Y_save)
+            output_var = input_var
         elif encoding_method == 'isi':
-            nmf_samples, nmf_labels = train_nmf(V_save_isi,Y_save,rank_NMF)
-            if args.debug_plot:
-                fig1, axis1 = plt.subplots(1, 1)
-                eee = torch.argsort(nmf_labels)
-                axis1.imshow(V_save_isi[eee, :].cpu().numpy(),aspect='auto')
-                fig5, axis5 = plt.subplots(1, 1)
-                axis5.imshow(nmf_samples[eee, :].cpu().numpy(), aspect='auto',interpolation='none')
+            input_var = V_save_isi
+            output_var, labels = train_nmf(V_save_isi,Y_save,rank_NMF)
         elif encoding_method == 'spike':
-            nmf_samples, nmf_labels = train_nmf(V_save_spike,Y_save,rank_NMF)
-            if args.debug_plot:
-                fig1, axis1 = plt.subplots(1, 1)
-                eee = torch.argsort(nmf_labels)
-                aaa = torch.where(V_save_spike[eee, :])
-                axis1.scatter(aaa[1].cpu().numpy(), aaa[0].cpu().numpy())
-                fig5, axis5 = plt.subplots(1, 1)
-                axis5.imshow(nmf_samples[eee, :].cpu().numpy(), aspect='auto',interpolation='none')
+            input_var = V_save_spike
+            output_var, labels = train_nmf(V_save_spike,Y_save,rank_NMF)
         elif encoding_method == 'isi_nonmf':
-            nmf_samples, nmf_labels = train_nmf(V_save_isi_nonmf,Y_save,rank_NMF)
-            if args.debug_plot:
-                fig1, axis1 = plt.subplots(1, 1)
-                eee = torch.argsort(nmf_labels)
-                axis1.imshow(V_save_isi_nonmf[eee, :].cpu().numpy(),aspect='auto')
-                fig5, axis5 = plt.subplots(1, 1)
-                axis5.imshow(nmf_samples[eee, :].cpu().numpy(), aspect='auto',interpolation='none')
+            input_var = V_save_isi_nonmf
+            output_var, labels = train_nmf(V_save_isi_nonmf,Y_save,rank_NMF)
         else:
             raise ValueError('Wrong name for the encoding')
-        # print('we')
-        h = list(MNclasses.keys()).index(MNclass)
-        eee = torch.argsort(nmf_labels)
-        #writer.add_histogram('Spike Count', spike_count, bins='auto',global_step=h)
         if args.debug_plot:
-            ax4[h].imshow(nmf_samples[eee,:],aspect='auto',cmap='Greens',interpolation='none')
-            ax4[h].set_title(MNclass)
+            fig1, axis1 = plt.subplots(1, 1,figsize=(10,10))
+            labels_ordered = torch.argsort(labels)
+            axis1.imshow(input_var[labels_ordered, :].cpu().numpy(), aspect='auto',interpolation='none')
+
+            axis1.set_title('Input '+name)
+            fig2, axis2 = plt.subplots(1, 1,figsize=(10,10))
+            axis2.imshow(output_var[labels_ordered,:].cpu().numpy(), aspect='auto',interpolation='none')
+            axis2.set_title('Output '+name)
+            writer.add_figure(figure=fig1, global_step=0, tag='Input')
+            writer.add_figure(figure=fig2, global_step=0, tag='Output')
 
         x_train, x_test, y_train, y_test = train_test_split(
-            nmf_samples.cpu(), nmf_labels, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
+            output_var.cpu(), labels, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
         ds_test = TensorDataset(x_test, y_test)
-        dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+        dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
                                 generator=torch.Generator(device=device))
-        dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+        dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
                                 generator=torch.Generator(device=device))
-        # fig1,axis1 = plt.subplots(1, 1)
-        # eee = torch.argsort(nmf_labels)
-        # aaa = torch.where(V_save_spike[eee,:])
-        # axis1.scatter(aaa[1].cpu().numpy(),aaa[0].cpu().numpy())
-        h = list(MNclasses.keys()).index(MNclass)
-        if args.debug_plot:
-            ax3[h].scatter(aaa[1].cpu().numpy(),aaa[0].cpu().numpy())
-            ax3[h].set_title(MNclass)
-        writer = None
-        # writer.add_figure(figure=fig4, global_step=0, tag='test_nmf')
-        # writer.add_figure(figure=fig3, global_step=0, tag='test_V')
-        # writer.add_figure('V', fig1, 0)
-        # writer.add_figure('NMF', fig5, 0)
+
         list_loss = []
         list_mi = []
         list_mse_test = []
         list_acc_test = []
         for e in pbar:
-            list_epoch_loss = []
-            list_epoch_MI = []
-            list_epoch_loss_test = []
-            loss_train = train(epoch=e, model=model, optimizer=optimizer, criterion=criterion, dl_train=dl_train, device=device,rank_NMF=rank_NMF, writer=writer,neuron=neuron,params=params)
+            loss_train = train(epoch=e, model=model, optimizer=optimizer, criterion=criterion, dl_train=dl_train, device=device,rank_NMF=rank_NMF, writer=writer,neuron=neuron,params=params,name=name)
             list_loss.append(loss_train.item())
-
-                    # get gradients w.r.t to parameters
-                    # update parameters
-            mi_test, mse_test,acc_test = eval(epoch=e, model=model, criterion=criterion, dl_test=dl_test, device=device,rank_NMF=rank_NMF, writer=writer,neuron=neuron,params=params)
+            mi_test, mse_test,acc_test = eval(epoch=e, model=model, criterion=criterion, dl_test=dl_test, device=device,rank_NMF=rank_NMF, writer=writer,neuron=neuron,params=params,name=name)
             list_mi.append(mi_test.item())
             list_mse_test.append(mse_test.item())
             list_acc_test.append(acc_test.item())
-            # list_mi.append(torch.mean(torch.tensor(list_epoch_mi)).cpu().numpy())
-            # print('plotting')
-            # fig1,axis1 = plt.subplots()
-            # plt.figure()
-            # axis1.plot(list_loss,color='b')
-            # axis2 = axis1.twinx()
-            # axis2.plot(list_mi, color='r')
-            # plt.show()
-        # print('Saving results')
+            pbar.set_postfix_str('Loss: {:.4f}, MI: {:.4f}, MSE: {:.4f}, Acc: {:.4f}'.format(loss_train.item(), mi_test.item(), mse_test.item(), acc_test.item()))
         torch.save(list_loss, results_dir + 'Loss.pt')
         torch.save(list_mi, results_dir + 'MI.pt')
         torch.save(list_acc_test, results_dir + 'Accuracy.pt')
         torch.save(list_mse_test, results_dir + 'MSE.pt')
-        torch.save(spike_count, results_dir + 'Spike_Count.pt')
+        torch.save(V_save_count, results_dir + 'Spike_Count.pt')
 from multiprocessing import Process
 
 def run_in_parallel(*fns):
@@ -773,7 +612,7 @@ def run_in_parallel(*fns):
     for p in proc:
         p.join()
 
-def calculate_MI_class(stimuli_type, range_val, MNclass,data, labels,dt_sec,name,args):
+def calculate_MI_class(stimuli_type, range_val, MNclass,data, labels,dt_sec,name,writer,args):
     print('-------------------------------------------')
     print('Class {}, Stimuli {}, Range center {} span {}, Encoding {}, Seed {}'.format(MNclass, stimuli_type, np.round(getattr(args, stimuli_type + '_center'),2),
                                                                       np.round(getattr(args, stimuli_type + '_span'),
@@ -781,7 +620,7 @@ def calculate_MI_class(stimuli_type, range_val, MNclass,data, labels,dt_sec,name
     # Generate dictionary with parameter values:
     dict_keys = generate_dict('a', [MNclasses[MNclass]['a']], force_param_dict=MNclasses[MNclass])
     # Run mutual information analysis
-    MI_neuron_params(dict_keys, stimuli_type, range_val, MNclass, data, labels, dt_sec=dt_sec, name=name,args = args)
+    MI_neuron_params(dict_keys, stimuli_type, range_val, MNclass, data, labels, dt_sec=dt_sec, name=name,writer=writer,args = args)
     print('-------------------------------------------')
     print('DONE. Class {}, Stimuli {}, Range center {} span {}, Encoding {}, Seed {}'.format(MNclass, stimuli_type, np.round(getattr(args, stimuli_type + '_center'),2),
                                                                       np.round(getattr(args, stimuli_type + '_span'),
@@ -798,12 +637,18 @@ if __name__ == "__main__":
     parser.add_argument('--stim_length_sec', type=float, default=1.1)
     parser.add_argument('--noise', type=float, default=0)
     parser.add_argument('--dt_sec', type=float, default=0.001)
-    parser.add_argument('--debug_plot', type=bool, default=False)
+    parser.add_argument('--debug_plot', '-d', action='store_true')
     parser.add_argument('--load_range', type=str, default='Braille')
     parser.add_argument('--encoding_methods',type=str,default='spike')
     parser.add_argument('--load_neuron', type=str, default='')
-    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=-1)
     parser.add_argument('--seed_n', type=int, default=100)
+    parser.add_argument('--gpu',  action='store_true')
+    parser.add_argument('--n_epochs', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--rank_NMF', type=int, default=10)
+    parser.add_argument('--num_workers', type=int, default=0)
 
 
 
@@ -832,16 +677,10 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis')
+    folder_run = Path('dataset_analysis_hb')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
-    # folder_fig = folder_run.joinpath('fig')
-    # folder_data = folder_run.joinpath('data')
-    # folder_fig.mkdir(parents=True, exist_ok=True)
-    # folder_data.mkdir(parents=True, exist_ok=True)
-    # folder_fig = str(folder_fig)
-    # folder_data = str(folder_data)
     ranges = {}
     stimuli_types = []
     if args.load_range == '':
@@ -871,7 +710,16 @@ if __name__ == "__main__":
                     pass
 
     stimuli_types = np.unique(stimuli_types)
-    for seed_here in range(args.seed_n):
+    if args.debug_plot:
+        writer = SummaryWriter(log_dir='MN_DSP/runs')
+    else:
+        writer = None
+    if args.seed == -1:
+        seeds = range(args.seed_n)
+    else:
+        seeds = [args.seed]
+        exp_id = 'Parallel'
+    for seed_here in seeds:
         seed = seed_here
         args.seed = seed
         np.random.seed(seed)
@@ -923,7 +771,7 @@ if __name__ == "__main__":
 
                         else:
                             raise ValueError('Stimuli type not recognized')
-                        torch.save(data, f'{folder_stimuli}/{stimuli}_data.pt')
+                        torch.save(data, f'experiments/results/{exp_id}/{stimuli}_data.pt')
 
                         data = data[0, :, :].T
                         concurrency = 1
@@ -931,7 +779,6 @@ if __name__ == "__main__":
                         all_processes = []
                         for MNclass in MNclasses:
                             # pass
-                            calculate_MI_class(stimuli, range_val, MNclass,data, labels,args.dt_sec,name,args)
+                            calculate_MI_class(stimuli, range_val, MNclass,data, labels,args.dt_sec,name,writer,args)
 
 
-plt.show()

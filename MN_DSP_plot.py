@@ -38,26 +38,31 @@ plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
 plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-path = 'experiments/results'
+path = 'experiments/results/'
 folder_high = ''
 if folder_high == '':
+    import glob
+
+    list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
+    latest_file = max(list_of_files, key=os.path.getctime)
+    print(latest_file)
     print('No folder high specified, using last one')
-    folder_high = np.sort(os.listdir(path))[-1]
-    print(folder_high)
+    folder_high = latest_file
+    print(latest_file)
 sweeps = ['ampli_neg']#,'freqs','slopes']
 window_width = 1
 avg_width = 10
 debug_plot = True
 # classes = os.listdir(folder)
-folder_high = os.path.join(path,folder_high)
+folder_high = os.path.join(folder_high)
+print(folder_high)
 MI_coll = {}
 colors = ['#BCE498','#7689A9','#FFE0AA','#E297AF']
 sns.set_palette(colors)
 seaborn_coll = {'MI':[],'Accuracy':[],'Class':[],'sweep':[],'measure':[],'type':[],'seed':[],'step':[]}
-fig1 = plt.figure(figsize=(8,8))
-gs = fig1.add_gridspec(4,3)
-ax1 = fig1.add_subplot(gs[:3,:])
-for MNclass in os.listdir(folder_high):
+#select only directories
+folders = [f for f in os.listdir(folder_high) if os.path.isdir(os.path.join(folder_high, f))]
+for MNclass in folders:
     MI_coll[MNclass] = {}
     range_type = [mystr.split('_')[0] for mystr in os.listdir(os.path.join(folder_high,MNclass))]
     range_sweep = [mystr.split('_')[1] for mystr in os.listdir(os.path.join(folder_high,MNclass))]
@@ -82,19 +87,24 @@ for MNclass in os.listdir(folder_high):
                         seaborn_coll['measure'].append(measure)
                         seaborn_coll['type'].append(stim_type)
                         seaborn_coll['seed'].append(seed)
-amplitude = torch.load('stimuli/Braille_amplitude_data.pt')
-frequency = torch.load('stimuli/Braille_frequency_data.pt')
-slope = torch.load('stimuli/Braille_slope_data.pt')
+amplitude = torch.load(f'{folder_high}/Braille_amplitude_data.pt')
+frequency = torch.load(f'{folder_high}/Braille_frequency_data.pt')
+slope = torch.load(f'{folder_high}/Braille_slope_data.pt')
 
 seaborn_pd = pd.DataFrame.from_dict(seaborn_coll)
-seaborn_pd = seaborn_pd[seaborn_pd['step']>=40]
+sns.lineplot(x='step',y='Accuracy',hue='Class',style='type',data=seaborn_pd)
+fig1 = plt.figure(figsize=(8,8))
+gs = fig1.add_gridspec(4,3)
+ax1 = fig1.add_subplot(gs[:3,:])
+seaborn_pd = seaborn_pd[seaborn_pd['step']>=len(MI)-10]
 
-sns.boxplot(x='type',y='MI',hue='Class',data=seaborn_pd,ax=ax1)
+sns.boxplot(x='type',y='Accuracy',hue='Class',data=seaborn_pd,ax=ax1)
 plt.xticks([0,1,2],['Amplitude','Frequency','Slope'])
 plt.ylabel('Accuracy (%)')
 plt.xlabel('Stimulus type')
 # plt.ylim([0,3])
-plt.title(f'MI for different stimulus types (over {len(os.listdir(os.path.join(folder_high,MNclass,stim_type,sweep,measure)))}  seeds and 10 last epochs)')
+seeds_n = len(os.listdir(os.path.join(folder_high,MNclass,stim_type,sweep,measure)))
+plt.title(f'MI for different stimulus types (over {seeds_n}  seeds and 10 last epochs)')
 # plt.text(4, 3.322 - 0.15, 'max MI = 3.322 bits', horizontalalignment='center', verticalalignment='center')
 # plt.plot([-1,6 + 1], [3.322, 3.322], 'k--')
 # ax = plt.gca()
