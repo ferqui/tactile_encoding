@@ -180,12 +180,12 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
                 for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
             ]
         )  # computing GR term
-        for param in dict_param:
-            grad_dict[param] = dict_param[param]["param"].grad
+
         loss_DB.backward()  # backpropagation of GR ter
         optimizer.step()
         #local_loss.append()
-
+        for param in dict_param:
+            grad_dict[param] = dict_param[param]["param"].grad
         with torch.no_grad():
             # compare to labels
             _, am = torch.max(m, 1)  # argmax over output units
