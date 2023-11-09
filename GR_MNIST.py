@@ -173,7 +173,8 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         grad_dict = {}
 
         for param in dict_param:
-            grad_dict[param+'b4gr'] = dict_param[param]["param"].grad
+            if dict_param[param]["param"].grad is not None:
+                grad_dict[param] = dict_param[param]["param"].grad.clone()
         loss_DB = args.gr * sum(
             [
                 torch.abs(kv[1]["param"].grad).sum()
