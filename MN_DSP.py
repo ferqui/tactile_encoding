@@ -635,7 +635,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--last', type=int, default=5)
     parser.add_argument('--stim_length_sec', type=float, default=1.1)
-    parser.add_argument('--noise', type=float, default=0)
+    parser.add_argument('--noise', type=str, default='0.1,0,0')
     parser.add_argument('--dt_sec', type=float, default=0.001)
     parser.add_argument('--debug_plot', '-d', action='store_true')
     parser.add_argument('--load_range', type=str, default='Braille')
@@ -662,7 +662,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-
+    if ',' in args.noise:
+        args.noise = args.noise.split(',')
+        args.noise = [float(noise) for noise in args.noise]
+    else:
+        args.noise = [float(args.noise)]
     if args.load_neuron == '':
         pass
     elif ',' in args.load_neuron:
@@ -681,6 +685,8 @@ if __name__ == "__main__":
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
+    folder_results = Path(f'experiments/results/{exp_id}')
+    folder_results.mkdir(parents=True, exist_ok=True)
     ranges = {}
     stimuli_types = []
     if args.load_range == '':
@@ -727,7 +733,7 @@ if __name__ == "__main__":
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
         for ds in args.load_range:
-            for stimuli_type in stimuli_types:
+            for st_idx,stimuli_type in enumerate(stimuli_types):
                     stimuli = ds+'_'+stimuli_type
                     for range_val in ranges[stimuli]:
                         # upsample_fac = 5
@@ -735,23 +741,23 @@ if __name__ == "__main__":
                         # amplitudes = np.linspace(1, 10, 10)
                         if stimuli_type == 'amplitude':
                             data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise, debug_plot=args.debug_plot)
+                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
                         elif stimuli_type == 'amplitude_neg':
                             data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise, debug_plot=args.debug_plot)
+                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
                             data = -data
 
                         elif stimuli_type == 'frequency':
                             data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
                                                                         offset=0, amplitude_100=40, fs=1/args.dt_sec, target_snr_db=20,
-                                                                        debug_plot=args.debug_plot, add_noise=args.noise > 0)
+                                                                        debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
                             # data[data < 0] = 0
 
                         elif stimuli_type == 'frequency_pos':
                             data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
                                                                         offset=0, amplitude_100=4, fs=1 / args.dt_sec,
                                                                         target_snr_db=20,
-                                                                        debug_plot=args.debug_plot, add_noise=args.noise > 0
+                                                                        debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0
                                                                         , stim_length_sec= args.stim_length_sec)
                             data[data < 0] = 0
                             # plt.figure()
@@ -762,15 +768,16 @@ if __name__ == "__main__":
                             data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
                                                                         offset=0, amplitude_100=40, fs=1 / args.dt_sec,
                                                                         target_snr_db=20,
-                                                                        debug_plot=args.debug_plot, add_noise=args.noise > 0)
+                                                                        debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
                             data[data < 0] = 0
                             data = -data
                         elif stimuli_type == 'slope':
                             data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
-                                                        last=args.last, first=0, sig=args.noise,debug_plot=args.debug_plot)
+                                                        last=args.last, first=0, sig=args.noise[st_idx],debug_plot=args.debug_plot)
 
                         else:
                             raise ValueError('Stimuli type not recognized')
+
                         torch.save(data, f'experiments/results/{exp_id}/{stimuli}_data.pt')
 
                         data = data[0, :, :].T
