@@ -529,13 +529,13 @@ def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data=''
             for s_idx,span in enumerate(spans[data_type]):
                 loss,acc = classifier_processed(dict_dataset, epochs, data_type, center, span, args, xf=xf)
                 matrix[c_idx,s_idx] = np.mean(acc[-2:])
-                plot_dict['center'].append(center)
-                plot_dict['span'].append(span)
-                plot_dict['accuracy'].append(np.mean(acc[-2:]))
-                plot_dict['data_type'].append(data_type)
-                plot_dict['dataset'].append(dataset_name)
+                plot_dict['center'].append([center]*len(acc))
+                plot_dict['span'].append([span]*len(acc))
+                plot_dict['accuracy'].append(acc)
+                plot_dict['data_type'].append([data_type]*len(acc))
+                plot_dict['dataset'].append([dataset_name]*len(acc))
                 if args.sim_id>=0:
-                    plot_dict['sim_id'].append(args.sim_id)
+                    plot_dict['sim_id'].append([args.sim_id]*len(acc))
                     np.save(os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{args.sim_id}.npy'),plot_dict)
         if args.sim_id<0:
             np.save(os.path.join(folder_data,
