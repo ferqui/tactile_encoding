@@ -16,19 +16,19 @@
 
 ## please adapt the following to your need:
 
-# set with how many cpu cores it should be running
-#SBATCH --cpus-per-task=6
+# from to (incl) range of iterations, max is 1000 total
+#SBATCH --array=0-299
 # memory requirement - check on your PC first if possible
-#SBATCH --mem=12GB
+#SBATCH --mem=50GB
 # max execution time
 #SBATCH --time=3-00:00:00
 # choose subcluster (short: up to 30 min, regular: up to 10 days - 128GB RAM?, himem: up tp 10 days - 1TB RAM?)
-#SBATCH --partition=regular
 # job name
-#SBATCH --job-name=train_dsp_h5file
+#SBATCH --job-name=dataset_analysis
 
 ## Most importantly check your python script on pg-interactive.hpc.rug.nl first (with reduced load) if you environment works fine.
 
-source ../texel/texel/bin/activate
+source spll_venv/bin/activate
+cd tactile_encoding
 
-python train_dsp_h5file.py --data_type $1 --n_epochs $2
+python3 dataset_analysis_raccapezed.py --sim_id ${SLURM_ARRAY_TASK_ID} $*

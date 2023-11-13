@@ -168,9 +168,10 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         loss_val = loss_fn(log_p_y, y_local) + reg_loss
         optimizer.zero_grad()
         # loss_val.backward()
-        loss_val.backward(create_graph=True)  # backpropagation of original loss
+
+        loss_val.backward(create_graph=args.gr>=0)  # backpropagation of original loss
         grad_dict = {}
-        if args.gr > 0:
+        if args.gr >= 0:
 
             for param in dict_param:
                 if dict_param[param]["param"].grad is not None:
@@ -183,11 +184,10 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
             )  # computing GR term
 
             loss_DB.backward()  # backpropagation of GR ter
-            optimizer.step()
 
         else:
-            loss_DB = 0
-            
+            loss_DB = torch.tensor(0)
+        optimizer.step()
         for param in dict_param:
             if dict_param[param]["param"].grad is not None:
                 grad_dict[param] = dict_param[param]["param"].grad
