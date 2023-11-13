@@ -166,25 +166,29 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
 
         # Here we combine supervised loss and the regularizer
         loss_val = loss_fn(log_p_y, y_local) + reg_loss
-
         optimizer.zero_grad()
         # loss_val.backward()
         loss_val.backward(create_graph=True)  # backpropagation of original loss
         grad_dict = {}
 
-        for param in dict_param:
-            if dict_param[param]["param"].grad is not None:
-                grad_dict[param] = dict_param[param]["param"].grad.clone()
-        loss_DB = args.gr * sum(
-            [
-                torch.abs(kv[1]["param"].grad).sum()
-                for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
-            ]
-        )  # computing GR term
+        if args.gr > 0:
 
-        loss_DB.backward()  # backpropagation of GR ter
-        optimizer.step()
-        #local_loss.append()
+            for param in dict_param:
+                if dict_param[param]["param"].grad is not None:
+                    grad_dict[param] = dict_param[param]["param"].grad.clone()
+            loss_DB = args.gr * sum(
+                [
+                    torch.abs(kv[1]["param"].grad).sum()
+                    for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
+                ]
+            )  # computing GR term
+
+            loss_DB.backward()  # backpropagation of GR ter
+            optimizer.step()
+
+        else:
+            loss_DB = 0
+            
         for param in dict_param:
             grad_dict[param] = dict_param[param]["param"].grad
         with torch.no_grad():
