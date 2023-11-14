@@ -662,7 +662,7 @@ if __name__ == "__main__":
 
 
 
-    ranges_possible = ['amplitude']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
+    ranges_possible = ['amplitude','slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
     # ranges_possible = ['frequency']
     for range_name in ranges_possible:
         parser.add_argument(f'--{range_name}'+'_center', type=float, default=0)
