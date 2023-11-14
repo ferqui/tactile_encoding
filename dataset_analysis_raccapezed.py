@@ -529,13 +529,13 @@ def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data=''
             for s_idx,span in enumerate(spans[data_type]):
                 loss,acc = classifier_processed(dict_dataset, epochs, data_type, center, span, args, xf=xf)
                 matrix[c_idx,s_idx] = np.mean(acc[-2:])
-                plot_dict['center'].append([center]*len(acc))
-                plot_dict['span'].append([span]*len(acc))
-                plot_dict['accuracy'].append(acc)
-                plot_dict['data_type'].append([data_type]*len(acc))
-                plot_dict['dataset'].append([dataset_name]*len(acc))
+                plot_dict['center'].extend([center]*len(acc))
+                plot_dict['span'].extend([span]*len(acc))
+                plot_dict['accuracy'].extend(acc)
+                plot_dict['data_type'].extend([data_type]*len(acc))
+                plot_dict['dataset'].extend([dataset_name]*len(acc))
                 if args.sim_id>=0:
-                    plot_dict['sim_id'].append([args.sim_id]*len(acc))
+                    plot_dict['sim_id'].extend([args.sim_id]*len(acc))
                     np.save(os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{args.sim_id}.npy'),plot_dict)
         if args.sim_id<0:
             np.save(os.path.join(folder_data,
@@ -575,7 +575,7 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_hb')
+    folder = Path('dataset_analysis_hb_allaccuracy')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)
@@ -651,6 +651,10 @@ def main(args):
             matrixes = retrieve_analysis(analysis,centers,spans,folder_data=str(folder_data),args=args)
             df1 = pd.DataFrame.from_dict(matrixes[0])
             for matrix in matrixes[1:]:
+                for key in matrix.keys():
+                    if len(matrix[key]) == 1:
+                        matrix[key] = matrix[key][0]
+
                 df2 = pd.DataFrame.from_dict(matrix)
                 df1=pd.concat([df1, df2])
             pd_datasets.append(df1)
@@ -665,14 +669,20 @@ def main(args):
             opt = {}
             for data_type in analysis:
                 plot_dict_sel = plot_dict[(plot_dict['data_type'] == data_type) & (plot_dict['dataset']==dataset)]
-                # plt.figure()
-                # g = sns.PairGrid(data=plot_dict_sel, y_vars=["accuracy"],
-                #                  x_vars=["center", "span"], height=4)
-                # g.map(sns.regplot)
-                # g.map(corrfunc)
-                # g.fig.subplots_adjust(top=0.8)  # adjust the Figure in rp
-                # N = len(centers[data_type])
-                # g.fig.suptitle(f'dataset {dataset}, feature: {data_type}')
+                mean_accuracy= {'center':[],'span':[],'accuracy':[]}
+                for center in plot_dict_sel['center'].unique():
+                    for span in plot_dict_sel['span'].unique():
+                        mean_accuracy['center'].append(center)
+                        mean_accuracy['span'].append(span)
+                        mean_accuracy['accuracy'].append(plot_dict_sel[(plot_dict_sel['center'] == center) & (plot_dict_sel['span'] == span) & (plot_dict_sel.index>90)]['accuracy'].mean(skipna=True))
+                        ## compute mean of last epochs
+                mean_accuracy = pd.DataFrame.from_dict(mean_accuracy)
+
+                plt.figure()
+                #plot accuracy vs step
+                sns.lineplot(x=plot_dict_sel.index,y='accuracy',data=plot_dict_sel,hue='span',style='center')
+                plt.savefig(os.path.join(folder_fig,f'dataset_analys_{data_type}_accuracy_vs_step.pdf'))
+
                 which_decimal_c = np.max(
                     [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))),
                      len(str(int(0.99 / (centers[data_type][0]))))])
@@ -686,7 +696,7 @@ def main(args):
                 #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
                 # # plt.close()
                 plt.figure()
-                plot_dict_hm = plot_dict_sel.pivot(index="center", columns="span", values="accuracy")
+                plot_dict_hm = mean_accuracy.pivot(index="center", columns="span", values="accuracy")
                 plot_dict_hm_np = np.array(plot_dict_hm)
                 max_here = np.unravel_index(np.argmax(plot_dict_hm_np), plot_dict_hm_np.shape)
                 sns.heatmap(plot_dict_hm)

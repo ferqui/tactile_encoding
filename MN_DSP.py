@@ -725,6 +725,8 @@ if __name__ == "__main__":
     else:
         seeds = [args.seed]
         exp_id = 'Parallel'
+    json.dump(args.__dict__, open(f'experiments/results/{exp_id}_args.json', 'w'))
+
     for seed_here in seeds:
         seed = seed_here
         args.seed = seed
@@ -732,6 +734,7 @@ if __name__ == "__main__":
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
+
         for ds in args.load_range:
             for st_idx,stimuli_type in enumerate(stimuli_types):
                     stimuli = ds+'_'+stimuli_type
@@ -779,7 +782,6 @@ if __name__ == "__main__":
                             raise ValueError('Stimuli type not recognized')
 
                         torch.save(data, f'experiments/results/{exp_id}/{stimuli}_data.pt')
-
                         data = data[0, :, :].T
                         concurrency = 1
                         sema = Semaphore(concurrency)

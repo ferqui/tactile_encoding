@@ -10,7 +10,7 @@ import glob
 
 sns.set_style("darkgrid")
 path = 'runs/'
-folder_high = 'Nov07_15-14-02_v100gpu23GR_MNIST/events.out.tfevents.1699366442.v100gpu23.693853.0'
+folder_high = 'Nov13_09-25-46_v100gpu24GR_MNIST/events.out.tfevents.1699863946.v100gpu24.999429.0'
 if folder_high == '':
 
     list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
@@ -44,7 +44,12 @@ print(df)
 tmp = np.array(df['variable'])
 import re
 parameters = ['A1','A2','a','b','G','R1','R2']
-grad_guys = ['A1_grad','A2_grad','a_grad','b_grad','G_grad','R1_grad','R2_grad']
+grad_guys = ['A1_grad','A2_grad','a_grad','b_grad','G_grad','R1_grad','R2_grad']+['Loss/GR']
+for param in grad_guys:
+
+    df_gr_sel_param = df[df['variable']==param]['value'].values
+    print(param,np.where(np.isnan(df_gr_sel_param))[0][0])
+raise ValueError
 colors = plt.get_cmap('tab20')(np.linspace(0,1,len(parameters)))
 for g_idx,grad_guy in enumerate(grad_guys):
     print(grad_guy)
@@ -58,6 +63,8 @@ plt.figure()
 sel = ['GR' in tmp[i] for i in range(len(tmp))]
 df_gr = df[sel]
 df_gr_sel = df_gr[df_gr['step']>0]
+
+
 
 
 # df_gr['step'] = df_gr['step'].astype(int)

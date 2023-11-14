@@ -7,6 +7,7 @@ import matplotlib as mpl
 import pandas as pd
 import seaborn as sns
 import os
+import glob
 
 # experiment = tb.data.experimental.ExperimentFromDev('6eOIgzYGQH6wLVNpO6eyBg')
 # df = experiment.get_scalars()
@@ -39,9 +40,8 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 path = 'experiments/results/'
-folder_high = ''
+folder_high = 'Multi_500_noise'
 if folder_high == '':
-    import glob
 
     list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
     latest_file = max(list_of_files, key=os.path.getctime)
@@ -49,12 +49,16 @@ if folder_high == '':
     print('No folder high specified, using last one')
     folder_high = latest_file
     print(latest_file)
+else:
+    folder_high = glob.glob(path+folder_high)[0]
+    # * means all if need specific format then *.csv
+    print(folder_high)
 sweeps = ['ampli_neg']#,'freqs','slopes']
 window_width = 1
 avg_width = 10
 debug_plot = True
 # classes = os.listdir(folder)
-folder_high = os.path.join(folder_high)
+# folder_high = os.path.join(folder_high)
 print(folder_high)
 MI_coll = {}
 colors = ['#BCE498','#7689A9','#FFE0AA','#E297AF']
