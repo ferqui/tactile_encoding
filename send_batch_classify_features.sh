@@ -29,6 +29,6 @@
 ## Most importantly check your python script on pg-interactive.hpc.rug.nl first (with reduced load) if you environment works fine.
 
 source spll_venv/bin/activate
-cd tactile_encoding
+cd tactile_encoding2
 
 python3 dataset_analysis_raccapezed.py --sim_id ${SLURM_ARRAY_TASK_ID} $*
