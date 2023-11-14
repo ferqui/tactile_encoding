@@ -168,14 +168,14 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         loss_val = loss_fn(log_p_y, y_local) + reg_loss
         optimizer.zero_grad()
         # loss_val.backward()
-        loss_val.backward(create_graph=True)  # backpropagation of original loss
-        grad_dict = {}
 
-        if args.gr > 0:
+        loss_val.backward(create_graph=args.gr>=0)  # backpropagation of original loss
+        grad_dict = {}
+        if args.gr >= 0:
 
             for param in dict_param:
                 if dict_param[param]["param"].grad is not None:
-                    grad_dict[param] = dict_param[param]["param"].grad.clone()
+                    grad_dict[param+'b4gr'] = dict_param[param]["param"].grad.clone()
             loss_DB = args.gr * sum(
                 [
                     torch.abs(kv[1]["param"].grad).sum()
@@ -184,13 +184,13 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
             )  # computing GR term
 
             loss_DB.backward()  # backpropagation of GR ter
-            optimizer.step()
 
         else:
-            loss_DB = 0
-
+            loss_DB = torch.tensor(0)
+        optimizer.step()
         for param in dict_param:
-            grad_dict[param] = dict_param[param]["param"].grad
+            if dict_param[param]["param"].grad is not None:
+                grad_dict[param] = dict_param[param]["param"].grad
         with torch.no_grad():
             # compare to labels
             _, am = torch.max(m, 1)  # argmax over output units
@@ -587,8 +587,8 @@ def main(args):
                 local_spk_count.append(spk_count.detach().cpu().numpy())
                 grad_dict_coll.append(grad_dict)
                 batches.update()
-                if batch_idx > 3:
-                    break
+                # if batch_idx > 3:
+                #     break
 
                 if np.logical_or.reduce([torch.isnan(grad_dict[param]).cpu().numpy() for param in grad_dict if grad_dict[param] is not None]):
                     with open('filename.pickle', 'wb') as handle:
