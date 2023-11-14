@@ -157,12 +157,18 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         log_p_y = log_softmax_fn(m)
 
         # Here we can set up our regularizer loss
-        reg_loss = args.reg_spikes * torch.mean(
+        reg_loss = args.reg_spikes_l1 * torch.mean(
             torch.sum(lif1_spk, 1)
         )  # e.g., L1 loss on total number of spikes (original: 1e-3)
-        reg_loss += args.reg_neurons * torch.mean(
+        reg_loss += args.reg_neurons_l1 * torch.mean(
             torch.sum(torch.sum(lif1_spk, dim=0), dim=0) ** 2
-        )  # L2 loss on spikes per neuron (original: 2e-6)
+        )  # L1 loss on spikes per neuron (original: 2e-6)
+        reg_loss += args.reg_spikes_l2 * torch.mean(
+            torch.sum(lif2_spk, 1)
+        )  # L2 loss on output layer spikes (original: 1e-3)
+        reg_loss += args.reg_neurons_l2 * torch.mean(
+            torch.sum(torch.sum(lif2_spk, dim=0), dim=0) ** 2
+        )  # L2 loss on output layer spikes per neuron (original: 2e-6)
 
         # Here we combine supervised loss and the regularizer
         loss_val = loss_fn(log_p_y, y_local) + reg_loss
@@ -172,7 +178,6 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         loss_val.backward(create_graph=args.gr>=0)  # backpropagation of original loss
         grad_dict = {}
         if args.gr >= 0:
-
             for param in dict_param:
                 if dict_param[param]["param"].grad is not None:
                     grad_dict[param+'b4gr'] = dict_param[param]["param"].grad.clone()
@@ -191,6 +196,7 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         for param in dict_param:
             if dict_param[param]["param"].grad is not None:
                 grad_dict[param] = dict_param[param]["param"].grad
+                dict_param[param]["param"].grad = None
         with torch.no_grad():
             # compare to labels
             _, am = torch.max(m, 1)  # argmax over output units
@@ -758,16 +764,29 @@ if __name__ == "__main__":
         help="weight_scale_factor",
     )
     parser.add_argument(
-        "--reg_spikes",
+        "--reg_spikes_1",
         type=float,
         default=parameters_thenc["reg_spikes"],
-        help="reg_spikes",
+        help="reg_spikes l1",
     )
     parser.add_argument(
-        "--reg_neurons",
+        "--reg_neurons_l1",
         type=float,
         default=parameters_thenc["reg_neurons"],
-        help="reg_neurons",
+        help="reg_neurons l1",
+    )
+    parser.add_argument(
+        "--reg_spikes_l2",
+        type=float,
+        default=parameters_thenc["reg_spikes"],
+        help="reg_spikes l2",
+    )
+
+    parser.add_argument(
+        "--reg_neurons_l2",
+        type=float,
+        default=parameters_thenc["reg_neurons"],
+        help="reg_neurons l2",
     )
 
     parser.add_argument(
