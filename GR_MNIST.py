@@ -188,7 +188,7 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
 
         else:
             loss_DB = 0
-            
+
         for param in dict_param:
             grad_dict[param] = dict_param[param]["param"].grad
         with torch.no_grad():
