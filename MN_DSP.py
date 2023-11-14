@@ -659,11 +659,15 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--rank_NMF', type=int, default=10)
     parser.add_argument('--num_workers', type=int, default=0)
+    parser.add_argument('--ranges_possible', type=str, default='amplitude,slope')
 
-
+    # ranges_possible = parser.get
+    # if ',' in ranges_possible:
+    #     ranges_possible = ranges_possible.split(',')
+    # else:
+    #     ranges_possible = [ranges_possible]
 
     ranges_possible = ['amplitude','slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
-    # ranges_possible = ['frequency']
     for range_name in ranges_possible:
         parser.add_argument(f'--{range_name}'+'_center', type=float, default=0)
         parser.add_argument(f'--{range_name}'+'_span', type=float, default=0)
@@ -671,7 +675,11 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-
+    if args.seed == -1:
+        seeds = range(args.seed_n)
+    else:
+        seeds = [args.seed]
+        exp_id = 'Parallel'
     if ',' in args.noise:
         args.noise = args.noise.split(',')
         args.noise = [float(noise) for noise in args.noise]
@@ -731,11 +739,7 @@ if __name__ == "__main__":
         writer = SummaryWriter(log_dir='MN_DSP/runs')
     else:
         writer = None
-    if args.seed == -1:
-        seeds = range(args.seed_n)
-    else:
-        seeds = [args.seed]
-        exp_id = 'Parallel'
+
     json.dump(args.__dict__, open(f'experiments/results/{exp_id}/metadata.json', 'w'))
 
     for seed_here in seeds:
