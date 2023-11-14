@@ -667,6 +667,7 @@ def main(args):
             folder_fig.mkdir(parents=True, exist_ok=True)
             folder_data = folder_run.joinpath('data')
             opt = {}
+            worse = {}
             for data_type in analysis:
                 plot_dict_sel = plot_dict[(plot_dict['data_type'] == data_type) & (plot_dict['dataset']==dataset)]
                 mean_accuracy= {'center':[],'span':[],'accuracy':[]}
@@ -696,10 +697,12 @@ def main(args):
                 #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
                 # # plt.close()
                 plt.figure()
+                chance_level = 1 / dict_dataset['n_classes']
                 plot_dict_hm = mean_accuracy.pivot(index="center", columns="span", values="accuracy")
                 plot_dict_hm_np = np.array(plot_dict_hm)
-                max_here = np.unravel_index(np.argmax(plot_dict_hm_np), plot_dict_hm_np.shape)
-                sns.heatmap(plot_dict_hm)
+                max_here = np.unravel_index(np.nanargmax(plot_dict_hm_np), plot_dict_hm_np.shape)
+                min_here = np.unravel_index(np.nanargmin(plot_dict_hm_np), plot_dict_hm_np.shape)
+                sns.heatmap(1-(plot_dict_hm/chance_level),cmap=sns.diverging_palette(as_cmap=True))
                 plt.title(f'dataset {dataset}, feature: {data_type}')
                 plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
                 plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
@@ -712,9 +715,14 @@ def main(args):
                                   'span': spans[data_type][max_here[1]],
                                   'n_steps': 10,
                                   'acc': plot_dict_hm_np.max() * 100}
+                worse[data_type] = {'center': centers[data_type][min_here[0]],
+                                    'span': spans[data_type][min_here[1]],
+                                    'n_steps': 10,
+                                    'acc': plot_dict_hm_np.min() * 100}
                 plt_best(opt,dict_dataset,data_type,dataset_name = dataset,folder_fig=folder_fig)
 
             json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
+            json.dump(worse, open(os.path.join(folder_data, 'worse.json'), 'w'))
 
 
 if __name__ == "__main__":

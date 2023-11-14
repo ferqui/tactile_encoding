@@ -566,15 +566,25 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         if args.debug_plot:
             fig1, axis1 = plt.subplots(1, 1,figsize=(10,10))
             labels_ordered = torch.argsort(labels)
-            axis1.imshow(input_var[labels_ordered, :].cpu().numpy(), aspect='auto',interpolation='none')
+            events_data = [torch.where(input_var[labels_ordered,i].T)[0].cpu().numpy() for i in range(input_var.shape[1])]
+            axis1.eventplot(events_data,lineoffsets=1,linelengths=1)
 
-            axis1.set_title('Input '+name)
+            axis1.set_title('Neuron Response '+name)
             fig2, axis2 = plt.subplots(1, 1,figsize=(10,10))
-            axis2.imshow(output_var[labels_ordered,:].cpu().numpy(), aspect='auto',interpolation='none')
-            axis2.set_title('Output '+name)
-            writer.add_figure(figure=fig1, global_step=0, tag='Input')
-            writer.add_figure(figure=fig2, global_step=0, tag='Output')
+            axis2.imshow(output_var[labels_ordered,:].T,aspect='auto',cmap='gray_r',interpolation='none')
+            axis2.set_title('NMF '+name)
+            fig3,axis3 = plt.subplots(1,1,figsize=(10,10))
 
+            # if MNclass == 'Tonic':
+            #     plt.figure()
+            for i in range(input_var.shape[0]):
+                uuu = np.where(input_var[i,:].numpy())
+                eee = np.diff(uuu)
+                axis3.plot(uuu[0][1:],eee[0])
+            #     plt.show()
+            writer.add_figure(figure=fig1, global_step=0, tag='Neuron')
+            writer.add_figure(figure=fig2, global_step=0, tag='NMF')
+            writer.add_figure(figure=fig3, global_step=0, tag='ISI')
         x_train, x_test, y_train, y_test = train_test_split(
             output_var.cpu(), labels, test_size=0.2, shuffle=True, stratify=labels, random_state=seed)
         ds_train = TensorDataset(x_train, y_train)
@@ -635,10 +645,10 @@ if __name__ == "__main__":
     parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--last', type=int, default=5)
     parser.add_argument('--stim_length_sec', type=float, default=1.1)
-    parser.add_argument('--noise', type=str, default='0.1,0,0')
+    parser.add_argument('--noise', type=str, default='0,0,0')
     parser.add_argument('--dt_sec', type=float, default=0.001)
     parser.add_argument('--debug_plot', '-d', action='store_true')
-    parser.add_argument('--load_range', type=str, default='Braille')
+    parser.add_argument('--load_range', type=str, default='MNIST')
     parser.add_argument('--encoding_methods',type=str,default='spike')
     parser.add_argument('--load_neuron', type=str, default='')
     parser.add_argument('--seed', type=int, default=-1)
@@ -652,7 +662,7 @@ if __name__ == "__main__":
 
 
 
-    ranges_possible = ['amplitude', 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
+    ranges_possible = ['amplitude']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
     # ranges_possible = ['frequency']
     for range_name in ranges_possible:
         parser.add_argument(f'--{range_name}'+'_center', type=float, default=0)
@@ -681,7 +691,7 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis_hb')
+    folder_run = Path('dataset_analysis_hb_allaccuracy')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
@@ -698,22 +708,23 @@ if __name__ == "__main__":
             args.load_range = args.load_range.split(',')
 
         for range_ds in args.load_range:
-            json_range = json.load(open(f'{folder_run}/{range_ds}/data/opt.json'))
-            for range_name in ranges_possible:
-                try:
-                    setattr(args, range_ds+'_'+range_name+'_center', json_range[range_name]['center'])
-                    setattr(args, range_ds+'_'+range_name+'_span', json_range[range_name]['span'])
-                    setattr(args, range_ds+'_'+range_name+'_n_steps', json_range[range_name]['n_steps'])
+            for type in ['worse','opt']:
+                json_range = json.load(open(f'{folder_run}/{range_ds}/data/{type}.json'))
+                for range_name in ranges_possible:
+                    try:
+                        setattr(args, range_ds+'_'+range_name+'_'+type+'_center', json_range[range_name]['center'])
+                        setattr(args, range_ds+'_'+range_name+'_'+type+'_span', json_range[range_name]['span'])
+                        setattr(args, range_ds+'_'+range_name+'_'+type+'_n_steps', json_range[range_name]['n_steps'])
 
-                    stimuli_types.append(range_name)
-                    ranges[range_ds +'_'+ range_name] = [np.linspace(
-                        getattr(args, range_ds + '_'+range_name + '_center') - getattr(args,
-                                                                                   range_ds + '_'+range_name + '_span') / 2,
-                        getattr(args, range_ds + '_'+range_name + '_center') + getattr(args,
-                                                                                   range_ds + '_'+range_name + '_span') / 2,
-                        getattr(args, range_ds + '_'+range_name + '_n_steps'))]
-                except KeyError:
-                    pass
+                        stimuli_types.append(range_name)
+                        ranges[range_ds +'_'+ range_name+'_'+type] = [np.linspace(
+                            getattr(args, range_ds + '_'+range_name + '_'+type+'_center') - getattr(args,
+                                                                                       range_ds + '_'+range_name + '_'+type+'_span') / 2,
+                            getattr(args, range_ds + '_'+range_name + '_'+type+'_center') + getattr(args,
+                                                                                       range_ds + '_'+range_name + '_'+type+'_span') / 2,
+                            getattr(args, range_ds + '_'+range_name + '_'+type+'_n_steps'))]
+                    except KeyError:
+                        pass
 
     stimuli_types = np.unique(stimuli_types)
     if args.debug_plot:
@@ -725,7 +736,7 @@ if __name__ == "__main__":
     else:
         seeds = [args.seed]
         exp_id = 'Parallel'
-    json.dump(args.__dict__, open(f'experiments/results/{exp_id}_args.json', 'w'))
+    json.dump(args.__dict__, open(f'experiments/results/{exp_id}/metadata.json', 'w'))
 
     for seed_here in seeds:
         seed = seed_here
@@ -737,57 +748,62 @@ if __name__ == "__main__":
 
         for ds in args.load_range:
             for st_idx,stimuli_type in enumerate(stimuli_types):
-                    stimuli = ds+'_'+stimuli_type
-                    for range_val in ranges[stimuli]:
-                        # upsample_fac = 5
-                        n_time_bins = int(np.floor(args.stim_length_sec / args.dt_sec))
-                        # amplitudes = np.linspace(1, 10, 10)
-                        if stimuli_type == 'amplitude':
-                            data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
-                        elif stimuli_type == 'amplitude_neg':
-                            data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                                   stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
-                            data = -data
+                for type in ['worse','opt']:
+                        stimuli = ds+'_'+stimuli_type+'_'+type
+                        for range_val in ranges[stimuli]:
+                            # upsample_fac = 5
+                            n_time_bins = int(np.floor(args.stim_length_sec / args.dt_sec))
+                            # amplitudes = np.linspace(1, 10, 10)
+                            if stimuli_type == 'amplitude':
+                                data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                                                       stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
+                            elif stimuli_type == 'amplitude_neg':
+                                data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                                                       stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
+                                data = -data
 
-                        elif stimuli_type == 'frequency':
-                            data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                        offset=0, amplitude_100=40, fs=1/args.dt_sec, target_snr_db=20,
-                                                                        debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
-                            # data[data < 0] = 0
+                            elif stimuli_type == 'frequency':
+                                data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                                            offset=0, amplitude_100=40, fs=1/args.dt_sec, target_snr_db=20,
+                                                                            debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
+                                # data[data < 0] = 0
 
-                        elif stimuli_type == 'frequency_pos':
-                            data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                        offset=0, amplitude_100=4, fs=1 / args.dt_sec,
-                                                                        target_snr_db=20,
-                                                                        debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0
-                                                                        , stim_length_sec= args.stim_length_sec)
-                            data[data < 0] = 0
-                            # plt.figure()
-                            # plt.plot(data[0, :, :])
-                            # plt.show()
+                            elif stimuli_type == 'frequency_pos':
+                                data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                                            offset=0, amplitude_100=4, fs=1 / args.dt_sec,
+                                                                            target_snr_db=20,
+                                                                            debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0
+                                                                            , stim_length_sec= args.stim_length_sec)
+                                data[data < 0] = 0
+                                # plt.figure()
+                                # plt.plot(data[0, :, :])
+                                # plt.show()
 
-                        elif stimuli_type == 'frequency_neg':
-                            data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                        offset=0, amplitude_100=40, fs=1 / args.dt_sec,
-                                                                        target_snr_db=20,
-                                                                        debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
-                            data[data < 0] = 0
-                            data = -data
-                        elif stimuli_type == 'slope':
-                            data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
-                                                        last=args.last, first=0, sig=args.noise[st_idx],debug_plot=args.debug_plot)
+                            elif stimuli_type == 'frequency_neg':
+                                data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                                            offset=0, amplitude_100=40, fs=1 / args.dt_sec,
+                                                                            target_snr_db=20,
+                                                                            debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
+                                data[data < 0] = 0
+                                data = -data
+                            elif stimuli_type == 'slope':
+                                data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
+                                                            last=args.last, first=0, sig=args.noise[st_idx],debug_plot=args.debug_plot)
 
-                        else:
-                            raise ValueError('Stimuli type not recognized')
+                            else:
+                                raise ValueError('Stimuli type not recognized')
 
-                        torch.save(data, f'experiments/results/{exp_id}/{stimuli}_data.pt')
-                        data = data[0, :, :].T
-                        concurrency = 1
-                        sema = Semaphore(concurrency)
-                        all_processes = []
-                        for MNclass in MNclasses:
-                            # pass
-                            calculate_MI_class(stimuli, range_val, MNclass,data, labels,args.dt_sec,name,writer,args)
+                            torch.save(data, f'experiments/results/{exp_id}/{stimuli}_data.pt')
+                            if args.debug_plot:
+                                fig1,axis1 = plt.subplots(1,1,figsize=(10,10))
+                                axis1.plot(data[0,:,:])
+                                writer.add_figure(figure=fig1, global_step=0, tag='Analog')
+                            data = data[0, :, :].T
+                            concurrency = 1
+                            sema = Semaphore(concurrency)
+                            all_processes = []
+                            for MNclass in MNclasses:
+                                # pass
+                                calculate_MI_class(stimuli, range_val, MNclass,data, labels,args.dt_sec,name,writer,args)
 
 

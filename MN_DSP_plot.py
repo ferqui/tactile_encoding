@@ -40,7 +40,7 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 path = 'experiments/results/'
-folder_high = 'Multi_500_noise'
+folder_high = ''
 if folder_high == '':
 
     list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
@@ -91,9 +91,10 @@ for MNclass in folders:
                         seaborn_coll['measure'].append(measure)
                         seaborn_coll['type'].append(stim_type)
                         seaborn_coll['seed'].append(seed)
-amplitude = torch.load(f'{folder_high}/Braille_amplitude_data.pt')
-frequency = torch.load(f'{folder_high}/Braille_frequency_data.pt')
-slope = torch.load(f'{folder_high}/Braille_slope_data.pt')
+for type in ['opt','worse']:
+    amplitude = torch.load(f'{folder_high}/Braille_amplitude_{type}_data.pt')
+    # frequency = torch.load(f'{folder_high}/Braille_frequency_{type}_data.pt')
+    # slope = torch.load(f'{folder_high}/Braille_slope_{type}_data.pt')
 
 seaborn_pd = pd.DataFrame.from_dict(seaborn_coll)
 sns.lineplot(x='step',y='Accuracy',hue='Class',style='type',data=seaborn_pd)
@@ -103,7 +104,7 @@ ax1 = fig1.add_subplot(gs[:3,:])
 seaborn_pd = seaborn_pd[seaborn_pd['step']>=len(MI)-10]
 
 sns.boxplot(x='type',y='Accuracy',hue='Class',data=seaborn_pd,ax=ax1)
-plt.xticks([0,1,2],['Amplitude','Frequency','Slope'])
+# plt.xticks([0,1,2],['Amplitude','Frequency','Slope'])
 plt.ylabel('Accuracy (%)')
 plt.xlabel('Stimulus type')
 # plt.ylim([0,3])
@@ -124,14 +125,14 @@ ax2.spines['right'].set_visible(False)
 ax2.set_xticks([0,1000])
 ax2.set_xticklabels([0,1])
 ax2.set_xlabel('Time (s)')
-ax3.plot(frequency[0],color='k',alpha=0.01)
+# ax3.plot(frequency[0],color='k',alpha=0.01)
 # ax3.set_title('Frequency')
 ax3.spines['top'].set_visible(False)
 ax3.spines['right'].set_visible(False)
 ax3.set_xticks([0,1000])
 ax3.set_xticklabels([0,1])
 ax3.set_xlabel('Time (s)')
-ax4.plot(slope[0],color='k')
+# ax4.plot(slope[0],color='k')
 # ax4.set_title('Slope')
 ax4.spines['top'].set_visible(False)
 ax4.spines['right'].set_visible(False)
