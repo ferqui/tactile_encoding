@@ -400,18 +400,26 @@ class MNISTDataset_current(Dataset):
     def __len__(self):
         return len(self.file['targets'])
 
-class Autoencoder(nn.Module):
+class Autoencoder_linear(nn.Module):
     def __init__(self, encoding_dim, input_dim=784):
-        super(Autoencoder, self).__init__()
+        super(Autoencoder_linear, self).__init__()
         ## encoder ##
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, encoding_dim),
+            nn.Linear(input_dim, encoding_dim*4),
+            nn.ReLU(),
+            nn.Linear(encoding_dim*4, encoding_dim*2),
+            nn.ReLU(),
+            nn.Linear(encoding_dim*2, encoding_dim),
             nn.ReLU()
         )
 
         ## decoder ##
         self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, input_dim),
+            nn.Linear(encoding_dim, encoding_dim*2),
+            nn.ReLU(),
+            nn.Linear(encoding_dim*2, encoding_dim*4),
+            nn.ReLU(),
+            nn.Linear(encoding_dim*4, input_dim),
             nn.Sigmoid()
         )
 

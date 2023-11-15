@@ -3,9 +3,10 @@ import numpy as np
 from torchvision import datasets
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+import torchvision as tv
 from tqdm import tqdm
 from utils import set_random_seed
-from utils_dataset import load_MNIST, Autoencoder
+from utils_dataset import load_MNIST, Autoencoder, ToBin, Autoencoder_linear
 import argparse
 import torch.nn as nn
 import seaborn as sns
@@ -21,7 +22,9 @@ def main(args):
     # try pytorch 1.13 with CUDA > 1.3
     kwargs = {'num_workers': 4, 'pin_memory': True}
 
-    list_transforms = [transforms.PILToTensor()]
+    trainset = MNIST(root='data', train=True, download=True)
+    list_transforms = [transforms.ToTensor(), transforms.Normalize((trainset.data.float().mean() / 255,),
+                                                                   (trainset.data.float().std() / 255,))]
 
     # Train:
     trainset = MNIST(root='data', train=True, download=True,
@@ -42,33 +45,46 @@ def main(args):
                              generator=generator,
                              **kwargs)
     print(f'N samples test: {len(testset.data)}')
+    dataloader = train_loader
 
+    # transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+    # trainTransform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((0.1307,), (0.3081,))])
+    # trainset = tv.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    # dataloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=False, num_workers=4)
+    # testset = tv.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=4, shuffle=False, num_workers=2)
 
     # Encoder model:
-    model = Autoencoder(args.encoding_dim)
-
+    #model = Autoencoder(args.encoding_dim)
+    model = Autoencoder_linear(args.encoding_dim)
     # Loss function
     criterion = nn.MSELoss()
 
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(model.parameters(), weight_decay=1e-5)
 
+    list_loss = []
     # Training:
     for epoch in range(1, args.n_epochs + 1):
         # monitor training loss
         train_loss = 0.0
 
-        for data in tqdm(train_loader):
+        for data in tqdm(dataloader):
             # _ stands in for labels, here
             images, _ = data
 
             # flatten images
             images = images.view(images.size(0), -1).float()
+
             # clear the gradients of all optimized variables
             optimizer.zero_grad()
+
             # forward pass: compute predicted outputs by passing inputs to the model
             outputs = model(images.float())
             # calculate the loss
+            # print(outputs.float().shape)
+            # print(images.shape)
             loss = criterion(outputs.float(), images)
             # backward pass: compute gradient of the loss with respect to model parameters
             loss.backward()
@@ -76,18 +92,21 @@ def main(args):
             optimizer.step()
             # update running training loss
             train_loss += loss.item() * images.size(0)
+            list_loss.append(loss.item())
 
         # print avg training statistics
-        train_loss = train_loss / len(train_loader)
         print('Epoch: {} \tTraining Loss: {:.6f}'.format(
             epoch,
-            train_loss
+            train_loss/len(dataloader)
         ))
 
+    plt.figure()
+    plt.plot(list_loss)
+    plt.show()
     # Plot output:
     # obtain one batch of test images
     # obtain one batch of test images
-    dataiter = iter(test_loader)
+    dataiter = iter(dataloader)
     images, labels = dataiter.next()
 
     images_flatten = images.view(images.size(0), -1)
@@ -116,7 +135,7 @@ def main(args):
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(False)
 
-    assert all(images_flatten[0] == torch.tensor(images)[0].flatten())
+    #assert all(images_flatten[0] == torch.tensor(images)[0].flatten())
 
     fig.savefig('./data/MNIST_autoencoder.pdf', format='pdf')
     fig.savefig('./data/MNIST_autoencoder.png', format='png', dpi=300)
@@ -136,10 +155,10 @@ if __name__ == '__main__':
                         default=24)
     parser.add_argument('--batch_size',
                         type=int,
-                        default=200)
+                        default=32)
     parser.add_argument('--n_epochs',
                         type=int,
-                        default=50)
+                        default=20)
     args = parser.parse_args()
 
     # Run test:
