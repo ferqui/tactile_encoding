@@ -88,7 +88,7 @@ ALIF_dict_param = {
 }
 
 
-def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time = None):
+def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time = None,writer=None,epoch=0):
         #pbar.set_description(f"{batch_idx}/{len(dl_train)}")
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(
             device, non_blocking=True
@@ -135,15 +135,19 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
                 lif2_spk.append(network[3].state.S)
                 time.update()
 
-        if not args.fast:
+        if (not args.fast):
                 l0_spk = torch.stack(l0_spk, dim=1)
                 l0_mem = torch.stack(l0_mem, dim=1)
+                if args.log:
+                   writer.add_scalar("l0_spk", torch.mean(l0_spk.sum(dim=1)), epoch)
         lif1_spk = torch.stack(lif1_spk, dim=1)
         # l1_events = np.where(lif1_spk[0, :, :].cpu().detach().numpy())
         # plt.figure()
         # plt.scatter(l1_events[0], l1_events[1], s=0.1)
         if not args.fast:
-                lif1_mem = torch.stack(lif1_mem, dim=1)
+            if args.log:
+                writer.add_scalar("l1_spk", torch.mean(lif1_spk.sum(dim=1)),epoch)
+            lif1_mem = torch.stack(lif1_mem, dim=1)
         lif2_spk = torch.stack(lif2_spk, dim=1)
         # plt.figure()
         # l2_events = np.where(lif2_spk[0, :, :].cpu().detach().numpy())
@@ -151,6 +155,8 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         # plt.show()
         if not args.fast:
                 lif2_mem = torch.stack(lif2_mem, dim=1)
+                if args.log:
+                    writer.add_scalar("l2_spk", torch.mean(lif2_spk.sum(dim=1)),epoch)
         m = torch.sum(lif2_spk, 1)  # sum over time
         # print('lif2_sum',m)
 
@@ -591,7 +597,7 @@ def main(args):
             grad_dict_coll = []# accs: mean training accuracies for each batch
             for batch_idx, (x_local, y_local) in enumerate(dl_train):
                 y_local = y_local[:,0]
-                loss,acc,loss_GR,grad_dict,spk_count,recorder = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time)
+                loss,acc,loss_GR,grad_dict,spk_count,recorder = training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,args,dict_param,time,writer,epoch=e)
                 local_loss.append(loss)
                 accs.append(acc)
                 local_loss_GR.append(loss_GR)
