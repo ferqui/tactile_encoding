@@ -32,4 +32,4 @@
 source spll_venv/bin/activate
 cd tactile_encoding2
 
-python3 GR_MNIST.py --shared_params --log --train --lr=$*
+python3 GR_MNIST.py --shared_params --log --train $*
