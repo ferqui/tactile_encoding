@@ -764,7 +764,7 @@ if __name__ == "__main__":
         help="weight_scale_factor",
     )
     parser.add_argument(
-        "--reg_spikes_1",
+        "--reg_spikes_l1",
         type=float,
         default=parameters_thenc["reg_spikes"],
         help="reg_spikes l1",
