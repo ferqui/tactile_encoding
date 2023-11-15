@@ -611,9 +611,6 @@ def main(args):
                                         gain = args.gain_Braille)
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
-
-
-
         elif 'MNIST' == dataset:
             print('MNIST')
             folder_run = Path(os.path.join(folder,'MNIST'))
@@ -638,6 +635,29 @@ def main(args):
                                         gain = args.gain_MNIST)
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST')
+        elif "MNIST_compressed" == dataset:
+            print('MNIST_compressed')
+            folder_run = Path(os.path.join(folder,'MNIST_compressed'))
+            folder_fig = folder_run.joinpath('fig')
+            folder_data = folder_run.joinpath('data')
+            folder_fig.mkdir(parents=True, exist_ok=True)
+            folder_data.mkdir(parents=True, exist_ok=True)
+            folder_fig = str(folder_fig)
+            folder_data = str(folder_data)
+            dict_dataset = load_dataset('MNIST_compressed',
+                                        batch_size=args.batch_size,
+                                        stim_len_sec=3,
+                                        dt_sec=1 / 100,
+                                        v_max=0.2,
+                                        generator=generator,
+                                        add_noise=True,
+                                        return_fft=False,
+                                        n_samples_train=6480,
+                                        n_samples_test=1620,
+                                        shuffle=True,
+                                        gain=args.gain_MNIST_compressed)
+            if args.load == False:
+                do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST_compressed')
         else:
             raise ValueError('dataset not found')
         if args.load:
@@ -702,7 +722,7 @@ def main(args):
                 plot_dict_hm_np = np.array(plot_dict_hm)
                 max_here = np.unravel_index(np.nanargmax(plot_dict_hm_np), plot_dict_hm_np.shape)
                 min_here = np.unravel_index(np.nanargmin(plot_dict_hm_np), plot_dict_hm_np.shape)
-                sns.heatmap(1-(plot_dict_hm/chance_level),cmap=sns.diverging_palette(as_cmap=True))
+                sns.heatmap(plot_dict_hm/chance_level-1,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20),vmin=-20,vmax=20)
                 plt.title(f'dataset {dataset}, feature: {data_type}')
                 plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
                 plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
@@ -740,6 +760,7 @@ if __name__ == "__main__":
     parser.add_argument('--stim_len_sec',  type=int, default=300)
     parser.add_argument('--gain_Braille', type=float, default=10)
     parser.add_argument('--gain_MNIST', type=float, default=0.02)
+    parser.add_argument('--gain_MNIST_compressed', type=float, default=0.25)
     args = parser.parse_args()
     if ',' in args.dataset:
         args.dataset = args.dataset.split(',')
