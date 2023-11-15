@@ -346,7 +346,7 @@ class MN_neuron_sp(nn.Module):
 
         i1 = (1 - spk) * i1 + (spk) * (self.R1 * i1 + self.A1)
         i2 = (1 - spk) * i2 + (spk) * (self.R2 * i2 + self.A2)
-        Thr = (1 - spk) * Thr + (spk) * torch.max(Thr, torch.tensor(self.Tr))
+        Thr = (1 - spk) * Thr + (spk) * torch.fmax(Thr, torch.tensor(self.Tr))
         V = (1 - spk) * V + (spk) * self.Vr
 
         self.state = self.NeuronState(V=V, i1=i1, i2=i2, Thr=Thr, spk=spk)
