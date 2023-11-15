@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import torchvision as tv
 from tqdm import tqdm
 from utils import set_random_seed
-from utils_dataset import load_MNIST, Autoencoder, ToBin, Autoencoder_linear
+from utils_dataset import Autoencoder_linear
 import argparse
 import torch.nn as nn
 import seaborn as sns
@@ -47,13 +47,6 @@ def main(args):
     print(f'N samples test: {len(testset.data)}')
     dataloader = train_loader
 
-    # transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-    # trainTransform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((0.1307,), (0.3081,))])
-    # trainset = tv.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    # dataloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=False, num_workers=4)
-    # testset = tv.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=4, shuffle=False, num_workers=2)
-
     # Encoder model:
     #model = Autoencoder(args.encoding_dim)
     model = Autoencoder_linear(args.encoding_dim)
@@ -61,7 +54,6 @@ def main(args):
     criterion = nn.MSELoss()
 
     # Optimizer
-    #optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     optimizer = torch.optim.Adam(model.parameters(), weight_decay=1e-5)
 
     list_loss = []
