@@ -102,14 +102,59 @@ class ToCurrent(object):
     def __call__(self, sample):
         # Map 2D input image to 2D tensor with px ids and current:
 
-        sample = sample.flatten(start_dim=1, end_dim=2).unsqueeze(1).repeat(1, self.n_time_steps, 1)
-        if self.add_noise:
-            # TODO: Check how to add noise
-            sample = (sample.to(torch.float) + torch.randint_like(sample, high=10) / 10 * self.v_max)*self.gain
+        if len(sample.shape) == 3:
+            # If without ToEnc transformation
+            sample = sample.flatten(start_dim=1, end_dim=2).unsqueeze(1).repeat(1, self.n_time_steps, 1)
+            if self.add_noise:
+                # TODO: Check how to add noise
+                sample = (sample.to(torch.float) + torch.randint_like(sample, high=10) / 10 * self.v_max) * self.gain
+            else:
+                sample *= self.gain
+            sample = sample[0]
 
-        # Return tensor without channel dimension (only grayscale samples)
-        return sample[0]
+        elif len(sample.shape) == 1:
+            # If after ToEnc transformation
+            sample = sample.unsqueeze(0).repeat(self.n_time_steps, 1)
+            if self.add_noise:
+                # TODO: Check how to add noise
+                sample = (sample.to(torch.float) + torch.randint_like(sample, high=10) / 10 * self.v_max) * self.gain
+            else:
+                sample *= self.gain
+        else:
+            raise ValueError
 
+        assert sample.shape[0] == self.n_time_steps
+        # sample.shape[1] == n features
+
+        return sample
+
+class ToEnc(object):
+    """
+    Custom data transformation.
+
+    Map pixel values to current amplitude across time.
+
+    """
+
+    def __init__(self, encoder_model, encoding_dim=24):
+        """
+        :param encoder_model: '.pt with model autoencoder'
+        :param dt_sec: stimulus dt (in sec)
+        """
+        self.model = Autoencoder_linear(encoding_dim)
+        self.model.load_state_dict(torch.load(encoder_model))
+        print(self.model)
+
+    def __call__(self, sample):
+        # Map 2D input image to 2D tensor with px ids and current:
+
+        sample_flatten = sample[0].flatten()
+
+        # get sample outputs
+        output = self.model(sample_flatten.float())
+        encs = self.model.encoder(sample_flatten.float()).clone().detach()
+
+        return encs
 
 class ToFft(object):
     """
@@ -141,7 +186,8 @@ def train_val_dataset(dataset, val_split=0.25):
     val_val = Subset(dataset, val_idx)
     return train_val, val_val
 def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=None, shuffle=True,
-               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False,train_val_split=0.2,gain=0.1):
+               n_samples_train=-1, n_samples_test=-1, subset_classes=None, add_noise=True, return_fft=False,
+               train_val_split=0.2,gain=1, compressed=False, encoder_model=None):
     """
     Load MNIST dataset and return train and test loader.
 
@@ -167,9 +213,18 @@ def load_MNIST(batch_size=1, stim_len_sec=1, dt_sec=1e-3, v_max=0.2, generator=N
                            ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain),
                            ToFft(dt_sec)]
     else:
-        # Return samples in time:
-        list_transforms = [transforms.PILToTensor(),
-                           ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain)]
+        if compressed:
+            buff_trainset = MNIST(root='data', train=True, download=True)
+            # Return samples in time:
+            list_transforms = [transforms.ToTensor(),
+                               transforms.Normalize((buff_trainset.data.float().mean() / 255,),
+                                                    (buff_trainset.data.float().std() / 255,)),
+                               ToEnc(encoder_model),
+                               ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain)]
+        else:
+            # Return samples in time:
+            list_transforms = [transforms.PILToTensor(),
+                               ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain)]
     # Train:
     trainset = MNIST(root='data', train=True, download=True,
                      transform=transforms.Compose(list_transforms))
@@ -420,7 +475,7 @@ class Autoencoder_linear(nn.Module):
             nn.Linear(encoding_dim*2, encoding_dim*4),
             nn.ReLU(),
             nn.Linear(encoding_dim*4, input_dim),
-            nn.Sigmoid()
+            nn.ReLU()
         )
 
     def forward(self, x):

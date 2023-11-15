@@ -150,7 +150,7 @@ if __name__ == '__main__':
                         default=32)
     parser.add_argument('--n_epochs',
                         type=int,
-                        default=20)
+                        default=50)
     args = parser.parse_args()
 
     # Run test:
