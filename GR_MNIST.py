@@ -169,7 +169,10 @@ def training(x_local,y_local,device,network,log_softmax_fn,loss_fn,optimizer,arg
         reg_loss += args.reg_neurons_l2 * torch.mean(
             torch.sum(torch.sum(lif2_spk, dim=0), dim=0) ** 2
         )  # L2 loss on output layer spikes per neuron (original: 2e-6)
+        ### regularizer for silent neurons
+        reg_loss += args.reg_silent_neurons_gain * nn.ReLU()(torch.mean(
 
+        args.reg_silent_neurons_th-torch.sum(lif2_spk, 1)))**2  # penalize silent neurons (original: 1e-5)
         # Here we combine supervised loss and the regularizer
         loss_val = loss_fn(log_p_y, y_local) + reg_loss
         optimizer.zero_grad()
@@ -787,6 +790,19 @@ if __name__ == "__main__":
         type=float,
         default=parameters_thenc["reg_neurons"],
         help="reg_neurons l2",
+    )
+
+    parser.add_argument(
+        "--reg_silent_neurons_gain",
+        type=float,
+        default=5,
+        help="reg for avoiding silent neurons (gain)",
+    )
+    parser.add_argument(
+        "--reg_silent_neurons_th",
+        type=float,
+        default=20,
+        help="reg for avoiding silent neurons (threshold)",
     )
 
     parser.add_argument(
