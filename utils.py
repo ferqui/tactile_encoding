@@ -1,6 +1,6 @@
 import os
 import numpy as np
-
+import torch
 
 def addHeaderToMetadata(filename, header):
     file = os.path.join(filename)
@@ -61,3 +61,13 @@ def generate_dict(key_to_change, variable_range, force_param_dict):
                 params[key] = np.linspace(float(value), float(value), num_values)
 
     return params
+
+def set_random_seed(seed, add_generator=False, device=torch.device('cpu')):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    if add_generator:
+        generator = torch.Generator(device=device).manual_seed(seed)
+        return generator
+    else:
+        return None

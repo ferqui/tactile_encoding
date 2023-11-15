@@ -7,7 +7,7 @@ from scipy import signal
 from numpy.fft import rfft, rfftfreq
 from datasets import load_data
 from sklearn.model_selection import train_test_split
-
+import torch.nn as nn
 
 def set_random_seed(seed, add_generator=False, device=torch.device('cpu')):
     np.random.seed(seed)
@@ -399,3 +399,29 @@ class MNISTDataset_current(Dataset):
 
     def __len__(self):
         return len(self.file['targets'])
+
+class Autoencoder(nn.Module):
+    def __init__(self, encoding_dim, input_dim=784):
+        super(Autoencoder, self).__init__()
+        ## encoder ##
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, encoding_dim),
+            nn.ReLU()
+        )
+
+        ## decoder ##
+        self.decoder = nn.Sequential(
+            nn.Linear(encoding_dim, input_dim),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # define feedforward behavior
+        # and scale the *output* layer with a sigmoid activation function
+        x = x.float()
+        # pass x into encoder
+        out = self.encoder(x)
+        # pass out into decoder
+        out = self.decoder(out)
+
+        return out
