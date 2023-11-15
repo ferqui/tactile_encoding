@@ -527,6 +527,8 @@ def main(args):
 
     else:
         print(' *** Training model ***')
+        if args.detect_anomaly:
+            torch.autograd.set_detect_anomaly(True,check_nan=True)
         ## Add the parameters from the LIF layers (2 and 3)
         my_list = ["2.", "3."]
         weight_params = [
@@ -876,6 +878,7 @@ if __name__ == "__main__":
         default=0.02,  # None, #"./MN_params",
         help="Scaling dataset to neuron",
     )
+    parser.add_argument("--detect_anomaly", action="store_true", help="Detect anomaly.")
 
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
