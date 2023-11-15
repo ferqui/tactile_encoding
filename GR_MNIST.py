@@ -344,7 +344,7 @@ def main(args):
     if args.telegram_bot_token_path is not None:
         with open(args.telegram_bot_token_path) as f:
             token = f.read()
-        bot = Telegram_bot(token, args.chat_id)
+        bot = Telegram_bot(token, args.telegram_bot_chat_id)
     ###########################################
     ##                Dataset                ##
     ###########################################
