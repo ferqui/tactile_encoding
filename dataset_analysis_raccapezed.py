@@ -644,18 +644,20 @@ def main(args):
             folder_data.mkdir(parents=True, exist_ok=True)
             folder_fig = str(folder_fig)
             folder_data = str(folder_data)
-            dict_dataset = load_dataset('MNIST_compressed',
-                                        batch_size=args.batch_size,
-                                        stim_len_sec=3,
-                                        dt_sec=1 / 100,
-                                        v_max=0.2,
-                                        generator=generator,
-                                        add_noise=True,
-                                        return_fft=False,
-                                        n_samples_train=6480,
-                                        n_samples_test=1620,
-                                        shuffle=True,
-                                        gain=args.gain_MNIST_compressed)
+            dict_dataset = load_dataset('MNIST',
+                            batch_size=10,
+                            stim_len_sec=3,
+                            dt_sec=0.001,
+                            v_max=0.2,
+                            generator=generator,
+                            add_noise=True,
+                            return_fft=False,
+                            n_samples_train=-1,
+                            n_samples_test=-1,
+                            shuffle=True,
+                            compressed=True,
+                            encoder_model='./data/784MNIST_2_24MNIST.pt',
+                            gain=args.gain_MNIST_compressed)
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST_compressed')
         else:
@@ -751,7 +753,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--dt', type=float, default=0.001)
     parser.add_argument('--load',action='store_true')
-    parser.add_argument('--dataset', type=str, default='Braille,MNIST')
+    parser.add_argument('--dataset', type=str, default='Braille,MNIST,MNIST_compressed')
     parser.add_argument('--analysis', type=str, default='amplitude,frequency,slope')
     parser.add_argument('--batch_size',  type=int, default=64)
     parser.add_argument('--epochs_n',  type=int, default=100)
