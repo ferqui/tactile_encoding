@@ -360,7 +360,11 @@ def main(args):
     batch_size = args.batch_size
     seed = args.seed
     generator = set_random_seed(seed, add_generator=True, device='cpu')
-    path_to_dataset = os.path.join(os.getcwd(), 'data','MNIST_time_dataloader')
+    if args.compressed:
+        compressed_string = '_compressed'
+    else:
+        compressed_string = ''
+    path_to_dataset = os.path.join(os.getcwd(), 'data',f'MNIST{compressed_string}_time_dataloader')
     train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'train.h5'), mode='r'), device='cpu')
     test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'test.h5'), mode='r'), device='cpu')
 
@@ -907,6 +911,7 @@ if __name__ == "__main__":
         help="Scaling dataset to neuron",
     )
     parser.add_argument("--detect_anomaly", action="store_true", help="Detect anomaly.")
+    parser.add_argument('--compressed', action='store_true', help='Use dataset compressed through an autoencoder with 24 channels')
 
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")

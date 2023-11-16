@@ -645,9 +645,9 @@ def main(args):
             folder_fig = str(folder_fig)
             folder_data = str(folder_data)
             dict_dataset = load_dataset('MNIST',
-                            batch_size=10,
+                            batch_size=args.batch_size,
                             stim_len_sec=3,
-                            dt_sec=0.001,
+                            dt_sec=1/100,
                             v_max=0.2,
                             generator=generator,
                             add_noise=True,
