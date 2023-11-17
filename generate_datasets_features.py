@@ -48,12 +48,26 @@ def main(args):
                                     n_samples_train=args.n_samples_train,
                                     n_samples_test=args.n_samples_test,
                                     shuffle=True)
+    elif args.dataset == 'MNIST_compressed':
+        dict_dataset = load_dataset('MNIST',
+                                    batch_size=args.batch_size,
+                                    stim_len_sec=args.stim_len_sec,
+                                    dt_sec=args.dt_sec,
+                                    v_max=args.v_max,
+                                    generator=generator,
+                                    add_noise=True,
+                                    return_fft=False,
+                                    n_samples_train=args.n_samples_train,
+                                    n_samples_test=args.n_samples_test,
+                                    shuffle=True,
+                                    compressed=True,
+                                    encoder_model='./data/784MNIST_2_24MNIST.pt')
     else:
         raise NotImplementedError
     path_to_dataset = Path(args.home_dataset)
     path_to_dataset.mkdir(parents=True, exist_ok=True)
 
-    if args.dataset == 'MNIST' and args.data_type == 'current':
+    if args.data_type == 'current':
         filename_dataset = path_to_dataset.joinpath(args.dataset,
                                                     args.data_type,
                                                     str(len(dict_dataset['train_loader'].dataset)) + '_' +
@@ -169,8 +183,8 @@ if __name__ == '__main__':
                         default=10)
     parser.add_argument('--dataset',
                         type=str,
-                        default='MNIST',
-                        choices=['MNIST', 'Braille'])
+                        default='MNIST_compressed',
+                        choices=['MNIST', 'Braille', 'MNIST_compressed'])
     parser.add_argument('--n_samples_train',
                         type=int,
                         default=6480)
