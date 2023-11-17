@@ -136,7 +136,7 @@ class ToEnc(object):
 
     """
 
-    def __init__(self, encoder_model, encoding_dim=24):
+    def __init__(self, encoder_model, encoding_dim=6):
         """
         :param encoder_model: '.pt with model autoencoder'
         :param dt_sec: stimulus dt (in sec)

@@ -15,6 +15,8 @@ import os
 from scipy import signal
 import json
 from torchvision.datasets import MNIST
+from sklearn import decomposition
+
 import pandas as pd
 import h5py
 from utils_dataset import load_dataset, set_random_seed, extract_interval, extract_histogram, get_fft
@@ -408,6 +410,10 @@ def plt_best(opt,dict_dataset,data_type,xf=None,dataset_name = '',folder_fig='')
         data_coll[label] = []
     for i, (data, target) in enumerate(dict_dataset['train_loader']):
         data = extract_feature(data, dict_dataset, data_type, center, span, args.bins, args, i, xf=xf)
+        if i == 0:
+            data4pca = data
+            label4pca = target
+        # plt.imshow(data_pca.T,aspect='auto',origin='lower')
         data = torch.tensor(data).to(torch.float)
         for label in range(dict_dataset['n_classes']):
             data_coll[label].append(data[target==label])
@@ -416,9 +422,37 @@ def plt_best(opt,dict_dataset,data_type,xf=None,dataset_name = '',folder_fig='')
         # print(data_coll[label])
 
         data_coll[label] = torch.mean(torch.concatenate(data_coll[label]),dim=0)
-        plt.plot(data_coll[label].cpu().numpy(),color=sns.color_palette("husl", dict_dataset['n_classes'])[label])
+        plt.plot(data_coll[label].cpu().numpy().T,color=sns.color_palette("husl", dict_dataset['n_classes'])[label])
     plt.title('Best '+data_type + ' '+dataset_name)
     plt.savefig(os.path.join(folder_fig,'best_'+data_type+'.png'))
+    plt.figure()
+    ### pca
+    pca = decomposition.PCA(n_components=10)
+    #noramlize data4pca
+    print(data4pca.shape)
+    print(np.nanmean(data4pca))
+    print(np.nanstd(data4pca))
+    print(data4pca)
+    data4pca = data4pca - np.nanmean(data4pca)
+    data4pca = data4pca / np.nanstd(data4pca)
+    data_pca = pca.fit_transform(data4pca)
+    # data_pca = pca.transform(data)
+    for targ in label4pca.unique():
+        # cum_explain = np.cumsum(pca.explained_variance_ratio_)
+        plt.plot(data_pca[label4pca == targ, 0], data_pca[label4pca == targ, 1], marker='o', linestyle='',
+                 label=targ.item())
+
+    plt.legend()
+
+    plt.savefig(os.path.join(folder_fig, f'{data_type}_pca.png'))
+    plt.figure()
+    cum_explain = np.cumsum(pca.explained_variance_ratio_)
+    plt.plot(cum_explain)
+    plt.title('Cumulative Explained Variance ' + data_type + ' ' + dataset_name+ ' acc% ' + str(int(opt[data_type]['acc'])))
+    plt.ylim([0, 1])
+    plt.xlabel('Number of Components')
+    plt.ylabel('Variance (%)')  # for each component
+    plt.savefig(os.path.join(folder_fig, f'{data_type}_pca_explained.png'))
     # plt.show()
 
 def extract_feature(data, dict_dataset, data_type,center,span,bins,args, i, xf=None,target= None):
@@ -486,6 +520,7 @@ def classifier_processed(dict_dataset,epochs,data_type,center,span,args,xf=None)
             # data *= dict_dataset['train_loader'].gain
             # print('data_before',data.shape)
             data = extract_feature(data, dict_dataset, data_type, center, span, args.bins, args, i, xf=xf)
+
             data = torch.tensor(data).to(device)
             data = data.float()
             target = target.long()
@@ -575,7 +610,7 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_hb_allaccuracy')
+    folder = Path('dataset_analysis_hb_allaccuracy_tmp')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)
@@ -656,7 +691,7 @@ def main(args):
                             n_samples_test=-1,
                             shuffle=True,
                             compressed=True,
-                            encoder_model='./data/784MNIST_2_24MNIST.pt',
+                            encoder_model='./data/784MNIST_2_6MNIST.pt',
                             gain=args.gain_MNIST_compressed)
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST_compressed')
@@ -722,9 +757,15 @@ def main(args):
                 chance_level = 1 / dict_dataset['n_classes']
                 plot_dict_hm = mean_accuracy.pivot(index="center", columns="span", values="accuracy")
                 plot_dict_hm_np = np.array(plot_dict_hm)
+                # print(plot_dict_hm_np)
                 max_here = np.unravel_index(np.nanargmax(plot_dict_hm_np), plot_dict_hm_np.shape)
                 min_here = np.unravel_index(np.nanargmin(plot_dict_hm_np), plot_dict_hm_np.shape)
-                sns.heatmap(plot_dict_hm/chance_level-1,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20),vmin=-20,vmax=20)
+                print(chance_level)
+                sns.heatmap(plot_dict_hm)
+                v_min = 0
+                v_max= 1/chance_level
+
+                sns.heatmap(plot_dict_hm)#,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
                 plt.title(f'dataset {dataset}, feature: {data_type}')
                 plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
                 plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
@@ -736,11 +777,11 @@ def main(args):
                 opt[data_type] = {'center': centers[data_type][max_here[0]],
                                   'span': spans[data_type][max_here[1]],
                                   'n_steps': 10,
-                                  'acc': plot_dict_hm_np.max() * 100}
+                                  'acc': np.nanmax(plot_dict_hm_np) * 100}
                 worse[data_type] = {'center': centers[data_type][min_here[0]],
                                     'span': spans[data_type][min_here[1]],
                                     'n_steps': 10,
-                                    'acc': plot_dict_hm_np.min() * 100}
+                                    'acc': np.nanmin(plot_dict_hm_np) * 100}
                 plt_best(opt,dict_dataset,data_type,dataset_name = dataset,folder_fig=folder_fig)
 
             json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
@@ -756,13 +797,13 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='Braille,MNIST,MNIST_compressed')
     parser.add_argument('--analysis', type=str, default='amplitude,frequency,slope')
     parser.add_argument('--batch_size',  type=int, default=64)
-    parser.add_argument('--epochs_n',  type=int, default=100)
-    parser.add_argument('--bins',  type=int, default=100)
+    parser.add_argument('--epochs_n',  type=int, default=2)
+    parser.add_argument('--bins',  type=int, default=10)
     parser.add_argument('--sim_id',  type=int, default=-1)
     parser.add_argument('--stim_len_sec',  type=int, default=300)
     parser.add_argument('--gain_Braille', type=float, default=10)
     parser.add_argument('--gain_MNIST', type=float, default=0.02)
-    parser.add_argument('--gain_MNIST_compressed', type=float, default=0.25)
+    parser.add_argument('--gain_MNIST_compressed', type=float, default=1/6)
     args = parser.parse_args()
     if ',' in args.dataset:
         args.dataset = args.dataset.split(',')
