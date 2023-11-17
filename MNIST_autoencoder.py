@@ -49,9 +49,13 @@ def main(args):
 
     # Encoder model:
     #model = Autoencoder(args.encoding_dim)
-    model = Autoencoder_linear(args.encoding_dim)
+    model = Autoencoder_linear(args.encoding_dim,
+                               input_dim=trainset.data.shape[1]**2,
+                               output_dim=args.output_dim)
+
     # Loss function
-    criterion = nn.MSELoss()
+    log_softmax_fn = nn.LogSoftmax(dim=1)
+    loss_fn = nn.CrossEntropyLoss()
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), weight_decay=1e-5)
@@ -64,9 +68,11 @@ def main(args):
 
         for data in tqdm(dataloader):
             # _ stands in for labels, here
-            images, _ = data
+            images, target = data
 
             # flatten images
+            # print(images.shape)
+            # print(target.shape)
             images = images.view(images.size(0), -1).float()
 
             # clear the gradients of all optimized variables
@@ -77,7 +83,11 @@ def main(args):
             # calculate the loss
             # print(outputs.float().shape)
             # print(images.shape)
-            loss = criterion(outputs.float(), images)
+            # print(outputs)
+
+            loss = loss_fn(outputs, target)
+
+            #loss = criterion(outputs.float(), images)
             # backward pass: compute gradient of the loss with respect to model parameters
             loss.backward()
             # perform a single optimization step (parameter update)
@@ -108,12 +118,12 @@ def main(args):
     output = model(images_flatten.float())
     encs = model.encoder(images_flatten.float()).clone().detach()
     print(encs.shape)
-    encs = torch.reshape(encs, (args.batch_size, 6, 4))
+    encs = torch.reshape(encs, (args.batch_size, 3, 2))
     # prep images for display
     images = images.numpy()
 
     # output is resized into a batch of images
-    output = output.view(args.batch_size, 1, 28, 28)
+    #output = output.view(args.batch_size, 1, 28, 28)
     # use detach when it's an output that requires_grad
     output = output.detach().numpy()
 
@@ -144,13 +154,16 @@ if __name__ == '__main__':
                         default=42)
     parser.add_argument('--encoding_dim',
                         type=int,
-                        default=24)
+                        default=6)
+    parser.add_argument('--output_dim',
+                        type=int,
+                        default=10)
     parser.add_argument('--batch_size',
                         type=int,
                         default=32)
     parser.add_argument('--n_epochs',
                         type=int,
-                        default=50)
+                        default=20)
     args = parser.parse_args()
 
     # Run test:
