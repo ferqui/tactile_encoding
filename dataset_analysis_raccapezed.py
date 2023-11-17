@@ -797,7 +797,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='Braille,MNIST,MNIST_compressed')
     parser.add_argument('--analysis', type=str, default='amplitude,frequency,slope')
     parser.add_argument('--batch_size',  type=int, default=64)
-    parser.add_argument('--epochs_n',  type=int, default=2)
+    parser.add_argument('--epochs_n',  type=int, default=100)
     parser.add_argument('--bins',  type=int, default=10)
     parser.add_argument('--sim_id',  type=int, default=-1)
     parser.add_argument('--stim_len_sec',  type=int, default=300)
