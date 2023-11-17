@@ -133,7 +133,10 @@ def main(args):
     # input images on top row, reconstructions on bottom
     for images_, row in zip([images, encs, output], axes):
         for img, ax in zip(images_, row):
-            sns.heatmap(np.squeeze(img), ax=ax, cmap='Greys')
+            try:
+                sns.heatmap(np.squeeze(img), ax=ax, cmap='Greys')
+            except:
+                pass
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(False)
 
