@@ -1,10 +1,15 @@
+!*/
 __pycache__
-data/*
+data/
+!data/Braille_trained_activity/Braille_classification/spikes/
 plots/*
-results/BrailleTrained_activity_classification/*
 results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/experiments_history/*
 results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_attempts/*
+results/BrailleTrained_activity_classification/*
+!results/BrailleTrained_activity_classification/activity_classification_Braille_20230927_092051
 results/plots/*
+!results/plots/BrailleTrained_activity_MN/braille_trained_activity_classifier/
+!results/plots/classification/Behaviours/
 logs/*
 bkp/*
 runs

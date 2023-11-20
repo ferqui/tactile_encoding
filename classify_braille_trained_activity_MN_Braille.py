@@ -544,7 +544,7 @@ print("*** classification done ***")
 activity_classification["Letter"] = letter
 activity_classification["Behaviour"] = behaviour
 activity_classification["Probabilities"] = behaviour_probs
-activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_{}".format(experiment_datetime))
+activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_Braille_{}".format(experiment_datetime))
 
 ### Prepare the dataframe for the heatmap and plot it
 grouped = activity_classification[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
