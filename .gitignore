@@ -9,8 +9,9 @@ data/label_*
 data/*Hz
 data/*.py
 data/*.ipynb
-data/Braille_trained_activity/*
-!data/Braille_trained_activity/Braille_classification/spikes/*.pt
+data/Braille_trained_activity/Braille_classification/*.csv
+data/Braille_trained_activity/Braille_classification/*.zip
+data/Braille_trained_activity/MNIST_classification/*
 logs/*
 NNI/dataset_splits/*
 NNI/logs/*
