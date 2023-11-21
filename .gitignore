@@ -5,7 +5,7 @@ __pycache__
 .ipynb_checkpoints
 bkp/*
 data/*
-!data/Braille_trained_activity/Braille_classification/spikes/*
+!data/Braille_trained_activity/Braille_classification/spikes/batch_*
 logs/*
 NNI/dataset_splits/*
 NNI/logs/*
@@ -15,8 +15,8 @@ results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/experiments_
 results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_attempts/*
 results/BrailleTrained_activity_classification/*
 !results/BrailleTrained_activity_classification/activity_classification_Braille_20230927_092051
-results/plots/*
-!results/plots/BrailleTrained_activity_MN/braille_trained_activity_classifier/*
-!results/plots/classification/Behaviours/
+results/plots/optimized/*
+results/plots/classification/Braille/*
+results/plots/classification/original_input_activity_MN/*
 runs/*
 TAC_RSNN/*
