@@ -699,7 +699,7 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis_hb_allaccuracy')
+    folder_run = Path('dataset_analysis_hb_allaccuracy_tmp')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
