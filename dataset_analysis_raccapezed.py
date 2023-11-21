@@ -402,7 +402,8 @@ def plt_fft(dict_dataset,dataset_name,folder_fig='',f_min=5):
     # plt.legend()
     plt.title('Mean FFT '+dataset_name)
     plt.savefig(os.path.join(folder_fig,'mean_fft.png'))
-def plt_best(opt,dict_dataset,data_type,xf=None,dataset_name = '',folder_fig=''):
+def plt_best(opt,dict_dataset,data_type,args,xf=None,dataset_name = '',folder_fig=''):
+    print('plotting best')
     center = opt[data_type]['center']
     span = opt[data_type]['span']
     data_coll = {}
@@ -425,34 +426,38 @@ def plt_best(opt,dict_dataset,data_type,xf=None,dataset_name = '',folder_fig='')
         plt.plot(data_coll[label].cpu().numpy().T,color=sns.color_palette("husl", dict_dataset['n_classes'])[label])
     plt.title('Best '+data_type + ' '+dataset_name)
     plt.savefig(os.path.join(folder_fig,'best_'+data_type+'.png'))
-    plt.figure()
-    ### pca
-    pca = decomposition.PCA(n_components=10)
-    #noramlize data4pca
-    print(data4pca.shape)
-    print(np.nanmean(data4pca))
-    print(np.nanstd(data4pca))
-    print(data4pca)
-    data4pca = data4pca - np.nanmean(data4pca)
-    data4pca = data4pca / np.nanstd(data4pca)
-    data_pca = pca.fit_transform(data4pca)
-    # data_pca = pca.transform(data)
-    for targ in label4pca.unique():
-        # cum_explain = np.cumsum(pca.explained_variance_ratio_)
-        plt.plot(data_pca[label4pca == targ, 0], data_pca[label4pca == targ, 1], marker='o', linestyle='',
-                 label=targ.item())
+    plt.close()
+    if args.pca:
+        plt.figure()
+        ### pca
+        pca = decomposition.PCA(n_components=10)
+        #noramlize data4pca
+        print(data4pca.shape)
+        print(np.nanmean(data4pca))
+        print(np.nanstd(data4pca))
+        print(data4pca)
+        data4pca = data4pca - np.nanmean(data4pca)
+        data4pca = data4pca / np.nanstd(data4pca)
+        data_pca = pca.fit_transform(data4pca)
+        # data_pca = pca.transform(data)
+        for targ in label4pca.unique():
+            # cum_explain = np.cumsum(pca.explained_variance_ratio_)
+            plt.plot(data_pca[label4pca == targ, 0], data_pca[label4pca == targ, 1], marker='o', linestyle='',
+                     label=targ.item())
 
-    plt.legend()
+        plt.legend()
 
-    plt.savefig(os.path.join(folder_fig, f'{data_type}_pca.png'))
-    plt.figure()
-    cum_explain = np.cumsum(pca.explained_variance_ratio_)
-    plt.plot(cum_explain)
-    plt.title('Cumulative Explained Variance ' + data_type + ' ' + dataset_name+ ' acc% ' + str(int(opt[data_type]['acc'])))
-    plt.ylim([0, 1])
-    plt.xlabel('Number of Components')
-    plt.ylabel('Variance (%)')  # for each component
-    plt.savefig(os.path.join(folder_fig, f'{data_type}_pca_explained.png'))
+        plt.savefig(os.path.join(folder_fig, f'{data_type}_pca.png'))
+        plt.figure()
+        cum_explain = np.cumsum(pca.explained_variance_ratio_)
+        plt.plot(cum_explain)
+        plt.title('Cumulative Explained Variance ' + data_type + ' ' + dataset_name+ ' acc% ' + str(int(opt[data_type]['acc'])))
+        plt.ylim([0, 1])
+        plt.xlabel('Number of Components')
+        plt.ylabel('Variance (%)')  # for each component
+        plt.savefig(os.path.join(folder_fig, f'{data_type}_pca_explained.png'))
+        plt.close()
+
     # plt.show()
 
 def extract_feature(data, dict_dataset, data_type,center,span,bins,args, i, xf=None,target= None):
@@ -579,16 +584,42 @@ def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data=''
 
 def retrieve_analysis(analysis,centers,spans,folder_data='',args=None):
     plot_dicts = []
+    not_found = False
+    ids = []
     for d_idx,data_type in enumerate(analysis):
         print(data_type)
         for c_idx,center in enumerate(centers[data_type]):
             for s_idx,span in enumerate(spans[data_type]):
                 # print(data_type,center,span)
-                id = s_idx*30 + c_idx*3 + d_idx
+                id = s_idx*len(analysis)*len(centers[data_type]) + c_idx*len(analysis) + d_idx
                 # print(id)
-                plot_dict = np.load(os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{id}.npy'),allow_pickle=True).item()
-                plot_dicts.append(plot_dict)
+                try:
+                    ids.append(id)
+                    plot_dict = np.load(os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{id}.npy'),allow_pickle=True).item()
+                    plot_dicts.append(plot_dict)
+                    # print(id,plot_dict)
+                except:
+
+                    print('I want',os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{id}.npy'))
+                    ##filter the files in the folder that end with .npy
+                    files = [f for f in os.listdir(folder_data) if os.path.isfile(os.path.join(folder_data, f)) and f.endswith(f'{id}.npy')]
+                    # print(files)
+                    # print('Missing '+str(id))
+                    not_found = True
+    if not_found:
+        raise ValueError('Missing files')
+    # print(np.sort(ids))
     return plot_dicts
+import matplotlib.colors as colors
+class MidpointNormalize(colors.Normalize):
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        v_ext = np.max( [ np.abs(self.vmin), np.abs(self.vmax) ] )
+        x, y = [-v_ext, self.midpoint, v_ext], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y))
 def main(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     cmaps = {
@@ -739,7 +770,10 @@ def main(args):
                 plt.figure()
                 #plot accuracy vs step
                 sns.lineplot(x=plot_dict_sel.index,y='accuracy',data=plot_dict_sel,hue='span',style='center')
+                plt.tight_layout()
+
                 plt.savefig(os.path.join(folder_fig,f'dataset_analys_{data_type}_accuracy_vs_step.pdf'))
+                plt.close()
 
                 which_decimal_c = np.max(
                     [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))),
@@ -760,20 +794,47 @@ def main(args):
                 # print(plot_dict_hm_np)
                 max_here = np.unravel_index(np.nanargmax(plot_dict_hm_np), plot_dict_hm_np.shape)
                 min_here = np.unravel_index(np.nanargmin(plot_dict_hm_np), plot_dict_hm_np.shape)
-                print(chance_level)
-                sns.heatmap(plot_dict_hm)
-                v_min = 0
-                v_max= 1/chance_level
+                # print('chance_level',chance_level)
+                norm = MidpointNormalize(midpoint=1, vmin=0, vmax=20)
+                # sns.heatmap(plot_dict_hm,norm=norm,vmin=0,vmax=1,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
+                annot_plot_dict_hm = np.zeros_like(plot_dict_hm_np)
+                annot_plot_dict_hm[max_here[0], max_here[1]] = plot_dict_hm_np[max_here[0], max_here[1]]
+                annot_plot_dict_hm[min_here[0], min_here[1]] = plot_dict_hm_np[min_here[0], min_here[1]]
+                ax = sns.heatmap(plot_dict_hm/chance_level,vmin=0,vmax=1,cmap=sns.diverging_palette(as_cmap=True,h_neg=20,h_pos=220),norm=norm,annot=plot_dict_hm/chance_level,fmt='.2f')
+                # for t in ax.texts:
+                #     if float(t.get_text()) == np.round(plot_dict_hm_np[max_here[0], max_here[1]],2):
+                #         t.set_text(t.get_text())  # if the value is greater than 0.4 then I set the text
+                #     elif float(t.get_text()) == np.round(plot_dict_hm_np[min_here[0], min_here[1]],2):
+                #
+                #         t.set_text(t.get_text())  # if the value is greater than 0.4 then I set the text
+                #     else:
+                #         t.set_text("")  # if not it sets an empty text
+                ax.collections[0].colorbar.set_label("Accuracy/Chance Level")
+                # ax.collections[0].colorbar.set_ticks([0,1])
+                # original_ticks = list(ax.collections[0].colorbar.get_ticks())
+                # ax.collections[0].colorbar.set_ticks(list(np.round(original_ticks,1)) + [1])
+                # ax.collections[0].colorbar.set_ticklabels(list(np.round(original_ticks,1)) + ['CL: '+str(np.round(chance_level,2))])
+                ## add annotation on maximum and minimum
 
-                sns.heatmap(plot_dict_hm)#,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
+                # print(eee)
+                # splt = plt.scatter(
+                #     np.repeat(x, xlen),
+                #     np.tile(x, xlen),
+                #     c=z, cmap='seismic', s=400,
+                #     norm=norm
+                # )
+                #
+                # plt.colorbar(ee)
+                # sns.heatmap(plot_dict_hm)#,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
                 plt.title(f'dataset {dataset}, feature: {data_type}')
                 plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
                 plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
+                plt.tight_layout()
                 plt.savefig(os.path.join(folder_fig,
                                          f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
                 plt.savefig(os.path.join(folder_fig,
                                          f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
-
+                plt.close()
                 opt[data_type] = {'center': centers[data_type][max_here[0]],
                                   'span': spans[data_type][max_here[1]],
                                   'n_steps': 10,
@@ -782,8 +843,7 @@ def main(args):
                                     'span': spans[data_type][min_here[1]],
                                     'n_steps': 10,
                                     'acc': np.nanmin(plot_dict_hm_np) * 100}
-                plt_best(opt,dict_dataset,data_type,dataset_name = dataset,folder_fig=folder_fig)
-
+                plt_best(opt,dict_dataset,data_type,args=args,dataset_name = dataset,folder_fig=folder_fig)
             json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
             json.dump(worse, open(os.path.join(folder_data, 'worse.json'), 'w'))
 
@@ -804,6 +864,7 @@ if __name__ == "__main__":
     parser.add_argument('--gain_Braille', type=float, default=10)
     parser.add_argument('--gain_MNIST', type=float, default=0.02)
     parser.add_argument('--gain_MNIST_compressed', type=float, default=1/6)
+    parser.add_argument('--pca',action='store_true',help='plot pca')
     args = parser.parse_args()
     if ',' in args.dataset:
         args.dataset = args.dataset.split(',')

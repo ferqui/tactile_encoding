@@ -176,8 +176,8 @@ def sweep_slopes(slopes=np.arange(10), n_trials=10, dt_sec=0.001, stim_length_se
         time_necessary = (last - first)/a
         time_first = (stim_length_sec - time_necessary)/2
         time_last = (stim_length_sec - time_necessary)/2
-        assert time_first > dt_sec
-        assert time_necessary > dt_sec
+        assert time_first > dt_sec, f"time_first:{time_first} is smaller than dt_sec {dt_sec}"
+        assert time_necessary > dt_sec, f"time_necessary:{time_necessary} is smaller than dt_sec {dt_sec}"
         first_vec = np.linspace(first, first, int(np.floor(time_first / dt_sec)))
         last_vec = np.linspace(last, last, int(np.floor(time_last / dt_sec)))
         slope = np.linspace(0,last-first,int(np.floor(time_necessary/dt_sec)))
@@ -648,11 +648,11 @@ if __name__ == "__main__":
     parser.add_argument('--noise', type=str, default='0,0,0')
     parser.add_argument('--dt_sec', type=float, default=0.001)
     parser.add_argument('--debug_plot', '-d', action='store_true')
-    parser.add_argument('--load_range', type=str, default='MNIST')
+    parser.add_argument('--load_range', type=str, default='Braille')
     parser.add_argument('--encoding_methods',type=str,default='spike')
-    parser.add_argument('--load_neuron', type=str, default='')
+    parser.add_argument('--load_neuron', type=str, default='Braille,MNIST,MNIST_compressed')
     parser.add_argument('--seed', type=int, default=-1)
-    parser.add_argument('--seed_n', type=int, default=100)
+    parser.add_argument('--seed_n', type=int, default=1)
     parser.add_argument('--gpu',  action='store_true')
     parser.add_argument('--n_epochs', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
@@ -699,7 +699,7 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis_hb_allaccuracy')
+    folder_run = Path('dataset_analysis_hb_allaccuracy_tmp')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
@@ -723,7 +723,7 @@ if __name__ == "__main__":
                         setattr(args, range_ds+'_'+range_name+'_'+type+'_center', json_range[range_name]['center'])
                         setattr(args, range_ds+'_'+range_name+'_'+type+'_span', json_range[range_name]['span'])
                         setattr(args, range_ds+'_'+range_name+'_'+type+'_n_steps', json_range[range_name]['n_steps'])
-
+                        print(range_ds+'_'+range_name+'_'+type+'_center', getattr(args, range_ds+'_'+range_name+'_'+type+'_center'))
                         stimuli_types.append(range_name)
                         ranges[range_ds +'_'+ range_name+'_'+type] = [np.linspace(
                             getattr(args, range_ds + '_'+range_name + '_'+type+'_center') - getattr(args,
@@ -733,7 +733,7 @@ if __name__ == "__main__":
                             getattr(args, range_ds + '_'+range_name + '_'+type+'_n_steps'))]
                     except KeyError:
                         pass
-
+    print(ranges)
     stimuli_types = np.unique(stimuli_types)
     if args.debug_plot:
         writer = SummaryWriter(log_dir='MN_DSP/runs')

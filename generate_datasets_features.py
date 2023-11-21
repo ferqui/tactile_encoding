@@ -61,7 +61,7 @@ def main(args):
                                     n_samples_test=args.n_samples_test,
                                     shuffle=True,
                                     compressed=True,
-                                    encoder_model='./data/784MNIST_2_24MNIST.pt')
+                                    encoder_model='./data/784MNIST_2_6MNIST.pt')
     else:
         raise NotImplementedError
     path_to_dataset = Path(args.home_dataset)

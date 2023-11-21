@@ -40,7 +40,7 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 path = 'experiments/results/'
-folder_high = ''
+folder_high = 'Parallel_opt_worse_noise'
 if folder_high == '':
 
     list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
