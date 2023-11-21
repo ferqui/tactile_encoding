@@ -4,8 +4,13 @@ __pycache__
 .venv
 .ipynb_checkpoints
 bkp/*
-data/*
-!data/Braille_trained_activity/Braille_classification/spikes/batch_*
+data/data_*
+data/label_*
+data/*Hz
+data/*.py
+data/*.ipynb
+data/Braille_trained_activity/*
+!data/Braille_trained_activity/Braille_classification/spikes/*.pt
 logs/*
 NNI/dataset_splits/*
 NNI/logs/*
