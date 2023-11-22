@@ -184,6 +184,7 @@ def main(args):
             is_recurrent=True,
             fwd_weight_scale=fwd_weight_scale,
             rec_weight_scale=rec_weight_scale,
+            train=args.no_train_weights == False,
         ),
         LIF_neuron(
             nb_hidden,
@@ -193,6 +194,7 @@ def main(args):
             is_recurrent=False,
             fwd_weight_scale=fwd_weight_scale,
             rec_weight_scale=rec_weight_scale,
+            train=args.no_train_weights == False,
         ),
     ).to(device)
     print(network)
@@ -265,7 +267,6 @@ def main(args):
             else:
                 param_list.append({"params": custom_param})
 
-
         ## Create optimizer
         optimizer = torch.optim.Adamax(param_list, lr=0.005, betas=(0.9, 0.995))
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
@@ -296,6 +297,10 @@ def main(args):
         )
 
         pbar = trange(nb_epochs)
+        if args.log:
+            gr_weights_path = Path('GR_weights')
+            gr_weights_path.mkdir(parents=True, exist_ok=True)
+            weight_dict = {'l2_weights':[],'l2_weights_rec':[],'l3_weights':[],'l3_weights_rec':[]}
         for e in pbar:
             local_loss = []
             accs = []  # accs: mean training accuracies for each batch
@@ -322,31 +327,44 @@ def main(args):
                 l0_mem = []
                 lif1_mem = []
                 lif2_mem = []
+                if args.fast:
+                    for t in range(x_local.shape[1]):
+                        out = network(x_local[:, t])
 
-                for t in range(x_local.shape[1]):
-                    out = network(x_local[:, t])
+                        # Get the spikes and voltages from the MN neuron encoder
+                        l0_spk.append(network[1].state.spk)
+                        l0_mem.append(network[1].state.V)
 
-                    # Get the spikes and voltages from the MN neuron encoder
-                    l0_spk.append(network[1].state.spk)
-                    l0_mem.append(network[1].state.V)
+                        # Get the spikes and voltages from the first LIF
+                        lif1_spk.append(network[2].state.S)
+                        lif1_mem.append(network[2].state.mem)
 
-                    # Get the spikes and voltages from the first LIF
-                    lif1_spk.append(network[2].state.S)
-                    lif1_mem.append(network[2].state.mem)
+                        # Get the spikes and voltages from the second LIF
+                        lif2_spk.append(network[3].state.S)
+                        lif2_mem.append(network[3].state.mem)
+                else:
+                    for t in range(x_local.shape[1]):
+                        out = network(x_local[:, t])
 
-                    # Get the spikes and voltages from the second LIF
-                    lif2_spk.append(network[3].state.S)
-                    lif2_mem.append(network[3].state.mem)
+                        # Get the spikes and voltages from the MN neuron encoder
+                        l0_spk.append(network[1].state.spk)
+                        l0_mem.append(network[1].state.V)
+
+                        # Get the spikes and voltages from the first LIF
+                        lif1_spk.append(network[2].state.S)
+                        lif1_mem.append(network[2].state.mem)
+
+                        # Get the spikes and voltages from the second LIF
+                        lif2_spk.append(network[3].state.S)
+                        lif2_mem.append(network[3].state.mem)
+                    l0_mem = torch.stack(l0_mem, dim=1)
+                    l0_events = torch.where(l0_spk[0])
+                    lif1_mem = torch.stack(lif1_mem, dim=1)
+                    lif2_mem = torch.stack(lif2_mem, dim=1)
 
                 l0_spk = torch.stack(l0_spk, dim=1)
-                l0_mem = torch.stack(l0_mem, dim=1)
-                l0_events = torch.where(l0_spk[0])
-                # plt.scatter(l0_events[0], l0_events[1], s=0.1)
-                # plt.show()
                 lif1_spk = torch.stack(lif1_spk, dim=1)
-                lif1_mem = torch.stack(lif1_mem, dim=1)
                 lif2_spk = torch.stack(lif2_spk, dim=1)
-                lif2_mem = torch.stack(lif2_mem, dim=1)
                 m = torch.sum(lif2_spk,1)
                   # sum over time
                 log_p_y = log_softmax_fn(m)
@@ -417,18 +435,6 @@ def main(args):
 
                 if args.log:
                     ###########################################
-                    ##               Plotting                ##
-                    ###########################################
-
-                    # fig1 = plot_spikes(mn_spk.cpu())
-                    # fig2 = plot_spikes(lif1_spk.cpu())
-                    # fig3 = plot_spikes(lif2_spk.cpu())
-                    #
-                    # fig4 = plot_voltages(mn_mem.cpu())
-                    # fig5 = plot_voltages(lif1_mem.cpu())
-                    # fig6 = plot_voltages(lif2_mem.cpu())
-
-                    ###########################################
                     ##                Logging                ##
                     ###########################################
                     nni.report_intermediate_result(test_acc)
@@ -451,6 +457,15 @@ def main(args):
                                 param, dict_param[param]["param"], global_step=e
                             )
 
+
+                    for l_idx, l in enumerate(network):
+                        if type(l) == LIF_neuron:
+                            print(l)
+                            weight_dict['l' + str(l_idx) + '_weights'].append(l.weight)
+                            if l.is_recurrent:
+                                weight_dict['l' + str(l_idx) + '_weights_rec'].append(l.weight_rec)
+                    if e%args.save_weights_period == 0:
+                        torch.save(weight_dict, gr_weights_path.joinpath(f'GR_weights_upto{e}.pt'))
                     # writer.add_histogram("w1", network[-2].weight, global_step=e)
                     # writer.add_histogram("w1_rec", network[-2].weight_rec, global_step=e)
                     # writer.add_histogram("w2", network[-1].weight, global_step=e)
@@ -548,13 +563,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reg_spikes",
         type=float,
-        default=parameters_thenc["reg_spikes"],
+        default=0.004137932487125182,
         help="reg_spikes",
     )
     parser.add_argument(
         "--reg_neurons",
         type=float,
-        default=parameters_thenc["reg_neurons"],
+        default=0.0000012554070087612182,
         help="reg_neurons",
     )
 
@@ -587,7 +602,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gr",
         type=float,
-        default=1.0,
+        default=0.2006232276576734,
         help="Gradient regularization",
     )
     parser.add_argument(
@@ -606,9 +621,16 @@ if __name__ == "__main__":
         default=None,#None, #"./MN_params",
         help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
     )
+    parser.add_argument(
+        "--no_train_weights",
+        action="store_true",
+        help="Do not train the weights",
+    )
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
     parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
+    parser.add_argument("--fast", action="store_true", help="Fast simulation.")
+    parser.add_argument("--save_weights_period", type=int, default=10, help="How often to save weights (in epochs)")
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
 
