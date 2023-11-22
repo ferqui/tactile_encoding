@@ -24,7 +24,6 @@ results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_atte
 results/BrailleTrained_activity_classification/*
 !results/BrailleTrained_activity_classification/activity_classification_Braille_20230927_092051
 results/plots/optimized/*
-results/plots/classification/Behaviours/*
 results/plots/classification/Braille/*
 results/plots/classification/original_input_activity_MN/with_Braille-optimized_parameters_v0/*
 runs/*
