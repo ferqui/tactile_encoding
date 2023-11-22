@@ -364,7 +364,13 @@ def main(args):
         compressed_string = '_compressed'
     else:
         compressed_string = ''
-    path_to_dataset = os.path.join(os.getcwd(), 'data',f'MNIST{compressed_string}_time_dataloader')
+    if args.reduced:
+        reduced_string = '_reduced'
+    else:
+        reduced_string = ''
+    # path_to_dataset = os.path.join(os.getcwd(), 'data/reduced',f'MNIST{compressed_string}_time_dataloader')
+    path_to_dataset = os.path.join(os.getcwd(), 'data/',f'MNIST_{compressed_string}{reduced_string}_time_dataloader')
+    # path_to_dataset = os.path.join(os.getcwd(),'data/MNIST_reduced_time_dataloader')
     train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'train.h5'), mode='r'), device='cpu')
     test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'test.h5'), mode='r'), device='cpu')
 
@@ -909,6 +915,11 @@ if __name__ == "__main__":
         type=float,
         default=0.02,  # None, #"./MN_params",
         help="Scaling dataset to neuron",
+    )
+    parser.add_argument(
+        "--reduced",
+        action="store_true",
+        help="Use reduced dataset",
     )
     parser.add_argument("--detect_anomaly", action="store_true", help="Detect anomaly.")
     parser.add_argument('--compressed', action='store_true', help='Use dataset compressed through an autoencoder with 24 channels')
