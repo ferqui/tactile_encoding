@@ -32,7 +32,8 @@ def compute_classification_accuracy(dataset, network, early, device, fast=True, 
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(
             device, non_blocking=True
         )
-        y_local = y_local[:, 0]
+        if len(y_local.shape) > 1:
+            y_local = y_local[:, 0]
 
         for layer in network:
             if hasattr(layer.__class__, "reset"):

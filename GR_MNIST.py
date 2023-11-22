@@ -369,7 +369,7 @@ def main(args):
     else:
         reduced_string = ''
     # path_to_dataset = os.path.join(os.getcwd(), 'data/reduced',f'MNIST{compressed_string}_time_dataloader')
-    path_to_dataset = os.path.join(os.getcwd(), 'data/',f'MNIST_{compressed_string}{reduced_string}_time_dataloader')
+    path_to_dataset = os.path.join(os.getcwd(), 'data/',f'MNIST{compressed_string}{reduced_string}_time_dataloader')
     # path_to_dataset = os.path.join(os.getcwd(),'data/MNIST_reduced_time_dataloader')
     train_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'train.h5'), mode='r'), device='cpu')
     test_dataset = MNISTDataset_current(h5py.File(os.path.join(path_to_dataset,'test.h5'), mode='r'), device='cpu')
@@ -385,6 +385,8 @@ def main(args):
                                              shuffle=True,
                                              generator=generator,
                                              num_workers=8)
+    # for batch_idx, (x_local, y_local) in enumerate(dict_dataset['test_loader']):
+    #     raise ValueError('test')
     # nb_channels = dataMN.data.shape[1] * dataMN.data.shape[2]
 
     # limited_samples = 100
