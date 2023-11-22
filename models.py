@@ -362,18 +362,18 @@ class LIF_neuron(nn.Module):
     LIFstate = namedtuple('LIFstate', ['syn', 'mem', 'S'])
 
     def __init__(self, nb_inputs, nb_outputs, alpha, beta, is_recurrent=True, fwd_weight_scale=1.0,
-                 rec_weight_scale=1.0):
+                 rec_weight_scale=1.0,train=True):
         super(LIF_neuron, self).__init__()
 
         # weight = torch.empty((nb_inputs, nb_outputs))
-        self.weight = torch.nn.Parameter(torch.empty((nb_inputs, nb_outputs)), requires_grad=True)
+        self.weight = torch.nn.Parameter(torch.empty((nb_inputs, nb_outputs)), requires_grad=train)
         torch.nn.init.normal_(self.weight, mean=0.0, std=fwd_weight_scale / np.sqrt(nb_inputs))
 
         self.is_recurrent = is_recurrent
         if is_recurrent:
             # weight_rec = torch.empty((nb_outputs, nb_outputs))
             # torch.nn.init.normal_(weight_rec, mean=0.0, std=rec_weight_scale / np.sqrt(nb_outputs))
-            self.weight_rec = torch.nn.Parameter(torch.empty((nb_outputs, nb_outputs)), requires_grad=True)
+            self.weight_rec = torch.nn.Parameter(torch.empty((nb_outputs, nb_outputs)), requires_grad=train)
             # torch.nn.init.zeros_(self.weight_rec)
             torch.nn.init.normal_(self.weight_rec, mean=0.0, std=rec_weight_scale / np.sqrt(nb_inputs))
 
