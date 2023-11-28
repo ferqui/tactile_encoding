@@ -630,18 +630,18 @@ def main(args):
     centers = {
         'frequency': np.linspace(10, 50, 10),
         'amplitude': np.linspace(0.5, 10, 10),
-        'slope': np.linspace(0.5, 5, 10),
+        'slope': np.logspace(-3, 1, 10),
     }
     spans = {
         'frequency': np.linspace(1, 10, 10),
         'amplitude': np.linspace(0.5, 10, 10),
-        'slope': np.linspace(0.5, 1, 10),
+        'slope': np.logspace(-3, 1, 10),
     }
     if args.seed >= 0:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_hb_allaccuracy_tmp')
+    folder = Path('dataset_analysis_newslopes')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)
