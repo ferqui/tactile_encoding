@@ -36,22 +36,22 @@ firing_mode_dict = {
 }
 
 MN_dict_param = {
-    "a": {"ini": 5, "train": True, "custom_lr": 5e-3},
-    "A1": {"ini": 0, "train": True, "custom_lr": 5e-3},
-    "A2": {"ini": 0, "train": True, "custom_lr": 5e-3},
-    "b": {"ini": 10, "train": True, "custom_lr": 5e-3},
-    "G": {"ini": 50, "train": True, "custom_lr": 5e-3},
-    "k1": {"ini": 200, "train": False, "custom_lr": None},
-    "k2": {"ini": 20, "train": False, "custom_lr": None},
-    "R1": {"ini": 0, "train": True, "custom_lr": 5e-3},
-    "R2": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "a": {"ini": 5, "train": args.notrain == False, "custom_lr": 5e-3},
+    "A1": {"ini": 0, "train": args.notrain == False, "custom_lr": 5e-3},
+    "A2": {"ini": 0, "train": args.notrain == False, "custom_lr": 5e-3},
+    "b": {"ini": 10, "train": args.notrain == False, "custom_lr": 5e-3},
+    "G": {"ini": 50, "train": args.notrain == False, "custom_lr": 5e-3},
+    "k1": {"ini": 200, "train": args.notrain == False, "custom_lr": None},
+    "k2": {"ini": 20, "train": args.notrain == False, "custom_lr": None},
+    "R1": {"ini": 0, "train": args.notrain == False, "custom_lr": 5e-3},
+    "R2": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
 }
 
 ALIF_dict_param = {
-    "beta_alif": {"ini": 1, "train": True, "custom_lr": 5e-3},
-    "tau_adp": {"ini": 1, "train": True, "custom_lr": 5e-3},
-    "b_0": {"ini": 1, "train": True, "custom_lr": 5e-3},
-    "beta_adapt": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "beta_alif": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
+    "tau_adp": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
+    "b_0": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
+    "beta_adapt": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
     }
 
 
@@ -628,7 +628,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
-    parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
+    parser.add_argument("--notrain", action="store_true", help="Inhibit neuron training the MN neuron.")
     parser.add_argument("--fast", action="store_true", help="Fast simulation.")
     parser.add_argument("--save_weights_period", type=int, default=10, help="How often to save weights (in epochs)")
     args = parser.parse_args()
