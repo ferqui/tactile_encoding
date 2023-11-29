@@ -35,9 +35,24 @@ firing_mode_dict = {
     "MIX": {"a": 5, "A1": 5, "A2": -0.3},
 }
 
+MN_dict_param = {
+    "a": {"ini": 5, "train": True, "custom_lr": 5e-3},
+    "A1": {"ini": 0, "train": True, "custom_lr": 5e-3},
+    "A2": {"ini": 0, "train": True, "custom_lr": 5e-3},
+    "b": {"ini": 10, "train": True, "custom_lr": 5e-3},
+    "G": {"ini": 50, "train": True, "custom_lr": 5e-3},
+    "k1": {"ini": 200, "train": False, "custom_lr": None},
+    "k2": {"ini": 20, "train": False, "custom_lr": None},
+    "R1": {"ini": 0, "train": True, "custom_lr": 5e-3},
+    "R2": {"ini": 1, "train": True, "custom_lr": 5e-3},
+}
 
-
-
+ALIF_dict_param = {
+    "beta_alif": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "tau_adp": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "b_0": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    "beta_adapt": {"ini": 1, "train": True, "custom_lr": 5e-3},
+    }
 
 
 def main(args):
@@ -95,25 +110,8 @@ def main(args):
 
 
     if args.ALIF == True:
-        ALIF_dict_param = {
-            "beta_alif": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
-            "tau_adp": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
-            "b_0": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
-            "beta_adapt": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
-            }
         dict_param = ALIF_dict_param
     else:
-        MN_dict_param = {
-            "a": {"ini": 5, "train": args.notrain == False, "custom_lr": 5e-3},
-            "A1": {"ini": 0, "train": args.notrain == False, "custom_lr": 5e-3},
-            "A2": {"ini": 0, "train": args.notrain == False, "custom_lr": 5e-3},
-            "b": {"ini": 10, "train": args.notrain == False, "custom_lr": 5e-3},
-            "G": {"ini": 50, "train": args.notrain == False, "custom_lr": 5e-3},
-            "k1": {"ini": 200, "train": args.notrain == False, "custom_lr": None},
-            "k2": {"ini": 20, "train": args.notrain == False, "custom_lr": None},
-            "R1": {"ini": 0, "train": args.notrain == False, "custom_lr": 5e-3},
-            "R2": {"ini": 1, "train": args.notrain == False, "custom_lr": 5e-3},
-        }
         dict_param = MN_dict_param
     C = 1
     print(dict_param)
