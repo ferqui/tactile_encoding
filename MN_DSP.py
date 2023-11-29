@@ -648,7 +648,7 @@ if __name__ == "__main__":
     parser.add_argument('--last', type=int, default=5)
     parser.add_argument('--stim_length_sec', type=float, default=5)
     parser.add_argument('--noise', type=str, default='0,0,0')
-    parser.add_argument('--dt_sec', type=float, default=0.0001)
+    parser.add_argument('--dt_sec', type=float, default=0.001)
     parser.add_argument('--debug_plot', '-d', action='store_true')
     parser.add_argument('--load_range', type=str, default='Braille')
     parser.add_argument('--encoding_methods',type=str,default='spike')
@@ -701,7 +701,7 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis_fusion_new')
+    folder_run = Path('dataset_analysis_fusion')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
