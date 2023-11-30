@@ -78,6 +78,11 @@ def main(args):
         data, labels, test_size=0.2, shuffle=True, stratify=labels
     )
 
+    if args.test == False:
+        x_train, x_test, y_train, y_test = train_test_split(
+            x_train, y_train, test_size=0.2, shuffle=True, stratify=y_train
+        )
+
     ds_train = TensorDataset(x_train, y_train)
     ds_test = TensorDataset(x_test, y_test)
 
@@ -625,6 +630,11 @@ if __name__ == "__main__":
         "--no_train_weights",
         action="store_true",
         help="Do not train the weights",
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Do not use validation set, use test instead",
     )
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
