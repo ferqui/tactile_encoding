@@ -149,12 +149,13 @@ class MNISTDataset:
                     ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain),
                 ]
             )
-        transform = tv.transforms.Compose(
-            [
-                transforms.PILToTensor(),
-                ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain),
-            ]
-        )
+        else:
+            transform = tv.transforms.Compose(
+                [
+                    transforms.PILToTensor(),
+                    ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain),
+                ]
+            )
 
         train_val_dataset = tv.datasets.MNIST(
             "./data", train=True, download=True, transform=transform
