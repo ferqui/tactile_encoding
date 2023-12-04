@@ -173,6 +173,8 @@ def sweep_slopes(slopes=np.arange(10), n_trials=10, dt_sec=0.001, stim_length_se
     slopes = slopes/dt_sec
     # list with mean current value (same dimension as the last dimension of input_current)
     for a in slopes:
+        if a <=1:
+            a = 1.1
         time_necessary = (last - first)/a
         time_first = (stim_length_sec - time_necessary)/2
         time_last = (stim_length_sec - time_necessary)/2
@@ -644,7 +646,7 @@ if __name__ == "__main__":
     parser.add_argument('--name', type=str, default=name)
     parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--last', type=int, default=5)
-    parser.add_argument('--stim_length_sec', type=float, default=1.1)
+    parser.add_argument('--stim_length_sec', type=float, default=5)
     parser.add_argument('--noise', type=str, default='0,0,0')
     parser.add_argument('--dt_sec', type=float, default=0.001)
     parser.add_argument('--debug_plot', '-d', action='store_true')
@@ -667,7 +669,7 @@ if __name__ == "__main__":
     # else:
     #     ranges_possible = [ranges_possible]
 
-    ranges_possible = ['amplitude','slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
+    ranges_possible = ['slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
     for range_name in ranges_possible:
         parser.add_argument(f'--{range_name}'+'_center', type=float, default=0)
         parser.add_argument(f'--{range_name}'+'_span', type=float, default=0)
@@ -699,7 +701,7 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis_hb_allaccuracy_tmp')
+    folder_run = Path('dataset_analysis_fusion')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)

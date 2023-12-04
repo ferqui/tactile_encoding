@@ -78,6 +78,11 @@ def main(args):
         data, labels, test_size=0.2, shuffle=True, stratify=labels
     )
 
+    if args.test == False:
+        x_train, x_test, y_train, y_test = train_test_split(
+            x_train, y_train, test_size=0.2, shuffle=True, stratify=y_train
+        )
+
     ds_train = TensorDataset(x_train, y_train)
     ds_test = TensorDataset(x_test, y_test)
 
@@ -147,6 +152,7 @@ def main(args):
 
     for param in dict_param:
         dict_param[param]["param"].to(device)
+        dict_param[param]['train'] = args.no_train == False
     # torch.autograd.set_detect_anomaly(True)
     if args.ALIF == True:
         l0 = ALIF_neuron(
@@ -161,7 +167,7 @@ def main(args):
                 nb_inputs,
                 firing_mode_dict[args.firing_mode],
                 dt=dt,
-                train=args.train,
+                train=args.no_train == False,
                 a=dict_param["a"]["param"],
                 A1=dict_param["A1"]["param"],
                 A2=dict_param["A2"]["param"],
@@ -319,7 +325,6 @@ def main(args):
                 # we are going to record the hidden layer
                 # spikes for regularization purposes
                 loss_local = 0
-
                 l0_spk = []
                 lif1_spk = []
                 lif2_spk = []
@@ -389,7 +394,7 @@ def main(args):
                 loss_DB = args.gr * sum(
                     [
                         torch.abs(kv[1]["param"].grad).sum()
-                        for kv in filter(lambda kv: kv[1]["train"], dict_param.items())
+                        for kv in filter(lambda kv: kv[1]["train"], dict_param.items()) if kv[1]["param"].grad is not None
                     ]
                 )
 
@@ -626,9 +631,14 @@ if __name__ == "__main__":
         action="store_true",
         help="Do not train the weights",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Do not use validation set, use test instead",
+    )
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
-    parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
+    parser.add_argument("--no_train", action="store_true", help="Do not Train the MN neuron.")
     parser.add_argument("--fast", action="store_true", help="Fast simulation.")
     parser.add_argument("--save_weights_period", type=int, default=10, help="How often to save weights (in epochs)")
     args = parser.parse_args()
