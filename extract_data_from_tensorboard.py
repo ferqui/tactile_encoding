@@ -7,98 +7,71 @@ import os
 import numpy as np
 import seaborn as sns
 import glob
+import json
+from tbparse import SummaryReader
 
 sns.set_style("darkgrid")
-path = 'runs/'
-folder_high = 'Nov20_20-34-01_v100gpu5GR_MNIST/events.out.tfevents.1700508841.v100gpu5.2803448.0'
-if folder_high == '':
-
-    list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
-    latest_file = max(list_of_files, key=os.path.getctime)
-    # print(latest_file)
-    print('No folder high specified, using last one')
-    folder_high = latest_file
-    # print(latest_file)
-    file = glob.glob(folder_high+'/*')[0]
-    # * means all if need specific format then *.csv
-    print(file)
-else:
-    file = glob.glob(path+folder_high)[0]
-    # * means all if need specific format then *.csv
-    print(file)
-ea = event_accumulator.EventAccumulator(file)
-ea.Reload()
-print(ea.scalars.Keys())
-print(ea.scalars.Items('a'))
-dict = {'wall_time':[],'step':[],'value':[],'variable':[]}
-df_coll = []
-
-for key in ea.scalars.Keys():
-    df = pd.DataFrame(ea.Scalars(key))
-    df['variable'] = [key for i in range(len(df))]
-    df_coll.append(df)
-df = pd.concat(df_coll)
-# df.to_pickle('GR_MNIST_gradient_madness.pkl')
-# print(df)
-# # ax = plt.gca()
-# tmp = np.array(df['variable'])
-# import re
-# parameters = ['A1','A2','a','b','G','R1','R2']
-# grad_guys = ['A1_grad','A2_grad','a_grad','b_grad','G_grad','R1_grad','R2_grad']+['Loss/GR']
-# for param in grad_guys:
-#
-#     df_gr_sel_param = df[df['variable']==param]['value'].values
-#     print(param,np.where(np.isnan(df_gr_sel_param))[0][0])
-# raise ValueError
-# colors = plt.get_cmap('tab20')(np.linspace(0,1,len(parameters)))
-# for g_idx,grad_guy in enumerate(grad_guys):
-#     print(grad_guy)
-#     sel = [grad_guy in tmp[i] for i in range(len(tmp))]
-#     df_grad = df[sel]
-#     df_grad_sel = df_grad[df_grad['step']>0]
-#     # df_grad['step'] = df_grad['step'].astype(int)
-#     sns.lineplot(data=df_grad_sel,x='step',y='value',hue='variable',color=colors[g_idx])
-# # plt.show()
-# plt.figure()
-# sel = ['GR' in tmp[i] for i in range(len(tmp))]
-# df_gr = df[sel]
-# df_gr_sel = df_gr[df_gr['step']>0]
 
 
-#
-#
-# # df_gr['step'] = df_gr['step'].astype(int)
-# sns.lineplot(x='step',y='value',hue='variable',data=df_gr_sel)
-# # plt.ylim([0,1e-5])
-# # plt.xlim([0,120])
-# plt.figure()
-# sel = ['test' in tmp[i] for i in range(len(tmp))]
-# df_gr = df[sel]
-# # df_gr_sel = df_gr[df_gr['step']<=80]
-# # df_gr['step'] = df_gr['step'].astype(int)
-# sns.lineplot(x='step',y='value',hue='variable',data=df_gr)
-# # plt.xlim([0,80])
-# plt.figure()
-# sel = ['spk' in tmp[i] for i in range(len(tmp))]
-# df_gr = df[sel]
-# # df_gr_sel = df_gr[df_gr['step']<=80]
-# # df_gr['step'] = df_gr['step'].astype(int)
-# sns.lineplot(x='step',y='value',hue='variable',data=df_gr)
-# plt.show()
-# print('ciao')
+
+def extract_data_from_tensorboard(folder_source,folder_dest,model_name,plot=False,name_source=''):
+    scalars = SummaryReader(folder_source, pivot=True).scalars
+    scalars['type'] = ['scalars' for i in range(len(scalars))]
+    hparams = SummaryReader(folder_source, pivot=True).hparams
+    hparams['type'] = ['hparams' for i in range(len(hparams))]
+    df_scalars = scalars.melt(id_vars=['step','type'],var_name="variable", value_name="value")
+    df_hparams = hparams.melt(id_vars=['type'],var_name="variable", value_name="value")
+    df_hparams['step'] = [len(scalars) for i in range(len(df_hparams))]
+    df = pd.concat([df_scalars,df_hparams])
+    if plot:
+        fig1, ax1 = plt.subplots(len(df['variable'].unique()), 1, sharex=True, figsize=(8, 8))
+        colors = plt.get_cmap('tab20')(np.linspace(0, 1, len(df['variable'].unique())))
+    dict = {}
+    for v_idx, variable in enumerate(df['variable'].unique()):
+        sel = df[df['variable'] == variable]
+        if plot:
+            ax1[v_idx].plot(sel['step'], sel['value'], label=variable, color=colors[v_idx])
+        if (sel['type'] == 'scalars').any():
+            dict[variable] = np.mean(sel['value'][sel['step'] > 0.9 * sel['step'].max()].values)
+        else:
+            dict[variable] = sel['value'].values[0]
+    if plot:
+        fig1.tight_layout()
+        plt.show()
+
+    # plt.plot(sel['step'],sel['value'])
+    try:
+        seed = '_'+str(int(dict['seed']))
+        weights_trained = ['_nw' if bool(dict['no_train_weights']) == True else '_w'][0]
+        json.dump(dict, open(os.path.join(folder_dest, f'{model_name}{weights_trained}{seed}.json'), 'w'))
+        return f'{model_name}{weights_trained}{seed}.json'
+
+    except:
+        print(folder_source)
+        print(dict)
+        # raise ValueError
+## create main
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser("extract_data_from_tensorboard")
+    parser.add_argument("--folder_source", type=str, default='runs/', help="folder_source")
+    parser.add_argument("--folder_dest", type=str, default='MN_params/', help="folder_dest")
+    parser.add_argument("--model_name", type=str, default='GR_Braille', help="model_name")
+    parser.add_argument("--plot", type=bool, default=False, help="plot")
+    parser.add_argument("--name_source", type=str, default='', help="name_source")
+    args = parser.parse_args()
+    runs = glob.glob(args.folder_source + '*')
+    bash_script = 'sbatch ./tactile_encoding2/send_batch_DSP.sh --debug_plot --load_range=Braille --noise=0.01,0.01 --seed_n=100'
+    coll = ''
+    for run in runs:
+        model_json = extract_data_from_tensorboard(run,args.folder_dest,args.model_name,args.plot,args.name_source)
+        if model_json is not None:
+            coll += f'{model_json.replace(".json","")},'
+    coll = coll[:-1]
+    bash_script += f' --model_json={coll}'
+    print(bash_script)
 
 
-fig1, ax1 = plt.subplots(len(df['variable'].unique()),1,sharex=True,figsize=(8,8))
-colors = plt.get_cmap('tab20')(np.linspace(0,1,len(df['variable'].unique())))
-dict = {}
-for v_idx,variable in enumerate(df['variable'].unique()):
-    sel = df[df['variable']==variable]
-    ax1[v_idx].plot(sel['step'],sel['value'],label=variable,color=colors[v_idx])
-    dict[variable] = np.mean(sel['value'][sel['step']>0.9*sel['step'].max()].values)
-fig1.tight_layout()
-print(dict)
-# plt.plot(sel['step'],sel['value'])
-import json
-json.dump(dict,open('MN_MNIST_compressed.json','w'))
-plt.show()
+
 
