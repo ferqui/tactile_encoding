@@ -94,7 +94,7 @@ def main(args):
     ###########################################
     upsample_fac = 1
     dt = (1 / 100.0) / upsample_fac
-    dataset = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2, v_max=0.2, add_noise=True, gain=1.0,)
+    dataset = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2, v_max=0.2, add_noise=True, gain=1.0,compressed=args.compressed,encoder_model=args.encoder_model)
     
     # Network parameters
     nb_input_copies = args.expansion
@@ -561,7 +561,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--detect_anomaly", action="store_true", help="Detect anomaly.")
     parser.add_argument('--compressed', action='store_true', help='Use dataset compressed through an autoencoder with 24 channels')
-
+    parser.add_argument("--encoder_model", type=str, default='./data/784MNIST_2_6MNIST.pt', help="Path to encoder model.")
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 

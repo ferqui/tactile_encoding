@@ -4,6 +4,7 @@ import torchvision as tv
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, Subset, TensorDataset
 from torchvision import transforms
+import torch.nn as nn
 
 
 class ToCurrent(object):
@@ -63,8 +64,61 @@ class ToCurrent(object):
         assert sample.shape[0] == self.n_time_steps
 
         return sample
+class Autoencoder_linear(nn.Module):
+    def __init__(self, encoding_dim, input_dim=784, output_dim=10):
+        super(Autoencoder_linear, self).__init__()
+        ## encoder ##
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, encoding_dim*4),
+            nn.ReLU(),
+            nn.Linear(encoding_dim*4, encoding_dim*2),
+            nn.ReLU(),
+            nn.Linear(encoding_dim*2, encoding_dim),
+            nn.ReLU()
+        )
 
+        ## decoder ##
+        self.decoder = nn.Sequential(
+            nn.Linear(encoding_dim, output_dim)
+        )
 
+    def forward(self, x):
+        # define feedforward behavior
+        # and scale the *output* layer with a sigmoid activation function
+        x = x.float()
+        # pass x into encoder
+        out = self.encoder(x)
+        # pass out into decoder
+        out = self.decoder(out)
+
+        return out
+class ToEnc(object):
+    """
+    Custom data transformation.
+
+    Map pixel values to current amplitude across time.
+
+    """
+
+    def __init__(self, encoder_model, encoding_dim=6):
+        """
+        :param encoder_model: '.pt with model autoencoder'
+        :param dt_sec: stimulus dt (in sec)
+        """
+        self.model = Autoencoder_linear(encoding_dim)
+        self.model.load_state_dict(torch.load(encoder_model))
+        print(self.model)
+
+    def __call__(self, sample):
+        # Map 2D input image to 2D tensor with px ids and current:
+
+        sample_flatten = sample[0].flatten()
+
+        # get sample outputs
+        output = self.model(sample_flatten.float())
+        encs = self.model.encoder(sample_flatten.float()).clone().detach()
+
+        return encs
 class MNISTDataset:
     def __init__(
         self,
@@ -77,6 +131,8 @@ class MNISTDataset:
         v_max=0.2,
         add_noise=True,
         gain=1.0,
+        compressed=False,
+        encoder_model=None
     ):
         num_val = int(num_train * val_size)
         num_train -= num_val
@@ -85,7 +141,14 @@ class MNISTDataset:
         self.num_test = num_test
         self.num_val = num_val
         self.batch_size = batch_size
-
+        self.compressed = compressed
+        if self.compressed:
+            transform = tv.transforms.Compose(
+                [
+                    transforms.PILToTensor(),ToEnc(encoder_model),
+                    ToCurrent(stim_len_sec, dt_sec, v_max, add_noise=add_noise, gain=gain),
+                ]
+            )
         transform = tv.transforms.Compose(
             [
                 transforms.PILToTensor(),
