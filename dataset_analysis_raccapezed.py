@@ -16,6 +16,7 @@ from scipy import signal
 import json
 from torchvision.datasets import MNIST
 from sklearn import decomposition
+from dataset_optim import MNISTDataset
 
 import pandas as pd
 import h5py
@@ -209,30 +210,30 @@ def classifier(data,labels,epochs=None):
         epochs.set_postfix_str(f"Loss: {np.mean(loss_list):.3f}, Acc: {np.mean(acc_list):.3f}")
         epochs.update()
     return loss_coll,acc_coll
-def plt_amplitude(dataloader,label_ascii,folder_fig = ''):
-    plt.figure()
-    idx_letters, indices = np.unique(labels, return_index=True)
-    colors = sns.color_palette("husl", len(idx_letters))
-    label_ascii_unique = np.unique(label_ascii)
-    sel_coll = []
-    fig1, axs1 = plt.subplots(1, 1)
-    for letter in range(len(label_ascii_unique)):
-        idx_to_plot = np.where(labels == letter)[0]
-        xhere = data[idx_to_plot, :, :]
-        xhere = xhere.permute(0, 2, 1)
-        xhere = xhere.flatten(0, 1)
-        # axs1[0].plot(xhere.T, color=tuple(np.array(colors[letter])*1.1), label=label_ascii_unique[letter], alpha=0.01,zorder=letter)
-        xsel = xhere[:, 100:250]
-        xsel[xsel == 0] = torch.nan
-        xhere[xhere == 0] = torch.nan
-        sel_avg = torch.nanmean(xsel, dim=1)
-        axs1.plot(torch.nanmean(xhere, dim=0), color=colors[letter], zorder=letter + len(label_ascii_unique))
-        #
-        # sel_coll.append(sel_avg)
-        # bins, edges = np.histogram(sel_avg, bins=100, range=(0.1, 4))
-        # axs1[1].bar(x=edges[:-1], height=bins / bins.max(), color=colors[letter], label=label_ascii_unique[letter],
-        #             alpha=0.5, zorder=letter, bottom=letter * 1.1, width=edges[1] - edges[0])
-    fig1.savefig(os.path.join(folder_fig,'amplitude.png'))
+# def plt_amplitude(dataloader,label_ascii,folder_fig = ''):
+#     plt.figure()
+#     idx_letters, indices = np.unique(labels, return_index=True)
+#     colors = sns.color_palette("husl", len(idx_letters))
+#     label_ascii_unique = np.unique(label_ascii)
+#     sel_coll = []
+#     fig1, axs1 = plt.subplots(1, 1)
+#     for letter in range(len(label_ascii_unique)):
+#         idx_to_plot = np.where(labels == letter)[0]
+#         xhere = data[idx_to_plot, :, :]
+#         xhere = xhere.permute(0, 2, 1)
+#         xhere = xhere.flatten(0, 1)
+#         # axs1[0].plot(xhere.T, color=tuple(np.array(colors[letter])*1.1), label=label_ascii_unique[letter], alpha=0.01,zorder=letter)
+#         xsel = xhere[:, 100:250]
+#         xsel[xsel == 0] = torch.nan
+#         xhere[xhere == 0] = torch.nan
+#         sel_avg = torch.nanmean(xsel, dim=1)
+#         axs1.plot(torch.nanmean(xhere, dim=0), color=colors[letter], zorder=letter + len(label_ascii_unique))
+#         #
+#         # sel_coll.append(sel_avg)
+#         # bins, edges = np.histogram(sel_avg, bins=100, range=(0.1, 4))
+#         # axs1[1].bar(x=edges[:-1], height=bins / bins.max(), color=colors[letter], label=label_ascii_unique[letter],
+#         #             alpha=0.5, zorder=letter, bottom=letter * 1.1, width=edges[1] - edges[0])
+#     fig1.savefig(os.path.join(folder_fig,'amplitude.png'))
     # plt.show()
 #
 def extract_interval(data,freqs,samples_n,center,span):
@@ -402,6 +403,7 @@ def plt_fft(dict_dataset,dataset_name,folder_fig='',f_min=5):
     # plt.legend()
     plt.title('Mean FFT '+dataset_name)
     plt.savefig(os.path.join(folder_fig,'mean_fft.png'))
+
 def plt_best(opt,dict_dataset,data_type,args,xf=None,dataset_name = '',folder_fig=''):
     print('plotting best')
     center = opt[data_type]['center']
@@ -630,12 +632,12 @@ def main(args):
     centers = {
         'frequency': np.linspace(10, 50, 10),
         'amplitude': np.linspace(0.5, 10, 10),
-        'slope': np.logspace(-3, 1, 10),
+        'slope': np.linspace(0.5, 5, 10),
     }
     spans = {
         'frequency': np.linspace(1, 10, 10),
         'amplitude': np.linspace(0.5, 10, 10),
-        'slope': np.logspace(-3, 1, 10),
+        'slope': np.linspace(0.5, 1, 10),
     }
     if args.seed >= 0:
         torch.manual_seed(args.seed)
@@ -675,6 +677,7 @@ def main(args):
                                         v_max=-1,
                                         shuffle=True,
                                         gain = args.gain_Braille)
+
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
         elif 'MNIST' == dataset:
@@ -687,18 +690,20 @@ def main(args):
             folder_data.mkdir(parents=True, exist_ok=True)
             folder_fig = str(folder_fig)
             folder_data = str(folder_data)
-            dict_dataset = load_dataset('MNIST',
-                                        batch_size=args.batch_size,
-                                        stim_len_sec=3,
-                                        dt_sec=1/100,
-                                        v_max=0.2,
-                                        generator=generator,
-                                        add_noise=True,
-                                        return_fft=False,
-                                        n_samples_train=6480,
-                                        n_samples_test=1620,
-                                        shuffle=True,
-                                        gain = args.gain_MNIST)
+            upsample_fac = 1
+            dt = (1 / 100.0) / upsample_fac
+            dataset_tmp = MNISTDataset(num_train=args.num_train, num_test=args.num_test, val_size=args.val_size, batch_size=args.batch_size, stim_len_sec=3, dt_sec=1e-2,
+                                   v_max=0.2,
+                                   add_noise=True, gain=1.0, compressed=False)
+            dict_dataset = {}
+            dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
+            dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
+            dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
+            dict_dataset['dt_sec'] = dataset_tmp.dt_sec
+            dict_dataset['n_classes'] = dataset_tmp.n_classes
+            dict_dataset['n_features'] = dataset_tmp.n_features
+            dict_dataset['n_inputs'] = dataset_tmp.n_inputs
+            dict_dataset['n_freq_steps'] = dataset_tmp.n_features
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST')
         elif "MNIST_compressed" == dataset:
@@ -710,20 +715,19 @@ def main(args):
             folder_data.mkdir(parents=True, exist_ok=True)
             folder_fig = str(folder_fig)
             folder_data = str(folder_data)
-            dict_dataset = load_dataset('MNIST',
-                            batch_size=args.batch_size,
-                            stim_len_sec=3,
-                            dt_sec=1/100,
-                            v_max=0.2,
-                            generator=generator,
-                            add_noise=True,
-                            return_fft=False,
-                            n_samples_train=-1,
-                            n_samples_test=-1,
-                            shuffle=True,
-                            compressed=True,
-                            encoder_model='./data/784MNIST_2_6MNIST.pt',
-                            gain=args.gain_MNIST_compressed)
+            dataset_tmp = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2,
+                                   v_max=0.2,
+                                   add_noise=True, gain=1.0, compressed=True,
+                                   encoder_model='./data/784MNIST_2_6MNIST.pt')
+            dict_dataset = {}
+            dict_dataset['train_loader'] = dataset_tmp.get_train(args.device)
+            dict_dataset['test_loader'] = dataset_tmp.get_test(args.device)
+            dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
+            dict_dataset['dt_sec'] = dataset_tmp.dt_sec
+            dict_dataset['n_classes'] = dataset_tmp.n_classes
+            dict_dataset['n_features'] = dataset_tmp.n_features
+            dict_dataset['n_inputs'] = dataset_tmp.n_inputs
+            dict_dataset['n_freq_steps'] = dataset_tmp.n_features
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST_compressed')
         else:
@@ -865,6 +869,30 @@ if __name__ == "__main__":
     parser.add_argument('--gain_MNIST', type=float, default=0.02)
     parser.add_argument('--gain_MNIST_compressed', type=float, default=1/6)
     parser.add_argument('--pca',action='store_true',help='plot pca')
+    parser.add_argument(
+        "--num-train",
+        type=int,
+        default=6480,
+        help="Number of channel expansion (default: 1 (no expansion)).",
+    )
+    parser.add_argument(
+        "--num-test",
+        type=int,
+        default=1620,
+        help="Number of channel expansion (default: 1 (no expansion)).",
+    )
+    parser.add_argument(
+        "--val-size",
+        type=float,
+        default=0,
+        help="Number of channel expansion (default: 1 (no expansion)).",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="",
+    )
     args = parser.parse_args()
     if ',' in args.dataset:
         args.dataset = args.dataset.split(',')

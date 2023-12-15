@@ -142,6 +142,11 @@ class MNISTDataset:
         self.num_val = num_val
         self.batch_size = batch_size
         self.compressed = compressed
+        self.n_time_steps = int(stim_len_sec / dt_sec)
+        self.dt_sec = dt_sec
+
+
+
         if self.compressed:
             transform = tv.transforms.Compose(
                 [
@@ -163,13 +168,16 @@ class MNISTDataset:
         test_dataset = tv.datasets.MNIST(
             "./data", train=False, download=True, transform=transform
         )
-
-        train_indices, val_indices = train_test_split(
-            range(len(train_val_dataset)),
-            test_size=num_val,
-            random_state=0,
-            shuffle=True,
-        )
+        if num_val > 0:
+            train_indices, val_indices = train_test_split(
+                range(len(train_val_dataset)),
+                test_size=num_val,
+                random_state=0,
+                shuffle=True,
+            )
+        else:
+            train_indices = range(len(train_val_dataset))
+            val_indices = []
         test_indices = np.random.permutation(np.arange(len(test_dataset)))[:-num_test]
 
         # to help with trying to do neuroevolution since the full dataset is a bit much for evolving convnets...
@@ -179,11 +187,15 @@ class MNISTDataset:
         ########################################################
         train_split = Subset(train_val_dataset, train_indices)
         train_dl = iter(DataLoader(train_split, batch_size=num_train, shuffle=False))
+        # examples = enumerate(train_dl)
+        # batch_idx, (example_data, example_targets) = next(examples)
+
         self.x_train, self.y_train = next(train_dl)
         ########################################################
-        val_split = Subset(train_val_dataset, val_indices)
-        val_dl = iter(DataLoader(val_split, batch_size=num_val, shuffle=False))
-        self.x_val, self.y_val = next(val_dl)
+        if num_val > 0:
+            val_split = Subset(train_val_dataset, val_indices)
+            val_dl = iter(DataLoader(val_split, batch_size=num_val, shuffle=False))
+            self.x_val, self.y_val = next(val_dl)
         ########################################################
         test_split = Subset(test_dataset, test_indices)
         test_dl = iter(DataLoader(test_split, batch_size=num_test, shuffle=False))
@@ -192,11 +204,40 @@ class MNISTDataset:
     @property
     def n_inputs(self):
         return self.x_test.shape[-1]
-    
+    @property
+    def n_features(self):
+        return self.x_test.shape[-2]
     @property
     def n_classes(self):
         return len(torch.unique(torch.flatten(self.y_test)))
+    def get_train_dataloader(self,device):
+        cutoff = self.num_train - self.num_train % self.batch_size
 
+        permutation = torch.randperm(self.num_train)[:cutoff]
+        obs = self.x_train[permutation]
+        labels = self.y_train[permutation]
+
+        # obs = obs.reshape((-1, self.batch_size) + obs.shape[1:]).to(device)
+        obs = obs.to(device)
+        labels = labels.to(device)
+        return DataLoader(
+            TensorDataset(obs, labels),
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
+    def get_test_dataloader(self,device):
+        cutoff = self.num_test - self.num_test % self.batch_size
+
+        obs = self.x_test[:cutoff]
+        labels = self.y_test[:cutoff]
+
+        obs = obs.to(device)
+        labels = labels.to(device)
+        return DataLoader(
+            TensorDataset(obs, labels),
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
     def get_train(self, device="cuda"):
         cutoff = self.num_train - self.num_train % self.batch_size
 
