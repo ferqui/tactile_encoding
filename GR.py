@@ -64,7 +64,9 @@ def main(args):
     if args.seed >= 0:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
-
+    if args.path_to_optimal_model is not None:
+        if ',' in args.path_to_optimal_model:
+            args.path_to_optimal_model = args.path_to_optimal_model.split(',')
     ###########################################
     ##                Dataset                ##
     ###########################################
@@ -139,7 +141,11 @@ def main(args):
     # if load params from training results
     if args.path_to_optimal_model is not None:
         # Load MN params from file:
-        with open(Path(args.path_to_optimal_model).joinpath('Braille.json'), 'r') as f:
+        if type(args.path_to_optimal_model) is list:
+            optimal_model = args.path_to_optimal_model[args.seed]
+        else:
+            optimal_model = args.path_to_optimal_model
+        with open(Path(optimal_model), 'r') as f:
             loaded_data = json.load(f)
         for param in dict_param:
             dict_param[param]["param"] = nn.Parameter(
@@ -214,36 +220,42 @@ def main(args):
 
     if args.path_to_optimal_model is not None:
         print(' *** Recording activity post training ***')
-        output_folder = Path('MN_output')
+        if type(args.path_to_optimal_model) is list:
+            model = args.path_to_optimal_model[args.seed].split('/')[-1].split('.')[0]
+        else:
+            model = args.path_to_optimal_model.split('/')[-1].split('.')[0]
+        output_folder = Path(args.new_dataset_output_folder).joinpath(model)
         output_folder.mkdir(parents=True, exist_ok=True)
-
-        dl = {'train': None, 'test': []}
-        dl['train'] = DataLoader(
-            ds_train, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
+        dl_train = DataLoader(
+            ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
         )
-        dl['test'] = DataLoader(
-            ds_test, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
+        dl_test = DataLoader(
+            ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
         )
+        dl = {'train': dl_train, 'test': dl_test}
         for subset in dl.keys():
-            folder = output_folder.joinpath('Braille', subset)
+            folder = output_folder.joinpath(subset)
             folder.mkdir(parents=True, exist_ok=True)
             for batch_idx, (x_local, y_local) in enumerate(dl[subset]):
                 # Reset all the layers in the network
                 for layer in network:
                     if hasattr(layer.__class__, "reset"):
                         layer.reset()
+                x_local = x_local.to(device, non_blocking=True)
 
                 l0_spk = []
-
                 for t in range(x_local.shape[1]):
                     _ = network(x_local[:, t])
                     # Get the spikes and voltages from the MN neuron encoder
                     l0_spk.append(network[1].state.spk)
-
                 l0_spk = torch.stack(l0_spk, dim=1)
-
-                torch.save(l0_spk, folder.joinpath(f'GR_Braille_b{batch_idx}_out.pt'))
-                torch.save(y_local, folder.joinpath(f'GR_Braille_b{batch_idx}_label.pt'))
+                # l0_spk = l0_spk.to(bool).to_sparse()
+                l0_spk = np.array(l0_spk.cpu().to(bool))
+                l0_spk = np.packbits(l0_spk, axis=0)
+                np.save(folder.joinpath(f'{model}_{batch_idx}.npy'), l0_spk, allow_pickle=True)
+                # torch.save(l0_spk, folder.joinpath(f'{model}_{batch_idx}.pt'))
+                torch.save(y_local, folder.joinpath(f'{model}_{batch_idx}_label.pt'))
+        raise ValueError('Done recording activity')
 
     else:
         print(' *** Training model ***')
@@ -350,7 +362,6 @@ def main(args):
                 else:
                     for t in range(x_local.shape[1]):
                         out = network(x_local[:, t])
-
                         # Get the spikes and voltages from the MN neuron encoder
                         l0_spk.append(network[1].state.spk)
                         l0_mem.append(network[1].state.V)
@@ -620,12 +631,10 @@ if __name__ == "__main__":
         action="store_true",
         help="run with nni",
     )
-    parser.add_argument(
-        "--path_to_optimal_model",
-        type=str,
-        default=None,#None, #"./MN_params",
-        help="path to folder that stores the parameters after training with nni (both MN params and hyperparams)",
-    )
+    parser.add_argument("--path_to_optimal_model", type=str, default=None,
+                        help="Path to optimal model (it only simulates the first layer using already trained model).")
+    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output',
+                        help="Path to folder where to save the new dataset.")
     parser.add_argument(
         "--no_train_weights",
         action="store_true",
