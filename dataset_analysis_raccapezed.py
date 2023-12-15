@@ -676,7 +676,7 @@ def main(args):
                                         sampling_freq_hz=100.0,
                                         v_max=-1,
                                         shuffle=True,
-                                        gain = args.gain_Braille)
+                                        gain = args.gain)
 
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
@@ -694,7 +694,7 @@ def main(args):
             dt = (1 / 100.0) / upsample_fac
             dataset_tmp = MNISTDataset(num_train=args.num_train, num_test=args.num_test, val_size=args.val_size, batch_size=args.batch_size, stim_len_sec=3, dt_sec=1e-2,
                                    v_max=0.2,
-                                   add_noise=True, gain=1.0, compressed=False)
+                                   add_noise=True, gain = args.gain, compressed=False)
             dict_dataset = {}
             dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
             dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
@@ -717,7 +717,7 @@ def main(args):
             folder_data = str(folder_data)
             dataset_tmp = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2,
                                    v_max=0.2,
-                                   add_noise=True, gain=1.0, compressed=True,
+                                   add_noise=True, gain = args.gain, compressed=True,
                                    encoder_model='./data/784MNIST_2_6MNIST.pt')
             dict_dataset = {}
             dict_dataset['train_loader'] = dataset_tmp.get_train(args.device)
@@ -865,9 +865,9 @@ if __name__ == "__main__":
     parser.add_argument('--bins',  type=int, default=10)
     parser.add_argument('--sim_id',  type=int, default=-1)
     parser.add_argument('--stim_len_sec',  type=int, default=300)
-    parser.add_argument('--gain_Braille', type=float, default=10)
-    parser.add_argument('--gain_MNIST', type=float, default=0.02)
-    parser.add_argument('--gain_MNIST_compressed', type=float, default=1/6)
+    parser.add_argument('--gain', type=float, default=10)
+    # parser.add_argument('--gain_MNIST', type=float, default=0.02)
+    # parser.add_argument('--gain_MNIST_compressed', type=float, default=1/6)
     parser.add_argument('--pca',action='store_true',help='plot pca')
     parser.add_argument(
         "--num-train",
