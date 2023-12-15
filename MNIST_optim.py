@@ -83,8 +83,9 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
         random.seed(0)
-    if ',' in args.path_to_optimal_model:
-        args.path_to_optimal_model = args.path_to_optimal_model.split(',')
+    if args.path_to_optimal_model is not None:
+        if ',' in args.path_to_optimal_model:
+            args.path_to_optimal_model = args.path_to_optimal_model.split(',')
     if args.telegram_bot_token_path is not None:
         with open(args.telegram_bot_token_path) as f:
             token = f.read()
@@ -147,7 +148,11 @@ def main(args):
 
     if args.path_to_optimal_model is not None:
         # Load MN params from file:
-        with open(Path(args.path_to_optimal_model), 'r') as f:
+        if type(args.path_to_optimal_model) is list:
+            optimal_model = args.path_to_optimal_model[args.seed]
+        else:
+            optimal_model = args.path_to_optimal_model
+        with open(Path(optimal_model), 'r') as f:
             loaded_data = json.load(f)
         for param in dict_param:
             dict_param[param]["param"] = nn.Parameter(
@@ -213,7 +218,7 @@ def main(args):
             model = args.path_to_optimal_model[args.seed].split('/')[-1].split('.')[0]
         else:
             model = args.path_to_optimal_model.split('/')[-1].split('.')[0]
-        output_folder = Path('MN_output').joinpath(model)
+        output_folder = Path(args.new_dataset_output_folder).joinpath(model)
         output_folder.mkdir(parents=True, exist_ok=True)
         dl = {'train':dataset.get_train(device),'test':dataset.get_test(device)}
         for subset in dl.keys():
@@ -230,7 +235,9 @@ def main(args):
                     # Get the spikes and voltages from the MN neuron encoder
                     l0_spk.append(network[1].state.spk)
                 l0_spk = torch.stack(l0_spk, dim=1)
-                torch.save(l0_spk, folder.joinpath(f'{model}_{batch_idx}.pt'))
+                l0_spk = np.array(l0_spk.cpu().to(bool))
+                l0_spk = np.packbits(l0_spk, axis=0)
+                np.save(folder.joinpath(f'{model}_{batch_idx}.npy'), l0_spk, allow_pickle=True)
                 torch.save(y_local, folder.joinpath(f'{model}_{batch_idx}_label.pt'))
         raise ValueError ('Done recording activity')
     ###########################################
@@ -605,6 +612,8 @@ if __name__ == "__main__":
     parser.add_argument("--telegram_bot_token_path", type=str, default=None, help="Path to telegram bot token.")
     parser.add_argument("--telegram_bot_chat_id", type=str, default='15905296', help="Chat id for telegram bot.")
     parser.add_argument("--path_to_optimal_model", type=str, default=None, help="Path to optimal model (it only simulates the first layer using already trained model).")
+    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output', help="Path to folder where to save the new dataset.")
+
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
 

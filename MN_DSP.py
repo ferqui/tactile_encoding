@@ -669,7 +669,7 @@ if __name__ == "__main__":
     # else:
     #     ranges_possible = [ranges_possible]
 
-    ranges_possible = ['slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
+    ranges_possible = ['amplitude','slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
     for range_name in ranges_possible:
         parser.add_argument(f'--{range_name}'+'_center', type=float, default=0)
         parser.add_argument(f'--{range_name}'+'_span', type=float, default=0)
@@ -681,7 +681,7 @@ if __name__ == "__main__":
         seeds = range(args.seed_n)
     else:
         seeds = [args.seed]
-        exp_id = 'Parallel'
+        exp_id = 'Parallel_oldslopes'
     if ',' in args.noise:
         args.noise = args.noise.split(',')
         args.noise = [float(noise) for noise in args.noise]
@@ -701,7 +701,7 @@ if __name__ == "__main__":
     else:
         args.encoding_methods = [args.encoding_methods]
     # print('Current path',Current_PATH)
-    folder_run = Path('dataset_analysis_fusion')
+    folder_run = Path('dataset_analysis_hb_allaccuracy_tmp')
     folder_stimuli = Path('stimuli')
     folder_run.mkdir(parents=True, exist_ok=True)
     folder_stimuli.mkdir(parents=True, exist_ok=True)
