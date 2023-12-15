@@ -39,15 +39,18 @@ ALIF_dict_param = {
     "beta_adapt": {"ini": 1.8, "train": True, "custom_lr": None},
 }
 
+
 class Telegram_bot():
     def __init__(self, token, chat_id):
         self.token = token
         self.chat_id = chat_id
+
     def send_message(self, message):
         requests.get(f'https://api.telegram.org/bot{self.token}/sendMessage?chat_id={self.chat_id}&text={message}')
 
+
 @torch.no_grad()
-def compute_classification_accuracy(dataset, network, early, device, args,fast=True):
+def compute_classification_accuracy(dataset, network, early, device, args, fast=True):
     accs = []
     x_test, y_test = dataset
     for x_local, y_local in tqdm(zip(x_test, y_test)):
@@ -57,7 +60,7 @@ def compute_classification_accuracy(dataset, network, early, device, args,fast=T
 
         lif2_spk = []
         for t in range(x_local.shape[1]):
-            out = network(x_local[:, t]*args.gain)
+            out = network(x_local[:, t] * args.gain)
             # Get the spikes and voltages from the second LIF
             lif2_spk.append(out)
         lif2_spk = torch.stack(lif2_spk, dim=1)
@@ -70,6 +73,7 @@ def compute_classification_accuracy(dataset, network, early, device, args,fast=T
         accs.append(tmp)
 
     return np.mean(accs)
+
 
 def main(args):
     device = (
@@ -95,8 +99,9 @@ def main(args):
     ###########################################
     upsample_fac = 1
     dt = (1 / 100.0) / upsample_fac
-    dataset = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2, v_max=0.2, add_noise=True, gain=1.0,compressed=args.compressed,encoder_model=args.encoder_model)
-    
+    dataset = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2, v_max=0.2,
+                           add_noise=True, gain=1.0, compressed=args.compressed, encoder_model=args.encoder_model)
+
     # Network parameters
     nb_input_copies = args.expansion
     nb_inputs = dataset.n_inputs * nb_input_copies
@@ -144,10 +149,13 @@ def main(args):
                 dict_param[param]["ini"] * 0.9, dict_param[param]["ini"] * 1.1
             )
 
-
     if args.path_to_optimal_model is not None:
         # Load MN params from file:
-        with open(Path(args.path_to_optimal_model), 'r') as f:
+        if type(args.path_to_optimal_model) is list:
+            optimal_model = args.path_to_optimal_model[args.seed]
+        else:
+            optimal_model = args.path_to_optimal_model
+        with open(Path(optimal_model), 'r') as f:
             loaded_data = json.load(f)
         for param in dict_param:
             dict_param[param]["param"] = nn.Parameter(
@@ -158,32 +166,32 @@ def main(args):
         dict_param[param]["param"].to(device)
     if args.ALIF == True:
         l0 = ALIF_neuron(
-                 nb_inputs=nb_inputs,
-                 beta = dict_param["beta_alif"]["param"],
-                 is_recurrent=False,
-                 b_0=dict_param["b_0"]["param"],
-                 dt=dt,
-                 tau_adp=dict_param["tau_adp"]["param"],
-                 beta_adapt=dict_param["beta_adapt"]["param"],
-                 analog_input=True,
-                 device = device)
+            nb_inputs=nb_inputs,
+            beta=dict_param["beta_alif"]["param"],
+            is_recurrent=False,
+            b_0=dict_param["b_0"]["param"],
+            dt=dt,
+            tau_adp=dict_param["tau_adp"]["param"],
+            beta_adapt=dict_param["beta_adapt"]["param"],
+            analog_input=True,
+            device=device)
     else:
         l0 = MN_neuron_sp(
-                nb_inputs,
-                firing_mode_dict[args.firing_mode],
-                dt=dt,
-                train=args.train,
-                a=dict_param["a"]["param"],
-                A1=dict_param["A1"]["param"],
-                A2=dict_param["A2"]["param"],
-                b=dict_param["b"]["param"],
-                G=dict_param["G"]["param"],
-                k1=dict_param["k1"]["param"],
-                k2=dict_param["k2"]["param"],
-                R1=dict_param["R1"]["param"],
-                R2=dict_param["R2"]["param"],
-                C=C,
-            )
+            nb_inputs,
+            firing_mode_dict[args.firing_mode],
+            dt=dt,
+            train=args.train,
+            a=dict_param["a"]["param"],
+            A1=dict_param["A1"]["param"],
+            A2=dict_param["A2"]["param"],
+            b=dict_param["b"]["param"],
+            G=dict_param["G"]["param"],
+            k1=dict_param["k1"]["param"],
+            k2=dict_param["k2"]["param"],
+            R1=dict_param["R1"]["param"],
+            R2=dict_param["R2"]["param"],
+            C=C,
+        )
     network = nn.Sequential(
         Encoder(nb_inputs, args.norm, bias=0.0, nb_input_copies=nb_input_copies),
         l0,
@@ -213,13 +221,13 @@ def main(args):
             model = args.path_to_optimal_model[args.seed].split('/')[-1].split('.')[0]
         else:
             model = args.path_to_optimal_model.split('/')[-1].split('.')[0]
-        output_folder = Path('MN_output').joinpath(model)
+        output_folder = Path(args.new_dataset_output_folder).joinpath(model)
         output_folder.mkdir(parents=True, exist_ok=True)
-        dl = {'train':dataset.get_train(device),'test':dataset.get_test(device)}
+        dl = {'train': dataset.get_train(device), 'test': dataset.get_test(device)}
         for subset in dl.keys():
             folder = output_folder.joinpath(subset)
             folder.mkdir(parents=True, exist_ok=True)
-            for batch_idx,(x_local, y_local) in enumerate(zip(dl[subset][0], dl[subset][1])):
+            for batch_idx, (x_local, y_local) in enumerate(zip(dl[subset][0], dl[subset][1])):
                 # Reset all the layers in the network
                 for layer in network:
                     if hasattr(layer.__class__, "reset"):
@@ -230,15 +238,19 @@ def main(args):
                     # Get the spikes and voltages from the MN neuron encoder
                     l0_spk.append(network[1].state.spk)
                 l0_spk = torch.stack(l0_spk, dim=1)
-                torch.save(l0_spk, folder.joinpath(f'{model}_{batch_idx}.pt'))
+                # l0_spk = l0_spk.to(bool).to_sparse()
+                l0_spk = np.array(l0_spk.cpu().to(bool))
+                l0_spk = np.packbits(l0_spk, axis=0)
+                np.save(folder.joinpath(f'{model}_{batch_idx}.npy'), l0_spk, allow_pickle=True)
+                # torch.save(l0_spk, folder.joinpath(f'{model}_{batch_idx}.pt'))
                 torch.save(y_local, folder.joinpath(f'{model}_{batch_idx}_label.pt'))
-        raise ValueError ('Done recording activity')
+        raise ValueError('Done recording activity')
     ###########################################
     ##               Training                ##
     ###########################################
     print(' *** Training model ***')
     if args.detect_anomaly:
-        torch.autograd.set_detect_anomaly(True,check_nan=True)
+        torch.autograd.set_detect_anomaly(True, check_nan=True)
 
     ## Add the parameters from the LIF layers (2 and 3)
     my_list = ["2.", "3."]
@@ -272,15 +284,15 @@ def main(args):
     accs_hist = [[], []]
 
     if args.log:
-        writer = SummaryWriter(comment="GR_MNIST_optim_"+"seed-"+str(args.seed))
+        writer = SummaryWriter(comment="GR_MNIST_optim_" + "seed-" + str(args.seed))
 
-    pbar = trange(nb_epochs,desc='Simulating')
+    pbar = trange(nb_epochs, desc='Simulating')
     for e in pbar:
         x_train, y_train = dataset.get_train(device)
         ## Training
         accs = []
         total_loss = []
-        mean_firing=[[],[]]
+        mean_firing = [[], []]
         network.train()
         for x_local, y_local in tqdm(zip(x_train, y_train)):
             ## Reset network internal states
@@ -291,32 +303,35 @@ def main(args):
             lif1_spk = torch.zeros(args.batch_size, nb_hidden, device=device)
             lif2_spk = torch.zeros(args.batch_size, nb_outputs, device=device)
             for t in range(x_local.shape[1]):
-                out = network(x_local[:, t]*args.gain)
+                out = network(x_local[:, t] * args.gain)
                 lif1_spk = lif1_spk + network[2].state.S
                 lif2_spk = lif2_spk + network[3].state.S
             log_p_y = log_softmax_fn(lif2_spk)
 
             # Here we can set up our regularizer loss
-            reg_loss = args.reg_spikes_l1 * torch.mean(lif1_spk)  # e.g., L1 loss on total number of spikes (original: 1e-3)
+            reg_loss = args.reg_spikes_l1 * torch.mean(
+                lif1_spk)  # e.g., L1 loss on total number of spikes (original: 1e-3)
             reg_loss += args.reg_neurons_l1 * torch.mean(
                 torch.sum(lif1_spk, dim=0) ** 2
             )  # L1 loss on spikes per neuron (original: 2e-6)
             reg_loss += args.reg_spikes_l2 * torch.mean(lif2_spk)  # L2 loss on output layer spikes (original: 1e-3)
-            reg_loss += args.reg_neurons_l2 * torch.mean(torch.sum(lif2_spk, dim=0) ** 2)  # L2 loss on output layer spikes per neuron (original: 2e-6)
+            reg_loss += args.reg_neurons_l2 * torch.mean(
+                torch.sum(lif2_spk, dim=0) ** 2)  # L2 loss on output layer spikes per neuron (original: 2e-6)
             ### regularizer for silent neurons
-            reg_loss += args.reg_silent_neurons_gain * nn.ReLU()(torch.mean(args.reg_silent_neurons_th-lif2_spk))**2  # penalize silent neurons (original: 1e-5)
-    
+            reg_loss += args.reg_silent_neurons_gain * nn.ReLU()(
+                torch.mean(args.reg_silent_neurons_th - lif2_spk)) ** 2  # penalize silent neurons (original: 1e-5)
+
             # Calculate loss
             loss_val = loss_fn(log_p_y, y_local.long()) + reg_loss
             optimizer.zero_grad()
-            
+
             GR_loss = 0
-            if args.gr>0:
+            if args.gr > 0:
                 grads = torch.autograd.grad(loss_val, gr_reg_params, create_graph=True)
                 for grad in grads:
                     GR_loss += torch.abs(grad).sum()
 
-            loss_DB = loss_val+args.gr*GR_loss
+            loss_DB = loss_val + args.gr * GR_loss
             loss_DB.backward()
 
             grad_dict = {}
@@ -333,7 +348,7 @@ def main(args):
                 total_loss.append(loss_DB.item())
                 mean_firing[0].append(torch.mean(lif1_spk, dim=1).mean().item())
                 mean_firing[1].append(torch.mean(lif2_spk, dim=1).mean().item())
-        
+
         train_acc = np.mean(accs)
         mean_loss = np.mean(total_loss)
         mean_firing[0] = np.mean(mean_firing[0])
@@ -344,7 +359,7 @@ def main(args):
 
         ## Evaluation step
         network.eval()
-        test_acc = compute_classification_accuracy(dataset.get_val(), network, True, device,args,args.fast)
+        test_acc = compute_classification_accuracy(dataset.get_val(), network, True, device, args, args.fast)
         accs_hist[1].append(test_acc)
 
         if args.log:
@@ -361,7 +376,7 @@ def main(args):
                         param, dict_param[param]["param"], global_step=e
                     )
                 for param in grad_dict:
-                    writer.add_scalar(param+"_grad",grad_dict[param],global_step=e)
+                    writer.add_scalar(param + "_grad", grad_dict[param], global_step=e)
             else:
                 for param in dict_param:
                     writer.add_histogram(
@@ -380,7 +395,7 @@ def main(args):
             bot.send_message(
                 "Epoch"
                 + str(e)
-                +"Train accuracy: "
+                + "Train accuracy: "
                 + str(np.round(train_acc * 100, 2))
                 + "%. Test accuracy: "
                 + str(np.round(test_acc * 100, 2))
@@ -396,7 +411,7 @@ def main(args):
         for param in dict_param:
             for element in dict_param[param]:
                 if (element in ["ini", "train", "custom_lr"]) & (
-                    dict_param[param][element] != None
+                        dict_param[param][element] != None
                 ):
                     args_dict[param + "_" + element] = dict_param[param][element]
         writer.add_hparams(
@@ -408,6 +423,8 @@ def main(args):
             },
             run_name=".",
         )
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -596,15 +613,21 @@ if __name__ == "__main__":
         help="Use reduced dataset",
     )
     parser.add_argument("--detect_anomaly", action="store_true", help="Detect anomaly.")
-    parser.add_argument('--compressed', action='store_true', help='Use dataset compressed through an autoencoder with 24 channels')
-    parser.add_argument("--encoder_model", type=str, default='./data/784MNIST_2_6MNIST.pt', help="Path to encoder model.")
+    parser.add_argument('--compressed', action='store_true',
+                        help='Use dataset compressed through an autoencoder with 24 channels')
+    parser.add_argument("--encoder_model", type=str, default='./data/784MNIST_2_6MNIST.pt',
+                        help="Path to encoder model.")
 
     parser.add_argument("--log", action="store_true", help="Log on tensorboard.")
 
     parser.add_argument("--train", action="store_true", help="Train the MN neuron.")
     parser.add_argument("--telegram_bot_token_path", type=str, default=None, help="Path to telegram bot token.")
     parser.add_argument("--telegram_bot_chat_id", type=str, default='15905296', help="Chat id for telegram bot.")
-    parser.add_argument("--path_to_optimal_model", type=str, default=None, help="Path to optimal model (it only simulates the first layer using already trained model).")
+    parser.add_argument("--path_to_optimal_model", type=str, default=None,
+                        help="Path to optimal model (it only simulates the first layer using already trained model).")
+    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output',
+                        help="Path to folder where to save the new dataset.")
+
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
 
