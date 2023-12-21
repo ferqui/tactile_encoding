@@ -720,8 +720,8 @@ def main(args):
                                    add_noise=True, gain = args.gain, compressed=True,
                                    encoder_model='./data/784MNIST_2_6MNIST.pt')
             dict_dataset = {}
-            dict_dataset['train_loader'] = dataset_tmp.get_train(args.device)
-            dict_dataset['test_loader'] = dataset_tmp.get_test(args.device)
+            dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
+            dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
             dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
             dict_dataset['dt_sec'] = dataset_tmp.dt_sec
             dict_dataset['n_classes'] = dataset_tmp.n_classes
