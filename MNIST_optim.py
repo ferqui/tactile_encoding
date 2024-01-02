@@ -235,7 +235,7 @@ def main(args):
                         layer.reset()
                 l0_spk = []
                 for t in range(x_local.shape[1]):
-                    _ = network(x_local[:, t])
+                    _ = network(x_local[:, t] * args.gain)
                     # Get the spikes and voltages from the MN neuron encoder
                     l0_spk.append(network[1].state.spk)
                 l0_spk = torch.stack(l0_spk, dim=1)
