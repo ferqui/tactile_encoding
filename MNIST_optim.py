@@ -87,8 +87,9 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
         random.seed(0)
-    if ',' in args.path_to_optimal_model:
-        args.path_to_optimal_model = args.path_to_optimal_model.split(',')
+    if args.path_to_optimal_model is not None:
+        if ',' in args.path_to_optimal_model:
+            args.path_to_optimal_model = args.path_to_optimal_model.split(',')
     if args.telegram_bot_token_path is not None:
         with open(args.telegram_bot_token_path) as f:
             token = f.read()
@@ -234,7 +235,7 @@ def main(args):
                         layer.reset()
                 l0_spk = []
                 for t in range(x_local.shape[1]):
-                    _ = network(x_local[:, t])
+                    _ = network(x_local[:, t] * args.gain)
                     # Get the spikes and voltages from the MN neuron encoder
                     l0_spk.append(network[1].state.spk)
                 l0_spk = torch.stack(l0_spk, dim=1)
