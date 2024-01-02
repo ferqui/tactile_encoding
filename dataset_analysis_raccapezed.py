@@ -352,7 +352,7 @@ def plt_frequency(data,labels,label_ascii,folder_fig=''):
     ax.spines['left'].set_visible(False)
     plt.xlabel('Frequency (Hz)')
     plt.savefig(os.path.join(folder_fig,'Frequency.pdf'), format='pdf', dpi=300)
-def plt_signal(dict_dataset,dataset_name,folder_fig=''):
+def plt_signal(dict_dataset,dataset_name,folder_fig='',fig=None,ax=None,palette=None):
     data_coll = []
     for i, (data, target) in enumerate(dict_dataset['train_loader']):
         data = extract_feature(data, dict_dataset, 'mean_amplitude', 0, 0, 0, args, i,target=target)
@@ -364,19 +364,28 @@ def plt_signal(dict_dataset,dataset_name,folder_fig=''):
                 data_lump[key] = []
             if key in data.keys():
                 data_lump[key].append(data[key])
-    plt.figure()
+    if ax is None:
+        fig,ax = plt.subplots()
+    if palette is None:
+        palette = 'husl'
+    colors = sns.color_palette(palette, dict_dataset['n_classes'])
     for key in data_lump.keys():
         data_lump[key] = torch.mean(torch.stack(data_lump[key]),dim=0)
-        plt.plot(data_lump[key][:,:].cpu().numpy(),color=sns.color_palette("husl", dict_dataset['n_classes'])[key])
+        ax.plot(data_lump[key][:,:].cpu().numpy(),color=colors[key])
     from matplotlib.lines import Line2D
 
-    custom_lines = [Line2D([0], [0], color=sns.color_palette("husl", dict_dataset['n_classes'])[key], lw=4) for key in data_lump.keys()]
+    custom_lines = [Line2D([0], [0], color=sns.color_palette(palette, dict_dataset['n_classes'])[key], lw=4) for key in data_lump.keys()]
     labels = [str(key) for key in data_lump.keys()]
     cols = len(labels)//10
-    plt.legend(custom_lines, [str(key) for key in data_lump.keys()],ncol=cols)
+    ax.legend(custom_lines, [str(key) for key in data_lump.keys()],ncol=cols)
     # plt.legend()
-    plt.title('Mean Amplitude '+dataset_name)
-    plt.savefig(os.path.join(folder_fig,'mean_amplitude.png'))
+    ax.set_title('Mean Amplitude '+ dataset_name)
+    ax.set_xlabel('Time (ms)')
+    ax.set_ylabel('Amplitude (adim)')
+    ## remove spline
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    fig.savefig(os.path.join(folder_fig,'mean_amplitude.png'))
 def plt_fft(dict_dataset,dataset_name,folder_fig='',f_min=5):
     data_coll = []
     for i, (data, target) in enumerate(dict_dataset['train_loader']):
@@ -583,7 +592,11 @@ def do_analysis(dict_dataset,analysis,centers,spans,folder_fig='',folder_data=''
             np.save(os.path.join(folder_data,
                                  f'{data_type}_accuracy_c{centers[data_type][0]}_{centers[data_type][-1]}_{centers[data_type][1] - centers[data_type][0]}_s{spans[data_type][0]}_{spans[data_type][-1]}_{spans[data_type][1] - spans[data_type][0]}.npy'),
                     matrix)
-
+def find_file(folder_data,index):
+    files = [f for f in os.listdir(folder_data) if os.path.isfile(os.path.join(folder_data, f)) and f.endswith(f'_{index}.npy')]
+    for file in files:
+            return file
+    raise ValueError('File not found',index)
 def retrieve_analysis(analysis,centers,spans,folder_data='',args=None):
     plot_dicts = []
     not_found = False
@@ -612,6 +625,38 @@ def retrieve_analysis(analysis,centers,spans,folder_data='',args=None):
         raise ValueError('Missing files')
     # print(np.sort(ids))
     return plot_dicts
+def retrieve_analysis_new(analysis,centers,spans,folder_data='',args=None):
+    plot_dicts = []
+    not_found = False
+    ids = []
+
+    for file in os.listdir(folder_data):
+        id_here = file.split('_')[-1].split('.')[0]
+        if file.endswith('.npy'):
+                ids.append(int(id_here))
+
+                print(id_here)
+                file = find_file(folder_data,id_here)
+                plot_dict = np.load(os.path.join(folder_data,file),allow_pickle=True).item()
+                plot_dicts.append(plot_dict)
+                # try:
+                #     ids.append(id)
+                #     plot_dict = np.load(os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{id}.npy'),allow_pickle=True).item()
+                #     plot_dicts.append(plot_dict)
+                #     # print(id,plot_dict)
+                # except:
+                #
+                #     print('I want',os.path.join(folder_data,f'{data_type}_accuracy_c{center}_s{span}_{id}.npy'))
+                #     ##filter the files in the folder that end with .npy
+                #     files = [f for f in os.listdir(folder_data) if os.path.isfile(os.path.join(folder_data, f)) and f.endswith(f'{id}.npy')]
+                #     # print(files)
+                #     # print('Missing '+str(id))
+                #     not_found = True
+    if not_found:
+        raise ValueError('Missing files')
+    print(np.sort(ids))
+    # print(np.sort(ids))
+    return plot_dicts
 import matplotlib.colors as colors
 class MidpointNormalize(colors.Normalize):
     def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
@@ -624,10 +669,11 @@ class MidpointNormalize(colors.Normalize):
         return np.ma.masked_array(np.interp(value, x, y))
 def main(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    cmaps = {
-        'frequency': 'Blues',
-        'amplitude': 'Reds',
-        'slope': 'Greens',
+    fig1,ax1 = plt.subplots(nrows=4,ncols=3)
+    palette = {
+        'Braille': 'Blues',
+        'MNIST': 'Reds',
+        'MNIST_compressed': 'Greens',
     }
     centers = {
         'frequency': np.linspace(10, 50, 10),
@@ -639,11 +685,16 @@ def main(args):
         'amplitude': np.linspace(0.5, 10, 10),
         'slope': np.linspace(0.5, 1, 10),
     }
+    enum = {
+        'Braille': 0,
+        'MNIST': 1,
+        'MNIST_compressed': 2,
+    }
     if args.seed >= 0:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_newslopes')
+    folder = Path('dataset_analysis_newslopes_afterChristmas')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)
@@ -694,7 +745,7 @@ def main(args):
             dt = (1 / 100.0) / upsample_fac
             dataset_tmp = MNISTDataset(num_train=args.num_train, num_test=args.num_test, val_size=args.val_size, batch_size=args.batch_size, stim_len_sec=3, dt_sec=1e-2,
                                    v_max=0.2,
-                                   add_noise=True, gain = args.gain, compressed=False)
+                                   add_noise=True, gain = args.gain*0.02, compressed=False)
             dict_dataset = {}
             dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
             dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
@@ -717,7 +768,7 @@ def main(args):
             folder_data = str(folder_data)
             dataset_tmp = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2,
                                    v_max=0.2,
-                                   add_noise=True, gain = args.gain, compressed=True,
+                                   add_noise=True, gain = args.gain*0.02, compressed=True,
                                    encoder_model='./data/784MNIST_2_6MNIST.pt')
             dict_dataset = {}
             dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
@@ -732,9 +783,15 @@ def main(args):
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST_compressed')
         else:
             raise ValueError('dataset not found')
+
         if args.load:
-            plt_signal(dict_dataset,dataset,folder_fig=folder_fig)
-            plt_fft(dict_dataset,dataset,folder_fig=folder_fig)
+            plt_signal(dict_dataset,dataset,
+                       folder_fig=folder_fig,
+                       # ax=ax1[0,enum[dataset]],
+                       # fig=fig1,
+                       palette=palette[dataset])
+
+            # plt_fft(dict_dataset,dataset,folder_fig=folder_fig)
             pd_datasets = []
 
             folder_run = folder.joinpath(dataset)
@@ -742,7 +799,7 @@ def main(args):
 
             matrixes = retrieve_analysis(analysis,centers,spans,folder_data=str(folder_data),args=args)
             df1 = pd.DataFrame.from_dict(matrixes[0])
-            for matrix in matrixes[1:]:
+            for matrix in matrixes:
                 for key in matrix.keys():
                     if len(matrix[key]) == 1:
                         matrix[key] = matrix[key][0]
@@ -793,6 +850,7 @@ def main(args):
                 # # plt.close()
                 plt.figure()
                 chance_level = 1 / dict_dataset['n_classes']
+                # chance_level = 1
                 plot_dict_hm = mean_accuracy.pivot(index="center", columns="span", values="accuracy")
                 plot_dict_hm_np = np.array(plot_dict_hm)
                 # print(plot_dict_hm_np)
@@ -847,7 +905,7 @@ def main(args):
                                     'span': spans[data_type][min_here[1]],
                                     'n_steps': 10,
                                     'acc': np.nanmin(plot_dict_hm_np) * 100}
-                plt_best(opt,dict_dataset,data_type,args=args,dataset_name = dataset,folder_fig=folder_fig)
+                # plt_best(opt,dict_dataset,data_type,args=args,dataset_name = dataset,folder_fig=folder_fig)
             json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
             json.dump(worse, open(os.path.join(folder_data, 'worse.json'), 'w'))
 
