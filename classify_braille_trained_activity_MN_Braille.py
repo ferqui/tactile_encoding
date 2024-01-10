@@ -40,7 +40,7 @@ import seaborn as sn
 import torch
 import torch.nn as nn
 
-from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, load_layers
+from NNI.utils.utils import *
 from data.load_BrailleTrained import *
 
 
@@ -88,6 +88,16 @@ parser.add_argument('-use_seed',
                     type=bool,
                     default=True,
                     help='Set if a seed is to be used or not.')
+# Enable mutliple seeds
+parser.add_argument('-multi_seed',
+                    type=bool,
+                    default=False,
+                    help='Set if more than one seed is to be used or not.')
+# Number of seeds
+parser.add_argument('-n_seed',
+                    type=int,
+                    default=10,
+                    help='Set the number of seeds if more than one is needed.')
 # Specify if running for debug
 parser.add_argument('-debugging',
                     type=bool,
@@ -110,13 +120,19 @@ trained_layers_path = settings["trained_layers_path"]
 best_test_id = settings["best_test_id"]
 
 use_seed = settings["use_seed"]
+multi_seed = settings["multi_seed"]
 
 if use_seed:
-    seed = 42
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
+    if multi_seed:
+        seed_list = [42, 0, 1, 14, 2024, 16, 6, 999, 19]
+    else:
+        seed = 42
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":4096:8"
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.use_deterministic_algorithms(True)
 else:
     seed = None
 
@@ -200,8 +216,9 @@ if use_seed:
 ################################################################################
 
 
-### 4) CUDA device set-up ######################################################
+### 4) Device resources usage ##################################################
 
+### GPU
 gpu_mem_frac = settings["gpu_mem_frac"]
 if settings["auto_gpu"]:
     flag_allocate_memory = False
@@ -220,6 +237,11 @@ else:
     print("Single GPU manually selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
     device = torch.device("cuda:"+str(gpu_sel))
     torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device)
+
+### CPU
+min_use = get_least_active_cores(num_cores=2)
+print("Selected CPU cores: {}".format(min_use))
+limit_cpu_cores(min_use)
 
 ################################################################################
 
@@ -519,32 +541,80 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
 
 ### Perform spiking patterns classification
 print("*** classification started ***")
-activity_classification = pd.DataFrame()
-letter = []
-behaviour = []
-behaviour_probs = []
-for num,el in enumerate(data):
-    
-    activity_spikes = el
-    
-    if el.nonzero().shape[0] > 0:
-        LOG.debug("Single-sample inference of 'active channel' {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
-        LOG.debug("Letter: {}".format(letter_lbl[num]))
-        pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
-        letter.append(letter_lbl[num])
-        behaviour.append(pred)
-        behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
-        LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
-        LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
-        print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
-        
-LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
-print("*** classification done ***")
+if multi_seed:
 
-activity_classification["Letter"] = letter
-activity_classification["Behaviour"] = behaviour
-activity_classification["Probabilities"] = behaviour_probs
-activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_Braille_{}".format(experiment_datetime))
+    for sd in range(settings["n_seed"]):
+
+        seed = seed_list[sd]
+        LOG.debug(f"\t --- \t seed ({sd+1}/{settings['n_seed']}): {seed} \t ---")
+
+        activity_classification = pd.DataFrame()
+        letter = []
+        behaviour = []
+        behaviour_probs = []
+
+        letter_repetitions = []
+        behaviour_repetitions = []
+        behaviour_probs_repetitions = []
+
+        for num,el in enumerate(data):
+
+            activity_spikes = el
+
+            if el.nonzero().shape[0] > 0:
+                LOG.debug("Single-sample inference of 'active channel' {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
+                LOG.debug("Letter: {}".format(letter_lbl[num]))
+                pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
+                letter.append(letter_lbl[num])
+                behaviour.append(pred)
+                behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
+                LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
+                LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
+                print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
+            
+            letter_repetitions.extend(letter)
+            behaviour_repetitions.extend(behaviour_repetitions)
+            behaviour_probs_repetitions.extend(behaviour_probs_repetitions)
+
+        print(f"\t --- \t seed {sd+1}/{settings['n_seed']} ({seed}) done \t ---")
+
+    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+    print("*** classification done ***")
+
+    activity_classification["Letter"] = letter_repetitions
+    activity_classification["Behaviour"] = behaviour_repetitions
+    activity_classification["Probabilities"] = behaviour_probs_repetitions
+    activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_Braille_{}repetitions_{}".format(settings["n_seed"],experiment_datetime))
+
+else:
+    
+    activity_classification = pd.DataFrame()
+    letter = []
+    behaviour = []
+    behaviour_probs = []
+    
+    for num,el in enumerate(data):
+
+        activity_spikes = el
+
+        if el.nonzero().shape[0] > 0:
+            LOG.debug("Single-sample inference of 'active channel' {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
+            LOG.debug("Letter: {}".format(letter_lbl[num]))
+            pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
+            letter.append(letter_lbl[num])
+            behaviour.append(pred)
+            behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
+            LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
+            LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
+            print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
+
+    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+    print("*** classification done ***")
+
+    activity_classification["Letter"] = letter
+    activity_classification["Behaviour"] = behaviour
+    activity_classification["Probabilities"] = behaviour_probs
+    activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_Braille_{}".format(experiment_datetime))
 
 ### Prepare the dataframe for the heatmap and plot it
 grouped = activity_classification[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()

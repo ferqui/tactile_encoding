@@ -8,6 +8,8 @@ from datetime import datetime
 from sklearn.model_selection import train_test_split
 from subprocess import check_output
 from io import StringIO
+import psutil
+import time
 
 
 def create_directory(
@@ -346,4 +348,48 @@ def retrieve_nni_results(
     con.close()
 
     return top.iloc[0]["trialJobId"], top.iloc[0][metrics]
+
+
+def limit_cpu_cores(cores_to_use):
+
+    num_cores = len(cores_to_use)
+
+    pid = os.getpid() # the current process
+
+    available_cores = list(range(psutil.cpu_count()))
+    #selected_cores = available_cores[:num_cores]
+    selected_cores = []
+    for ii in cores_to_use:
+        if ii in available_cores:
+            selected_cores.append(ii)
+
+    os.sched_setaffinity(pid, selected_cores)
+
+    # Limit the number of threads used by different libraries
+    os.environ["OMP_NUM_THREADS"] = str(num_cores)
+    os.environ["MKL_NUM_THREADS"] = str(num_cores)
+    torch.set_num_threads(num_cores)
+
+
+def get_least_active_cores(num_cores, num_readings=10):
+
+    # Get CPU usage for each core for multiple readings
+    cpu_usage_readings = []
+    for ii in range(num_readings):
+        cpu_usage_readings.append(psutil.cpu_percent(percpu=True))
+        time.sleep(0.05)
+
+    # Calculate the average CPU usage for each core
+    avg_cpu_usage = [sum(usage) / num_readings for usage in zip(*cpu_usage_readings)]
+
+    # Create a list of tuples (core_index, avg_cpu_usage)
+    core_usage_tuples = list(enumerate(avg_cpu_usage))
+
+    # Sort the list based on average CPU usage
+    sorted_cores = sorted(core_usage_tuples, key=lambda x: x[1])
+
+    # Get the first 'num_cores' indices (least active cores)
+    least_active_cores = [index for index, _ in sorted_cores[:num_cores]]
+
+    return least_active_cores
 
