@@ -41,7 +41,7 @@ import torch
 import torch.nn as nn
 
 from NNI.utils.utils import *
-from data.load_BrailleTrained import *
+from data.loader import load_BrailleTrained_activity
 
 
 ### 1) various experiment settings #############################################

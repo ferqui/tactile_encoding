@@ -1,12 +1,11 @@
 """
 This script allows to classify the MN neuron output 
 spike patterns obtained from an NNI-optimized
-network with trained MN neuron parameters for 
-Braille letters classification.
+network with trained MN neuron parameters.
 The spike_classifier with NNI-optimized parameters
 and pre-trained weights is used.
 
-MNIST AS INPUT FOR THE SPIKING ACTIVITY.
+BRAILLE DATA AS INPUT FOR THE SPIKING ACTIVITY.
 
 Settings to be accounted for:
     experiment_name
@@ -27,7 +26,6 @@ Torino, Italy.
 """
 
 
-import argparse
 import datetime
 import json
 import logging
@@ -40,68 +38,12 @@ import seaborn as sn
 import torch
 import torch.nn as nn
 
-from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, load_layers
-from data.load_BrailleTrained import *
+from data.loader import load_activity
+from NNI.utils.utils import *
+from settings import settings
 
 
 ### 1) various experiment settings #############################################
-
-parser = argparse.ArgumentParser()
-
-# Experiment name
-parser.add_argument('-experiment_name',
-                    type=str,
-                    default="braille_trained_activity_classifier",
-                    help='Name of this experiment.')
-# ID of the NNI experiment to refer to
-parser.add_argument('-experiment_id',
-                    type=str,
-                    default="vpeqjlkr",
-                    help='ID of the NNI experiment whose results are to be used.')
-# ID of the NNI trial providing the best test accuracy
-parser.add_argument('-best_test_id',
-                    type=str,
-                    default="euX7c",
-                    help='ID of the NNI trial that gave the highest test accuracy.')
-# Path of weights to perform test only (if do_training is False)
-parser.add_argument('-trained_layers_path',
-                    type=str,
-                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt",
-                    help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
-# Auto-selection of GPU
-parser.add_argument('-auto_gpu',
-                    type=bool,
-                    default=True,
-                    help='Enable or not auto-selection of GPU to use.')
-# Manual selection of GPU
-parser.add_argument('-manual_gpu_idx',
-                    type=int,
-                    default=1,
-                    help='Set which GPU to use.')
-# (maximum) GPU memory fraction to be allocated
-parser.add_argument('-gpu_mem_frac',
-                    type=float,
-                    default=0.3,
-                    help='The maximum GPU memory fraction to be used by this experiment.')
-# Set seed usage
-parser.add_argument('-use_seed',
-                    type=bool,
-                    default=True,
-                    help='Set if a seed is to be used or not.')
-# Specify if running for debug
-parser.add_argument('-debugging',
-                    type=bool,
-                    default=False,
-                    help='Set if the run is to debug the code or not.')
-# Save heatmap
-parser.add_argument('-save_hm',
-                    type=bool,
-                    default=True,
-                    help='Save or not the heatmap produced for behaviour classification.')
-
-args = parser.parse_args()
-
-settings = vars(args)
 
 experiment_name = settings["experiment_name"]
 
@@ -110,36 +52,48 @@ trained_layers_path = settings["trained_layers_path"]
 best_test_id = settings["best_test_id"]
 
 use_seed = settings["use_seed"]
+multi_seed = settings["multi_seed"]
 
 if use_seed:
-    seed = 42
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
+    if multi_seed:
+        seed_list = [42, 0, 1, 14, 2024, 16, 6, 999, 19]
+    else:
+        seed = 42
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":4096:8"
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.use_deterministic_algorithms(True)
 else:
     seed = None
 
 ################################################################################
 
 
-experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 ### 2) data loading ############################################################
 
-task_activity = "MNIST_classification"
+activity_dir = "./data/Activity"
 
-braille_activity_path = "./data/Braille_trained_activity/{}".format(task_activity)
+activity_dataset = "GR_Braille"
+activity_experiment = "GR_Braille_nw"
+experiment_number = 2
 
-braille_activity_df = load_BrailleTrained_activity(braille_activity_path)
+activity_path = os.path.join(activity_dir,activity_dataset,f"{activity_experiment}_{experiment_number}")
 
-data = braille_activity_df["Activity"].values
-label = braille_activity_df["Label"].values
-letter_lbl = braille_activity_df["Letter"].values
+subset = "test"
 
-letter_written = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+lbl_string = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
     'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+
+activity_df = load_activity(activity_path, subset, lbl_string)
+
+data = activity_df["Activity"].values
+label = activity_df["Label"].values
+stimulus_lbl = activity_df["Stimulus"].values
 
 # For the activity classification:
 labels_mapping = {
@@ -170,7 +124,7 @@ labels_mapping = {
 
 ### 3) log file configuration ##################################################
 
-log_path = "./logs/classification/braille_trained_activity_MN"
+log_path = os.path.join("./logs/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}")
 create_directory(log_path)
 if settings["debugging"]:
     logging.basicConfig(filename=log_path+"/{}_{}_debug.log".format(experiment_id,best_test_id),
@@ -184,7 +138,7 @@ else:
                         datefmt='%Y%m%d_%H%M%S')
 LOG = logging.getLogger(experiment_name)
 LOG.setLevel(logging.DEBUG)
-LOG.debug("Activity classification from task: {}\n".format(task_activity))
+LOG.debug("Activity classification from: {} ({})\n".format(activity_dataset+"/"+activity_experiment+"_"+str(experiment_number), subset))
 LOG.debug("Experiment started on: {}-{}-{} {}:{}:{}\n".format(
     experiment_datetime[:4],
     experiment_datetime[4:6],
@@ -200,8 +154,9 @@ if use_seed:
 ################################################################################
 
 
-### 4) CUDA device set-up ######################################################
+### 4) Device resources usage ##################################################
 
+### GPU
 gpu_mem_frac = settings["gpu_mem_frac"]
 if settings["auto_gpu"]:
     flag_allocate_memory = False
@@ -217,9 +172,14 @@ if settings["auto_gpu"]:
     device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 else:
     gpu_sel = settings["manual_gpu_idx"]
-    print("Single GPU manually selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
+    LOG.debug("Single GPU manually selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
     device = torch.device("cuda:"+str(gpu_sel))
     torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device)
+
+### CPU
+min_use = get_least_active_cores(num_cores=2)
+LOG.debug("Selected CPU cores: {}".format(min_use))
+limit_cpu_cores(min_use)
 
 ################################################################################
 
@@ -508,7 +468,7 @@ def classify_spikes(input_spikes, single_input, labels_mapping, trained_path, de
 
 ### WHERE THINGS ACTUALLY HAPPEN ###############################################
 
-print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
+LOG.debug("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
     experiment_datetime[:4],
     experiment_datetime[4:6],
     experiment_datetime[6:8],
@@ -519,39 +479,91 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
 
 ### Perform spiking patterns classification
 print("*** classification started ***")
-activity_classification = pd.DataFrame()
-letter = []
-behaviour = []
-behaviour_probs = []
-for num,el in enumerate(data):
-    
-    activity_spikes = el
-    
-    if el.nonzero().shape[0] > 0:
-        LOG.debug("Single-sample inference of 'active channel' {}/{} from Braille-trained activity of the Braille classifier:".format(num+1,len(data)))
-        LOG.debug("Letter: {}".format(letter_lbl[num]))
-        pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
-        letter.append(letter_lbl[num])
-        behaviour.append(pred)
-        behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
-        LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
-        LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
-        print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
-        
-LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
-print("*** classification done ***")
+if multi_seed:
 
-activity_classification["Letter"] = letter
-activity_classification["Behaviour"] = behaviour
-activity_classification["Probabilities"] = behaviour_probs
-activity_classification.to_pickle("./results/BrailleTrained_activity_classification/activity_classification_MNIST_{}".format(experiment_datetime))
+    for sd in range(settings["n_seed"]):
+
+        seed = seed_list[sd]
+        LOG.debug(f"\t --- \t seed ({sd+1}/{settings['n_seed']}): {seed} \t ---")
+
+        activity_classification = pd.DataFrame()
+        letter = []
+        behaviour = []
+        behaviour_probs = []
+
+        letter_repetitions = []
+        behaviour_repetitions = []
+        behaviour_probs_repetitions = []
+
+        for num,el in enumerate(data):
+
+            activity_spikes = el
+
+            if el.nonzero().shape[0] > 0:
+                LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
+                LOG.debug("Stimulus label: {}".format(stimulus_lbl[num]))
+                pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
+                letter.append(stimulus_lbl[num])
+                behaviour.append(pred)
+                behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
+                LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
+                LOG.debug("Label probabilities (%): {}\n".format(np.round(probs.detach().cpu().numpy()*100,2)))
+                print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
+            
+            letter_repetitions.extend(letter)
+            behaviour_repetitions.extend(behaviour_repetitions)
+            behaviour_probs_repetitions.extend(behaviour_probs_repetitions)
+
+        print(f"\t --- \t seed {sd+1}/{settings['n_seed']} ({seed}) done \t ---")
+
+    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+    print("*** classification done ***")
+
+    activity_classification["Letter"] = letter_repetitions
+    activity_classification["Behaviour"] = behaviour_repetitions
+    activity_classification["Probabilities"] = behaviour_probs_repetitions
+    df2pkl_path = os.path.join("./results/activity_classification/MN_activity",activity_dataset)
+    create_directory(df2pkl_path)
+    activity_classification.to_pickle(os.path.join(df2pkl_path,f"{activity_experiment}_{experiment_number}_{subset}_{settings['n_seed']}repetitions_{experiment_datetime}.pkl"))
+
+else:
+    
+    activity_classification = pd.DataFrame()
+    letter = []
+    behaviour = []
+    behaviour_probs = []
+    
+    for num,el in enumerate(data):
+
+        activity_spikes = el
+
+        if el.nonzero().shape[0] > 0:
+            LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
+            LOG.debug("Stimulus label: {}".format(stimulus_lbl[num]))
+            pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
+            letter.append(stimulus_lbl[num])
+            behaviour.append(pred)
+            behaviour_probs.append(np.round(probs.detach().cpu().numpy()*100,2))
+            LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
+            LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
+            print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
+
+    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+    print("*** classification done ***")
+
+    activity_classification["Letter"] = letter
+    activity_classification["Behaviour"] = behaviour
+    activity_classification["Probabilities"] = behaviour_probs
+    df2pkl_path = os.path.join("./results/activity_classification/MN_activity",activity_dataset)
+    create_directory(df2pkl_path)
+    activity_classification.to_pickle(os.path.join(df2pkl_path,f"{activity_experiment}_{experiment_number}_{subset}_{experiment_datetime}.pkl"))
 
 ### Prepare the dataframe for the heatmap and plot it
 grouped = activity_classification[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
-classified_activity_df = pd.DataFrame(index=range(len(letter_written)), columns=range(len(list(labels_mapping.values()))))
-for ii in range(len(letter_written)):
+classified_activity_df = pd.DataFrame(index=range(len(lbl_string)), columns=range(len(list(labels_mapping.values()))))
+for ii in range(len(lbl_string)):
     for jj in range(len(list(labels_mapping.keys()))):
-        classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==letter_written[ii]]["Probabilities"].item()[-1][jj])
+        classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==lbl_string[ii]]["Probabilities"].item()[-1][jj])
 classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
 plt.figure(figsize=(16, 12))
 sn.heatmap(classified_activity_df.T,
@@ -561,11 +573,14 @@ sn.heatmap(classified_activity_df.T,
            square=False,
            cmap="YlOrBr"
            )
-plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=letter_written, rotation=0)
+plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=lbl_string, rotation=0)
 plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
 plt.tight_layout()
 if settings["save_hm"]:
-    path_for_plots = "./results/plots/BrailleTrained_activity_MN/{}".format(experiment_name)
+    if multi_seed:
+        path_for_plots = os.path.join("./results/plots/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}_{subset}_{settings['n_seed']}repetitions")
+    else:
+        path_for_plots = os.path.join("./results/plots/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}_{subset}")
     create_directory(path_for_plots)
     path_to_save_fig = f'{path_for_plots}/hm_{experiment_id}_{best_test_id}_{experiment_datetime}'
     plt.savefig(path_to_save_fig+".png", dpi=300)
