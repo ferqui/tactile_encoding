@@ -5,7 +5,7 @@ network with trained MN neuron parameters.
 The spike_classifier with NNI-optimized parameters
 and pre-trained weights is used.
 
-SPIKING ACTIVITY PRODUCED FOR BRAILLE CLASSIFICATION.
+SPIKING ACTIVITY COLLECTED FROM BRAILLE CLASSIFICATION.
 
 CHECK SETTINGS in settings.py
 
@@ -69,12 +69,12 @@ experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 activity_dir = "./data/Activity"
 
 activity_dataset = "GR_Braille"
-activity_experiment = "GR_Braille_nw"
-experiment_number = 0
+activity_experiment = "GR_Braille_w"
+experiment_number = 1
 
 activity_path = os.path.join(activity_dir,activity_dataset,f"{activity_experiment}_{experiment_number}")
 
-subset = "eval"
+subset = "test"
 
 lbl_string = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
     'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
