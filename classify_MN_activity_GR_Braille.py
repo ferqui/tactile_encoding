@@ -5,19 +5,9 @@ network with trained MN neuron parameters.
 The spike_classifier with NNI-optimized parameters
 and pre-trained weights is used.
 
-BRAILLE DATA AS INPUT FOR THE SPIKING ACTIVITY.
+SPIKING ACTIVITY PRODUCED FOR BRAILLE CLASSIFICATION.
 
-Settings to be accounted for:
-    experiment_name
-    experiment_id
-    best_test_id
-    trained_layers_path
-    auto_gpu
-    manual_gpu_idx
-    gpu_mem_frac
-    use_seed
-    debugging
-    save_hm
+CHECK SETTINGS in settings.py
 
 Fra, Vittorio,
 Politecnico di Torino,
@@ -68,10 +58,10 @@ if use_seed:
 else:
     seed = None
 
-################################################################################
-
 
 experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+################################################################################
 
 
 ### 2) data loading ############################################################
@@ -79,12 +69,12 @@ experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 activity_dir = "./data/Activity"
 
 activity_dataset = "GR_Braille"
-activity_experiment = "GR_Braille_nw"
-experiment_number = 2
+activity_experiment = "GR_Braille_w"
+experiment_number = 1
 
 activity_path = os.path.join(activity_dir,activity_dataset,f"{activity_experiment}_{experiment_number}")
 
-subset = "test"
+subset = "train"
 
 lbl_string = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
     'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
@@ -495,11 +485,16 @@ if multi_seed:
         behaviour_repetitions = []
         behaviour_probs_repetitions = []
 
+        non_zero_channels = 0
+        non_zero_channels_repetitions = []
+        zero_spikes_letters = []
+
         for num,el in enumerate(data):
 
             activity_spikes = el
 
             if el.nonzero().shape[0] > 0:
+                non_zero_channels += 1
                 LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
                 LOG.debug("Stimulus label: {}".format(stimulus_lbl[num]))
                 pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
@@ -509,19 +504,24 @@ if multi_seed:
                 LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
                 LOG.debug("Label probabilities (%): {}\n".format(np.round(probs.detach().cpu().numpy()*100,2)))
                 print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
+
+                letter_repetitions.extend(letter)
+                behaviour_repetitions.extend(behaviour_repetitions)
+                behaviour_probs_repetitions.extend(behaviour_probs_repetitions)
             
-            letter_repetitions.extend(letter)
-            behaviour_repetitions.extend(behaviour_repetitions)
-            behaviour_probs_repetitions.extend(behaviour_probs_repetitions)
+            else:
+                zero_spikes_letters.append(stimulus_lbl[num])
+            
+        non_zero_channels_repetitions.append(non_zero_channels)
 
         print(f"\t --- \t seed {sd+1}/{settings['n_seed']} ({seed}) done \t ---")
-
-    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
-    print("*** classification done ***")
+    
+    LOG.debug(f"Number of channels with spiking activity for the different seeds (out of {len(data)}): {non_zero_channels_repetitions}")
 
     activity_classification["Letter"] = letter_repetitions
     activity_classification["Behaviour"] = behaviour_repetitions
     activity_classification["Probabilities"] = behaviour_probs_repetitions
+    activity_classification["Sparsity"] = behaviour_probs_repetitions
     df2pkl_path = os.path.join("./results/activity_classification/MN_activity",activity_dataset)
     create_directory(df2pkl_path)
     activity_classification.to_pickle(os.path.join(df2pkl_path,f"{activity_experiment}_{experiment_number}_{subset}_{settings['n_seed']}repetitions_{experiment_datetime}.pkl"))
@@ -532,12 +532,16 @@ else:
     letter = []
     behaviour = []
     behaviour_probs = []
+
+    non_zero_channels = 0
+    zero_spikes_letters = []
     
     for num,el in enumerate(data):
 
         activity_spikes = el
 
         if el.nonzero().shape[0] > 0:
+            non_zero_channels += 1
             LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
             LOG.debug("Stimulus label: {}".format(stimulus_lbl[num]))
             pred, probs = classify_spikes(activity_spikes, True, labels_mapping, trained_layers_path)
@@ -547,9 +551,11 @@ else:
             LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
             LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
             print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
-
-    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
-    print("*** classification done ***")
+        
+        else:
+            zero_spikes_letters.append(stimulus_lbl[num])
+    
+    LOG.debug(f"Number of channels with spiking activity (out of {len(data)}): {non_zero_channels}")
 
     activity_classification["Letter"] = letter
     activity_classification["Behaviour"] = behaviour
@@ -558,38 +564,50 @@ else:
     create_directory(df2pkl_path)
     activity_classification.to_pickle(os.path.join(df2pkl_path,f"{activity_experiment}_{experiment_number}_{subset}_{experiment_datetime}.pkl"))
 
-### Prepare the dataframe for the heatmap and plot it
-grouped = activity_classification[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
-classified_activity_df = pd.DataFrame(index=range(len(lbl_string)), columns=range(len(list(labels_mapping.values()))))
-for ii in range(len(lbl_string)):
-    for jj in range(len(list(labels_mapping.keys()))):
-        classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==lbl_string[ii]]["Probabilities"].item()[-1][jj])
-classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
-plt.figure(figsize=(16, 12))
-sn.heatmap(classified_activity_df.T,
-           annot=True,
-           fmt='.2f',
-           cbar=False,
-           square=False,
-           cmap="YlOrBr"
-           )
-plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=lbl_string, rotation=0)
-plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
-plt.tight_layout()
-if settings["save_hm"]:
-    if multi_seed:
-        path_for_plots = os.path.join("./results/plots/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}_{subset}_{settings['n_seed']}repetitions")
-    else:
-        path_for_plots = os.path.join("./results/plots/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}_{subset}")
-    create_directory(path_for_plots)
-    path_to_save_fig = f'{path_for_plots}/hm_{experiment_id}_{best_test_id}_{experiment_datetime}'
-    plt.savefig(path_to_save_fig+".png", dpi=300)
-    plt.savefig(path_to_save_fig+".pdf", dpi=300)
-    plt.close()
-else:
-    plt.show()
+unique_lbl, unique_count = np.unique(zero_spikes_letters, return_counts=True)
+count_zero_spikes, _ = np.unique(unique_count, return_counts=True)
 
-conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+if len(count_zero_spikes) == 1:
+    if count_zero_spikes.item()*len(lbl_string) == data.shape[0]:
+        LOG.debug("##### NO SPIKES #####")
+        LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+        print("*** No spikes ***")
+else:
+    ### Prepare the dataframe for the heatmap and plot it
+    grouped = activity_classification[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
+    classified_activity_df = pd.DataFrame(index=range(len(lbl_string)), columns=range(len(list(labels_mapping.values()))))
+    for ii in range(len(lbl_string)):
+        for jj in range(len(list(labels_mapping.keys()))):
+            classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==lbl_string[ii]]["Probabilities"].item()[-1][jj])
+    classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
+    plt.figure(figsize=(16, 12))
+    sn.heatmap(classified_activity_df.T,
+               annot=True,
+               fmt='.2f',
+               cbar=False,
+               square=False,
+               cmap="YlOrBr"
+               )
+    plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=lbl_string, rotation=0)
+    plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
+    plt.tight_layout()
+    if settings["save_hm"]:
+        if multi_seed:
+            path_for_plots = os.path.join("./results/plots/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}_{subset}_{settings['n_seed']}repetitions")
+        else:
+            path_for_plots = os.path.join("./results/plots/activity_classification/MN_activity",activity_dataset,f"{activity_experiment}_{experiment_number}_{subset}")
+        create_directory(path_for_plots)
+        path_to_save_fig = f'{path_for_plots}/hm_{experiment_id}_{best_test_id}_{experiment_datetime}'
+        plt.savefig(path_to_save_fig+".png", dpi=300)
+        plt.savefig(path_to_save_fig+".pdf", dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+    LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
+    print("*** classification done ***")
+
+conclusion_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
     conclusion_datetime[:4],
     conclusion_datetime[4:6],
