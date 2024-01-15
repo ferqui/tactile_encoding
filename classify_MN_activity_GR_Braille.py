@@ -480,11 +480,13 @@ if multi_seed:
         letter = []
         behaviour = []
         behaviour_probs = []
+        n_spikes = []
         sparsity = []
 
         letter_repetitions = []
         behaviour_repetitions = []
         behaviour_probs_repetitions = []
+        n_spikes_repetitions = []
         sparsity_repetitions = []
 
         non_zero_channels = 0
@@ -496,6 +498,7 @@ if multi_seed:
             activity_spikes = el
 
             if el.nonzero().shape[0] > 0:
+                n_spikes.append(int(el.sum().cpu().item()))
                 sparsity.append(np.round(1-el.mean().cpu().item(),4))
                 non_zero_channels += 1
                 LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
@@ -511,6 +514,7 @@ if multi_seed:
                 letter_repetitions.extend(letter)
                 behaviour_repetitions.extend(behaviour)
                 behaviour_probs_repetitions.extend(behaviour_probs)
+                n_spikes_repetitions.extend(n_spikes)
                 sparsity_repetitions.extend(sparsity)
             
             else:
@@ -525,6 +529,7 @@ if multi_seed:
     activity_classification["Letter"] = letter_repetitions
     activity_classification["Behaviour"] = behaviour_repetitions
     activity_classification["Probabilities"] = behaviour_probs_repetitions
+    activity_classification["Spikes"] = n_spikes_repetitions
     activity_classification["Sparsity"] = behaviour_probs_repetitions
     df2pkl_path = os.path.join("./results/activity_classification/MN_activity",activity_dataset)
     create_directory(df2pkl_path)
@@ -536,6 +541,7 @@ else:
     letter = []
     behaviour = []
     behaviour_probs = []
+    n_spikes = []
     sparsity = []
     non_zero_channels = 0
     zero_spikes_letters = []
@@ -545,6 +551,7 @@ else:
         activity_spikes = el
 
         if el.nonzero().shape[0] > 0:
+            n_spikes.append(int(el.sum().cpu().item()))
             sparsity.append(np.round(1-el.mean().cpu().item(),4))
             non_zero_channels += 1
             LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
@@ -565,6 +572,7 @@ else:
     activity_classification["Letter"] = letter
     activity_classification["Behaviour"] = behaviour
     activity_classification["Probabilities"] = behaviour_probs
+    activity_classification["Spikes"] = n_spikes
     activity_classification["Sparsity"] = sparsity
     df2pkl_path = os.path.join("./results/activity_classification/MN_activity",activity_dataset)
     create_directory(df2pkl_path)
