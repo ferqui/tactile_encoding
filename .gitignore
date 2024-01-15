@@ -12,8 +12,7 @@ data/label_*
 data/*Hz
 data/*.py
 data/*.ipynb
-data/Activity/Braille_trained_activity/Braille_classification/*.csv
-data/Activity/Braille_trained_activity/Braille_classification/*.zip
+data/Activity/Braille_trained_activity/Braille_classification/*
 data/Activity/Braille_trained_activity/MNIST_classification/*
 data/Activity/GR_Braille/*
 data/Activity/GR_MNIST_2Gen/*
@@ -23,12 +22,13 @@ NNI/dataset_splits/*
 NNI/logs/*
 NNI/results/*
 plots/*
-results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/experiments_history/*
-results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_attempts/*
 results/activity_classification/MN_activity/BrailleTrained_activity_classification/*
 !results/activity_classification/MN_activity/BrailleTrained_activity_classification/activity_classification_Braille_20230927_092051
-results/plots/optimized/*
+results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/experiments_history/*
+results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_attempts/*
+results/plots/activity_classification/MN_activity/BrailleTrained_activity_MN/braille_trained_activity_classifier/character_behaviours/*
 results/plots/classification/Braille/*
 results/plots/classification/original_input_activity_MN/with_Braille-optimized_parameters_v0/*
+results/plots/optimized/*
 runs/*
 TAC_RSNN/*
