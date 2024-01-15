@@ -79,13 +79,18 @@ def main(args):
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=0.2, shuffle=True, stratify=labels
     )
-
-    if args.test == False:
-        x_train, x_test, y_train, y_test = train_test_split(
+    if args.val == True:
+        x_train, x_val, y_train, y_val = train_test_split(
             x_train, y_train, test_size=0.2, shuffle=True, stratify=y_train
         )
+    print('y_train',len(y_train))
+    print('y_val',len(y_val))
+    print('y_test',len(y_test))
+
+
 
     ds_train = TensorDataset(x_train, y_train)
+    ds_val = TensorDataset(x_val, y_val)
     ds_test = TensorDataset(x_test, y_test)
 
     # Network parameters
@@ -229,10 +234,13 @@ def main(args):
         dl_train = DataLoader(
             ds_train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
         )
+        dl_val = DataLoader(
+            ds_val, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
+        )
         dl_test = DataLoader(
             ds_test, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True
         )
-        dl = {'train': dl_train, 'test': dl_test}
+        dl = {'train': dl_train, 'eval': dl_val,'test': dl_test}
         for subset in dl.keys():
             folder = output_folder.joinpath(subset)
             folder.mkdir(parents=True, exist_ok=True)
@@ -310,6 +318,8 @@ def main(args):
         dl_train = DataLoader(
             ds_train, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
         )
+        if test == False:
+            ds_test = ds_val
         dl_test = DataLoader(
             ds_test, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True
         )
@@ -633,12 +643,17 @@ if __name__ == "__main__":
     )
     parser.add_argument("--path_to_optimal_model", type=str, default=None,
                         help="Path to optimal model (it only simulates the first layer using already trained model).")
-    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output',
+    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output_new',
                         help="Path to folder where to save the new dataset.")
     parser.add_argument(
         "--no_train_weights",
         action="store_true",
         help="Do not train the weights",
+    )
+    parser.add_argument(
+        "--val",
+        action="store_true",
+        help="Do not use validation set, use test instead",
     )
     parser.add_argument(
         "--test",

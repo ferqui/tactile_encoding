@@ -224,10 +224,11 @@ def main(args):
             model = args.path_to_optimal_model.split('/')[-1].split('.')[0]
         output_folder = Path(args.new_dataset_output_folder).joinpath(model)
         output_folder.mkdir(parents=True, exist_ok=True)
-        dl = {'train': dataset.get_train(device), 'test': dataset.get_test(device)}
+        dl = {'train': dataset.get_train(device), 'test': dataset.get_test(device), 'eval':dataset.get_val(device)}
         for subset in dl.keys():
             folder = output_folder.joinpath(subset)
             folder.mkdir(parents=True, exist_ok=True)
+            print(subset,len(dl[subset]))
             for batch_idx, (x_local, y_local) in enumerate(zip(dl[subset][0], dl[subset][1])):
                 # Reset all the layers in the network
                 for layer in network:
@@ -628,5 +629,5 @@ if __name__ == "__main__":
                         help="Path to folder where to save the new dataset.")
     args = parser.parse_args()
     assert args.expansion > 0, "Expansion number should be greater that 0"
-
+    print(args)
     main(args)
