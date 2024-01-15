@@ -69,12 +69,12 @@ experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 activity_dir = "./data/Activity"
 
 activity_dataset = "GR_Braille"
-activity_experiment = "GR_Braille_w"
-experiment_number = 1
+activity_experiment = "GR_Braille_nw"
+experiment_number = 0
 
 activity_path = os.path.join(activity_dir,activity_dataset,f"{activity_experiment}_{experiment_number}")
 
-subset = "train"
+subset = "eval"
 
 lbl_string = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
     'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
@@ -480,10 +480,12 @@ if multi_seed:
         letter = []
         behaviour = []
         behaviour_probs = []
+        sparsity = []
 
         letter_repetitions = []
         behaviour_repetitions = []
         behaviour_probs_repetitions = []
+        sparsity_repetitions = []
 
         non_zero_channels = 0
         non_zero_channels_repetitions = []
@@ -494,6 +496,7 @@ if multi_seed:
             activity_spikes = el
 
             if el.nonzero().shape[0] > 0:
+                sparsity.append(np.round(1-el.mean().cpu().item(),4))
                 non_zero_channels += 1
                 LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
                 LOG.debug("Stimulus label: {}".format(stimulus_lbl[num]))
@@ -506,8 +509,9 @@ if multi_seed:
                 print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
 
                 letter_repetitions.extend(letter)
-                behaviour_repetitions.extend(behaviour_repetitions)
-                behaviour_probs_repetitions.extend(behaviour_probs_repetitions)
+                behaviour_repetitions.extend(behaviour)
+                behaviour_probs_repetitions.extend(behaviour_probs)
+                sparsity_repetitions.extend(sparsity)
             
             else:
                 zero_spikes_letters.append(stimulus_lbl[num])
@@ -532,7 +536,7 @@ else:
     letter = []
     behaviour = []
     behaviour_probs = []
-
+    sparsity = []
     non_zero_channels = 0
     zero_spikes_letters = []
     
@@ -541,6 +545,7 @@ else:
         activity_spikes = el
 
         if el.nonzero().shape[0] > 0:
+            sparsity.append(np.round(1-el.mean().cpu().item(),4))
             non_zero_channels += 1
             LOG.debug("Single-sample inference of 'active channel' {}/{}:".format(num+1,len(data)))
             LOG.debug("Stimulus label: {}".format(stimulus_lbl[num]))
@@ -560,6 +565,7 @@ else:
     activity_classification["Letter"] = letter
     activity_classification["Behaviour"] = behaviour
     activity_classification["Probabilities"] = behaviour_probs
+    activity_classification["Sparsity"] = sparsity
     df2pkl_path = os.path.join("./results/activity_classification/MN_activity",activity_dataset)
     create_directory(df2pkl_path)
     activity_classification.to_pickle(os.path.join(df2pkl_path,f"{activity_experiment}_{experiment_number}_{subset}_{experiment_datetime}.pkl"))
