@@ -73,9 +73,8 @@ def main(args):
     upsample_fac = 1
     dt = (1 / 100.0) / upsample_fac
     # file_name = "data/data_braille_letters_all.pkl"
-    data, labels, _, _, _, _ = load_data(args.data_path, upsample_fac)
+    data, labels, timestamps_resampled, data_steps, le, _, labels_ascii = load_data(args.data_path, upsample_fac,label_ascii=True)
     nb_channels = data.shape[-1]
-
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=0.2, shuffle=True, stratify=labels
     )
@@ -83,8 +82,9 @@ def main(args):
         x_train, x_val, y_train, y_val = train_test_split(
             x_train, y_train, test_size=0.2, shuffle=True, stratify=y_train
         )
+        print('y_val', len(y_val))
+
     print('y_train',len(y_train))
-    print('y_val',len(y_val))
     print('y_test',len(y_test))
 
 
@@ -242,6 +242,9 @@ def main(args):
         )
         dl = {'train': dl_train, 'eval': dl_val,'test': dl_test}
         for subset in dl.keys():
+            # overall_size_spk = []
+            # overall_size_label = []
+            # overall_size_spk_pckd = []
             folder = output_folder.joinpath(subset)
             folder.mkdir(parents=True, exist_ok=True)
             for batch_idx, (x_local, y_local) in enumerate(dl[subset]):
@@ -257,12 +260,22 @@ def main(args):
                     # Get the spikes and voltages from the MN neuron encoder
                     l0_spk.append(network[1].state.spk)
                 l0_spk = torch.stack(l0_spk, dim=1)
+
                 # l0_spk = l0_spk.to(bool).to_sparse()
                 l0_spk = np.array(l0_spk.cpu().to(bool))
+                l0_spk_tmp = l0_spk
                 l0_spk = np.packbits(l0_spk, axis=0)
                 np.save(folder.joinpath(f'{model}_{batch_idx}.npy'), l0_spk, allow_pickle=True)
                 # torch.save(l0_spk, folder.joinpath(f'{model}_{batch_idx}.pt'))
-                torch.save(y_local, folder.joinpath(f'{model}_{batch_idx}_label.pt'))
+            #     print(f'{subset},{l0_spk_tmp.shape[0]},{y_local.shape[0]}')
+            #     # print(y_local.shape)
+            #     overall_size_spk.append(l0_spk_tmp.shape[0])
+            #     overall_size_label.append(y_local.shape[0])
+            #     l0_spk_unpkd = np.unpackbits(l0_spk, axis=0,count=l0_spk_tmp.shape[0])
+            #     overall_size_spk_pckd.append(l0_spk_unpkd.shape[0])
+            #
+            #     torch.save(y_local, folder.joinpath(f'{model}_{batch_idx}_label.pt'))
+            # print(f'{subset},{np.sum(overall_size_spk)},{np.sum(overall_size_label)}, {np.sum(overall_size_spk_pckd)}')
         raise ValueError('Done recording activity')
 
     else:
@@ -643,7 +656,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--path_to_optimal_model", type=str, default=None,
                         help="Path to optimal model (it only simulates the first layer using already trained model).")
-    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output_new',
+    parser.add_argument("--new_dataset_output_folder", type=str, default='MN_output_test',
                         help="Path to folder where to save the new dataset.")
     parser.add_argument(
         "--no_train_weights",

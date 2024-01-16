@@ -621,8 +621,9 @@ def retrieve_analysis(analysis,centers,spans,folder_data='',args=None):
                     # print(files)
                     # print('Missing '+str(id))
                     not_found = True
+                    ids.append(id)
     if not_found:
-        raise ValueError('Missing files')
+        raise ValueError(f'Missing {len(ids)} files:',ids)
     # print(np.sort(ids))
     return plot_dicts
 def retrieve_analysis_new(analysis,centers,spans,folder_data='',args=None):
@@ -694,7 +695,7 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_newslopes_afterChristmas')
+    folder = Path('dataset_analysis_newslopes_3Gen_100')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)

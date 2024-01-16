@@ -35,8 +35,8 @@ sweep_param_name = ['a', 'A1', 'A2', 'b', 'G', 'k1', 'k2']
 sweep_ranges = [[-10, 10], [-100, 100], [-1000, 1000]]
 
 MNclasses = {
-    'Tonic': {'a':0,'A1':0,'A2': 0,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
-    'Adaptive': {'a':5,'A1':0,'A2': 0,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
+    #'Tonic': {'a':0,'A1':0,'A2': 0,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
+    #'Adaptive': {'a':5,'A1':0,'A2': 0,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
     # 'K': {'a':30,'A1':0,'A2': 0,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
     # 'L': {'a':30,'A1':10,'A2': -0.6,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
     # 'M2O': {'a':5,'A1':10,'A2': -0.6,"b" :10,"G" : 50,"k1" :  200,"k2" : 20,"gain" : 1, 'R1': 0, 'R2': 1},
@@ -173,29 +173,33 @@ def sweep_slopes(slopes=np.arange(10), n_trials=10, dt_sec=0.001, stim_length_se
     slopes = slopes/dt_sec
     # list with mean current value (same dimension as the last dimension of input_current)
     for a in slopes:
-        if a <=1:
-            a = 1.1
-        time_necessary = (last - first)/a
-        time_first = (stim_length_sec - time_necessary)/2
-        time_last = (stim_length_sec - time_necessary)/2
-        assert time_first > dt_sec, f"time_first:{time_first} is smaller than dt_sec {dt_sec}"
-        assert time_necessary > dt_sec, f"time_necessary:{time_necessary} is smaller than dt_sec {dt_sec}"
-        first_vec = np.linspace(first, first, int(np.floor(time_first / dt_sec)))
-        last_vec = np.linspace(last, last, int(np.floor(time_last / dt_sec)))
-        slope = np.linspace(0,last-first,int(np.floor(time_necessary/dt_sec)))
-        # slope = np.arange(0,last-first,time_necessary/dt_sec)
-        for n in range(n_trials):
-            # stim.append(torch.tensor([a] * n_time_bins))
-            try:
+        # if a <=1:
+        #     a = 1.1
+        if a > 0.1:
+            time_necessary = (last - first)/a
+            time_first = (stim_length_sec - time_necessary)/4
+            time_last = (stim_length_sec - time_necessary)/4
+            assert time_first > dt_sec, f"time_first:{time_first} is smaller than dt_sec {dt_sec}"
+            assert time_necessary > dt_sec, f"time_necessary:{time_necessary} is smaller than dt_sec {dt_sec}"
+            first_vec = np.linspace(first, first, int(np.floor(time_first / dt_sec)))
+            last_vec = np.linspace(last, last, int(np.floor(time_last / dt_sec)))
+            slope = np.linspace(0,last-first,int(np.floor(time_necessary/dt_sec)))
+            slope_neg = np.linspace(last,first,int(np.floor(time_necessary/dt_sec)))
+            # slope = np.arange(0,last-first,time_necessary/dt_sec)
+            for n in range(n_trials):
+                # stim.append(torch.tensor([a] * n_time_bins))
+                try:
 
-                value = np.concatenate([first_vec,slope,last_vec])
-                remaining = np.linspace(last, last,n_time_bins - len(value))
-                value = np.concatenate([value,remaining])
-                I_gwn =  value + sig * np.random.randn(n_time_bins) / np.sqrt(n_time_bins / 1000.)
-            except ValueError:
-                print('ciao')
-            stim.append(torch.tensor(I_gwn))
-            list_mean_current.append(a)
+                    value = np.concatenate([first_vec,slope,slope_neg,last_vec])
+                    remaining = np.linspace(last, last,n_time_bins - len(value))
+                    value = np.concatenate([value,remaining])
+                    I_gwn =  value + sig * np.random.randn(n_time_bins) / np.sqrt(n_time_bins / 1000.)
+                except ValueError:
+                    print('we')
+                stim.append(torch.tensor(I_gwn))
+                list_mean_current.append(a)
+        else:
+            print('skipped')
 
     input_current = torch.stack(stim, dim=1)
     input_current = torch.reshape(input_current, (n_time_bins, n_neurons))
@@ -217,6 +221,72 @@ def sweep_slopes(slopes=np.arange(10), n_trials=10, dt_sec=0.001, stim_length_se
         list_mean_slopes_index.append(np.where(unique_slopes == mean_slopes)[0][0])
     return input_current, list_mean_slopes_index
 
+def sweep_bumps(slopes=np.arange(10), bumps = 5, n_trials=10, dt_sec=0.001, stim_length_sec=0.1, sig=.1, debug_plot=True,last=5,first = 0):
+    """
+    Return amplitude of input current across time, with as many input signals as the dimension of
+    the input amplitudes.
+
+    dt_sec:
+    stim_length_sec:
+    amplitudes
+
+    input_curent: batch_size (1) x time bins x neurons (or n amplitudes x n trials)
+    """
+    n_time_bins = int(np.floor(stim_length_sec / dt_sec))
+    n_neurons = len(slopes) * n_trials
+    stim = []
+    list_mean_current = []
+    slopes = slopes/dt_sec
+    # list with mean current value (same dimension as the last dimension of input_current)
+    for a in slopes:
+        stim_length_sec_here = stim_length_sec/bumps
+        for bump in range(bumps):
+
+            if a <=1:
+                a = 1.1
+            time_necessary = (last - first)/a
+            time_first = (stim_length_sec_here - time_necessary)/2
+            time_last = (stim_length_sec_here - time_necessary)/2
+            assert time_first > dt_sec, f"time_first:{time_first} is smaller than dt_sec {dt_sec}"
+            assert time_necessary > dt_sec, f"time_necessary:{time_necessary} is smaller than dt_sec {dt_sec}"
+            first_vec = np.linspace(first, first, int(np.floor(time_first / dt_sec)))
+            last_vec = np.linspace(last, last, int(np.floor(time_last / dt_sec)))
+            slope = np.linspace(0,last-first,int(np.floor(time_necessary/dt_sec)))
+            # slope = np.arange(0,last-first,time_necessary/dt_sec)
+            for n in range(n_trials):
+                # stim.append(torch.tensor([a] * n_time_bins))
+                try:
+
+                    value = np.concatenate([first_vec,slope,last_vec])
+                    remaining = np.linspace(last, last,n_time_bins - len(value))
+                    value = np.concatenate([value,remaining])
+                    I_gwn =  value + sig * np.random.randn(n_time_bins) / np.sqrt(n_time_bins / 1000.)
+                except ValueError:
+                    print('ciao')
+                stim.append(torch.tensor(I_gwn))
+                list_mean_current.append(a)
+
+    input_current = torch.stack(stim, dim=1)
+    input_current = torch.reshape(input_current, (n_time_bins, n_neurons))
+    input_current = input_current[None, :]  # add first dimension for batch size 1
+
+    assert input_current.shape[0] == 1
+    assert input_current.shape[1] == n_time_bins
+    assert input_current.shape[2] == len(
+        slopes) * n_trials  # thid dim: n_trials = n_neurons (all stimulated ad once)
+
+    if debug_plot:
+        for i in range(input_current.shape[2]):
+            plt.plot(np.arange(n_time_bins) * dt_sec, input_current[0, :, i].cpu())
+        plt.xlabel('Time (sec)')
+        plt.ylabel('Input current')
+    unique_slopes = np.unique(list_mean_current)
+    list_mean_slopes_index = []
+    for mean_slopes in list_mean_current:
+        list_mean_slopes_index.append(np.where(unique_slopes == mean_slopes)[0][0])
+    plt.plot(np.arange(n_time_bins) * dt_sec, input_current[0, :, 0].cpu())
+    plt.show()
+    return input_current, list_mean_slopes_index
 
 def sweep_amplitude_oscillations(amplitudes=np.arange(10), n_trials=10, offset=0, f=10, fs=1000, target_snr_db=20,
                                  debug_plot=True, add_noise=True):
@@ -345,7 +415,27 @@ def sweep_frequency_oscillations(frequencies=np.arange(20, 30), n_trials=10, off
 #     Y_save = torch.concat(Y_save)
 #     H_save = net.H.clone().detach()
 #     return H_save, Y_save
-
+def sweep_coherent_noise(n_trials=10,n_classes = 10,sigma_coherent=0.1,sigma_uncoherent= 0.01,amplitude=10,stim_length_sec=1,dt_sec=0.01):
+    stim = []
+    labels = []
+    n_time_bins = int(np.floor(stim_length_sec / dt_sec))
+    n_neurons = n_classes * n_trials
+    # colors = plt.cm.rainbow(np.linspace(0, 1, n_classes))
+    for c in range(n_classes):
+        noise_coherent = sigma_coherent * np.random.randn(n_time_bins) / np.sqrt(n_time_bins / 1000.)
+        for n in range(n_trials):
+            noise_unchoerent = sigma_uncoherent * np.random.randn(n_time_bins) / np.sqrt(n_time_bins / 1000.)
+            I_gwn = amplitude + noise_coherent + noise_unchoerent
+            stim.append(I_gwn)
+            labels.append(c)
+    #         plt.plot(I_gwn, color=colors[c]
+    #                     , label=f'class {c}')
+    # plt.show()
+    # input_current = torch.stack(stim, dim=1)
+    input_current = np.reshape(np.stack(stim),(n_time_bins,n_neurons))
+    input_current = input_current[None, :]  # add first dimension for batch size 1
+    input_current = torch.tensor(input_current)
+    return input_current,labels
 def train_nmf(V_save, Y_save,rank_NMF):
     net = NMF(V_save.shape, rank=rank_NMF)
     net.fit(V_save,verbose=False)
@@ -455,7 +545,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     #                       generator=torch.Generator(device=device))
     # dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True, num_workers=num_workers,
     #                      generator=torch.Generator(device=device))
-    dl_4nmf = DataLoader(ds_4nmf, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers,
+    dl_4nmf = DataLoader(ds_4nmf, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
                             generator=torch.Generator(device=device))
     # pbar = trange(nb_epochs)
     criterion = torch.nn.CrossEntropyLoss()
@@ -473,6 +563,7 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
     V_save_isi = []
     Y_save = []
     V_save_isi_nonmf = []
+    v_mem_coll = []
     for x_local, y_local in dl_4nmf:
         x_local, y_local = x_local.to(device, non_blocking=True), y_local.to(device, non_blocking=True)
         params['nb_channels'] = x_local.shape[0]
@@ -480,15 +571,30 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         neuron.reset()
 
         s_out_rec = []
+        v_mem = []
+        v_thr = []
         for t in range(x_local.shape[1]):
             out = neuron(
                 x_local[None, :, t])
             s_out_rec.append(out)
-
+            v_mem.append(neuron.state.V.clone().detach())
+            v_thr.append(neuron.state.Thr.clone().detach())
         s_out_rec_train = torch.stack(s_out_rec, dim=1)
         s_out_rec_train = torch.flatten(s_out_rec_train, start_dim=0, end_dim=1)
+        v_mem = torch.stack(v_mem, dim=1)
+        v_thr = torch.stack(v_thr, dim=1)
         # spike_count = torch.sum(s_out_rec_train, dim=0)
-
+        # plt.plot(x_local.T)
+        # plt.figure()
+        # plt.plot(v_mem[0,:,:])
+        # plt.figure()
+        # plt.plot(v_thr[0, :, :])
+        # spikes = torch.where(s_out_rec_train)
+        # plt.figure()
+        # plt.scatter(spikes[0],spikes[1])
+        #
+        # plt.show()
+        v_mem_coll.append(v_mem)
         Y_save.append(y_local)
         V_matrix_spike = s_out_rec_train.T
         V_save_spike.append(V_matrix_spike)
@@ -518,6 +624,16 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
             V_save_isi_nonmf.append(V_matrix_isi_nonmf)
     V_save_spike = torch.vstack(V_save_spike)
     V_save_count = torch.vstack(V_save_count)
+    # plt.plot(x_local.T)
+    # plt.figure()
+    # plt.plot(v_mem[0,:,:])
+    # plt.figure()
+    # plt.plot(v_thr[0, :, :])
+    # spikes = torch.where(s_out_rec_train)
+    # plt.figure()
+    # plt.scatter(spikes[0],spikes[1])
+    #
+    # plt.show()
     if 'isi' in args.encoding_methods:
         V_save_isi = torch.vstack(V_save_isi)
     if 'isi_nonmf' in args.encoding_methods:
@@ -557,9 +673,25 @@ def MI_neuron_params(neuron_param_values, name_param_sweeped, extremes_sweep, MN
         elif encoding_method == 'isi':
             input_var = V_save_isi
             output_var, labels = train_nmf(V_save_isi,Y_save,rank_NMF)
+
         elif encoding_method == 'spike':
             input_var = V_save_spike
             output_var, labels = train_nmf(V_save_spike,Y_save,rank_NMF)
+            # print('we')
+            # plt.figure()
+            # plt.plot(x_local.T)
+            # plt.figure()
+            # # plt.plot(torch.concatenate(v_mem_coll,dim=0).T)
+            # # plt.figure()
+            # order = torch.argsort(labels)
+            # spikes = torch.where(V_save_spike[order,:].T)
+            # plt.scatter(spikes[0],spikes[1])
+            # plt.figure()
+            # plt.imshow(output_var[order,:].T,aspect='auto',cmap='gray_r',interpolation='none')
+            #
+            # plt.show()
+
+
         elif encoding_method == 'isi_nonmf':
             input_var = V_save_isi_nonmf
             output_var, labels = train_nmf(V_save_isi_nonmf,Y_save,rank_NMF)
@@ -639,6 +771,69 @@ def calculate_MI_class(stimuli_type, range_val, MNclass,data, labels,dt_sec,name
                                                                                2),name,args.seed))
     sema.release()
 
+def choose_signal(range_val, stimuli_type,args):
+    n_time_bins = int(np.floor(args.stim_length_sec / args.dt_sec))
+    # amplitudes = np.linspace(1, 10, 10)
+    if stimuli_type == 'amplitude':
+        range_val = [i for i in range(50)]
+        data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                   stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx],
+                                   debug_plot=args.debug_plot)
+    elif stimuli_type == 'amplitude_neg':
+        data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                   stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx],
+                                   debug_plot=args.debug_plot)
+        data = -data
+
+    elif stimuli_type == 'frequency':
+
+        data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                    offset=0, amplitude_100=40, fs=1 / args.dt_sec, target_snr_db=20,
+                                                    debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
+        # data[data < 0] = 0
+
+    elif stimuli_type == 'frequency_pos':
+        data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                    offset=0, amplitude_100=4, fs=1 / args.dt_sec,
+                                                    target_snr_db=20,
+                                                    debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0
+                                                    , stim_length_sec=args.stim_length_sec)
+        data[data < 0] = 0
+        # plt.figure()
+        # plt.plot(data[0, :, :])
+        # plt.show()
+
+    elif stimuli_type == 'frequency_neg':
+        data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
+                                                    offset=0, amplitude_100=40, fs=1 / args.dt_sec,
+                                                    target_snr_db=20,
+                                                    debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
+        data[data < 0] = 0
+        data = -data
+    elif stimuli_type == 'slope':
+
+        range_val = np.array([1 / (i * 20) for i in range(1, 50)])
+        data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                    stim_length_sec=args.stim_length_sec,
+                                    last=args.last, first=0, sig=args.noise[st_idx], debug_plot=args.debug_plot)
+    elif stimuli_type == 'coherent_noise':
+
+        data, labels = sweep_coherent_noise(n_trials=args.n_trials, dt_sec=args.dt_sec,
+                                            stim_length_sec=args.stim_length_sec,
+                                            sigma_coherent=0.1, sigma_uncoherent=0.01,
+                                            n_classes=10)
+
+    # elif stimuli_type == 'slope':
+    #
+    #     range_val = np.array([1 / (i * 50) for i in range(1, 50)])
+    #     data, labels = sweep_bumps(slopes=range_val, n_trials=args.n_trials,
+    #                                 dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
+    #                                 last=args.last, first=0, sig=args.noise[st_idx],
+    #                                 debug_plot=args.debug_plot)
+
+    else:
+        raise ValueError('Stimuli type not recognized')
+    return data,labels
 from multiprocessing import Semaphore,Process
 if __name__ == "__main__":
     name = 'MN_DSP'
@@ -650,18 +845,19 @@ if __name__ == "__main__":
     parser.add_argument('--noise', type=str, default='0,0,0')
     parser.add_argument('--dt_sec', type=float, default=0.001)
     parser.add_argument('--debug_plot', '-d', action='store_true')
-    parser.add_argument('--load_range', type=str, default='Braille')
+    parser.add_argument('--load_range', type=str, default='')
     parser.add_argument('--encoding_methods',type=str,default='spike')
-    parser.add_argument('--load_neuron', type=str, default='Braille,MNIST,MNIST_compressed')
+    parser.add_argument('--load_neuron', type=str, default='')
     parser.add_argument('--seed', type=int, default=-1)
     parser.add_argument('--seed_n', type=int, default=1)
     parser.add_argument('--gpu',  action='store_true')
-    parser.add_argument('--n_epochs', type=int, default=50)
-    parser.add_argument('--batch_size', type=int, default=100)
+    # parser.add_argument('--n_epochs', type=int, default=1000)
+    parser.add_argument('--n_epochs', type=int, default=1000)
+    parser.add_argument('--batch_size', type=int, default=500)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--rank_NMF', type=int, default=10)
     parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--ranges_possible', type=str, default='amplitude,slope')
+    parser.add_argument('--ranges_possible', type=str, default='amplitude')
 
     # ranges_possible = parser.get
     # if ',' in ranges_possible:
@@ -669,7 +865,8 @@ if __name__ == "__main__":
     # else:
     #     ranges_possible = [ranges_possible]
 
-    ranges_possible = ['amplitude','slope']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
+    ranges_possible = ['amplitude','coherent_noise']#, 'amplitude_neg', 'frequency', 'frequency_neg', 'frequency_pos', 'slope']
+
     for range_name in ranges_possible:
         parser.add_argument(f'--{range_name}'+'_center', type=float, default=0)
         parser.add_argument(f'--{range_name}'+'_span', type=float, default=0)
@@ -692,9 +889,9 @@ if __name__ == "__main__":
     elif ',' in args.load_neuron:
         args.load_neuron = args.load_neuron.split(',')
         for MNclass in args.load_neuron:
-            MNclasses[MNclass] = json.load(open('MN_params/' + MNclass + '.json'))
+            MNclasses[MNclass] = json.load(open('MN_params_new/' + MNclass + '.json'))
     else:
-        MNclasses[args.load_neuron] = json.load(open('MN_params/' + args.load_neuron + '.json'))
+        MNclasses[args.load_neuron] = json.load(open('MN_params_new/' + args.load_neuron + '.json'))
 
     if ',' in args.encoding_methods:
         args.encoding_methods = args.encoding_methods.split(',')
@@ -710,15 +907,18 @@ if __name__ == "__main__":
     ranges = {}
     stimuli_types = []
     if args.load_range == '':
-        pass
+        for range_name in ranges_possible:
+            stimuli_types.append(range_name)
     else:
         if (',' in args.load_range) == False:
             args.load_range = [args.load_range]
         elif ',' in args.load_range:
             args.load_range = args.load_range.split(',')
 
+
         for range_ds in args.load_range:
             for type in ['worse','opt']:
+                print(f'{folder_run}/{range_ds}/data/{type}.json')
                 json_range = json.load(open(f'{folder_run}/{range_ds}/data/{type}.json'))
                 for range_name in ranges_possible:
                     try:
@@ -735,6 +935,8 @@ if __name__ == "__main__":
                             getattr(args, range_ds + '_'+range_name + '_'+type+'_n_steps'))]
                     except KeyError:
                         pass
+
+
     print(ranges)
     stimuli_types = np.unique(stimuli_types)
     if args.debug_plot:
@@ -751,53 +953,23 @@ if __name__ == "__main__":
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
-
+        if args.load_range == '':
+            args.load_range = ['']
         for ds in args.load_range:
             for st_idx,stimuli_type in enumerate(stimuli_types):
-                for type in ['worse','opt']:
-                        stimuli = ds+'_'+stimuli_type+'_'+type
+                for type in ['worse']:#,'opt']:
+                        if ds != '':
+                            stimuli = ds+'_'+stimuli_type+'_'+type
+                        else:
+                            stimuli = stimuli_type
+                            ranges[stimuli_type] = ['']
+
                         for range_val in ranges[stimuli]:
+                            print(stimuli_type)
                             # upsample_fac = 5
-                            n_time_bins = int(np.floor(args.stim_length_sec / args.dt_sec))
-                            # amplitudes = np.linspace(1, 10, 10)
-                            if stimuli_type == 'amplitude':
-                                data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                                       stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
-                            elif stimuli_type == 'amplitude_neg':
-                                data, labels = sweep_steps(amplitudes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec,
-                                                                       stim_length_sec=args.stim_length_sec, sig=args.noise[st_idx], debug_plot=args.debug_plot)
-                                data = -data
+                            data,labels = choose_signal(range_val, stimuli_type, args)
 
-                            elif stimuli_type == 'frequency':
-                                data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                            offset=0, amplitude_100=40, fs=1/args.dt_sec, target_snr_db=20,
-                                                                            debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
-                                # data[data < 0] = 0
 
-                            elif stimuli_type == 'frequency_pos':
-                                data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                            offset=0, amplitude_100=4, fs=1 / args.dt_sec,
-                                                                            target_snr_db=20,
-                                                                            debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0
-                                                                            , stim_length_sec= args.stim_length_sec)
-                                data[data < 0] = 0
-                                # plt.figure()
-                                # plt.plot(data[0, :, :])
-                                # plt.show()
-
-                            elif stimuli_type == 'frequency_neg':
-                                data, labels = sweep_frequency_oscillations(frequencies=range_val, n_trials=args.n_trials,
-                                                                            offset=0, amplitude_100=40, fs=1 / args.dt_sec,
-                                                                            target_snr_db=20,
-                                                                            debug_plot=args.debug_plot, add_noise=args.noise[st_idx] > 0)
-                                data[data < 0] = 0
-                                data = -data
-                            elif stimuli_type == 'slope':
-                                data, labels = sweep_slopes(slopes=range_val, n_trials=args.n_trials, dt_sec=args.dt_sec, stim_length_sec=args.stim_length_sec,
-                                                            last=args.last, first=0, sig=args.noise[st_idx],debug_plot=args.debug_plot)
-
-                            else:
-                                raise ValueError('Stimuli type not recognized')
 
                             torch.save(data, f'experiments/results/{exp_id}/{stimuli}_data.pt')
                             if args.debug_plot:

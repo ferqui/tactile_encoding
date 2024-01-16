@@ -39,6 +39,8 @@ class ToCurrent(object):
             )
             if self.add_noise:
                 # TODO: Check how to add noise
+                # TODO: Check if this is the right way to add noise
+                # TODO: Check if this is the left way to add noise
                 sample = (
                     sample.to(torch.float)
                     + torch.randint_like(sample, high=10) / 10 * self.v_max
@@ -200,6 +202,7 @@ class MNISTDataset:
         test_split = Subset(test_dataset, test_indices)
         test_dl = iter(DataLoader(test_split, batch_size=num_test, shuffle=False))
         self.x_test, self.y_test = next(test_dl)
+
 
     @property
     def n_inputs(self):
