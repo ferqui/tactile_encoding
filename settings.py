@@ -56,7 +56,7 @@ parser.add_argument('-n_seed',
 # Specify if running for debug
 parser.add_argument('-debugging',
                     type=bool,
-                    default=True,
+                    default=False,
                     help='Set if the run is to debug the code or not.')
 # Save heatmap
 parser.add_argument('-save_hm',
