@@ -370,8 +370,15 @@ def plt_signal(dict_dataset,dataset_name,folder_fig='',fig=None,ax=None,palette=
         palette = 'husl'
     colors = sns.color_palette(palette, dict_dataset['n_classes'])
     for key in data_lump.keys():
+
         data_lump[key] = torch.mean(torch.stack(data_lump[key]),dim=0)
-        ax.plot(data_lump[key][:,:].cpu().numpy(),color=colors[key])
+        print(data_lump[key].shape)
+        print(data_lump[key][:,:].mean())
+        ax.plot(data_lump[key][:,:].mean(dim=1).cpu().numpy(),color=colors[key])
+        ax.fill_between(np.arange(data_lump[key].shape[0]),data_lump[key][:,:].mean(dim=1).cpu().numpy()-data_lump[key][:,:].std(dim=1).cpu().numpy(),data_lump[key][:,:].mean(dim=1).cpu().numpy()+data_lump[key][:,:].std(dim=1).cpu().numpy(),color=colors[key],alpha=0.2)
+        # ax.plot(data_lump[key][:,:].std(dim=1).cpu().numpy(),color=colors[key])
+        # ax.plot(data_lump[key][:,:].cpu().numpy(),color=colors[key])
+    # plt.show()
     from matplotlib.lines import Line2D
 
     custom_lines = [Line2D([0], [0], color=sns.color_palette(palette, dict_dataset['n_classes'])[key], lw=4) for key in data_lump.keys()]
@@ -656,6 +663,8 @@ def retrieve_analysis_new(analysis,centers,spans,folder_data='',args=None):
     if not_found:
         raise ValueError('Missing files')
     print(np.sort(ids))
+
+
     # print(np.sort(ids))
     return plot_dicts
 import matplotlib.colors as colors
@@ -695,7 +704,7 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_newslopes_3Gen_100')
+    folder = Path('dataset_analysis_newslopes_3Gen')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)
@@ -709,6 +718,7 @@ def main(args):
         spans = {analysis[0]:[spans[analysis[0]][sim_id_span]]}
     else:
         analysis = args.analysis
+    fig5, ax5 = plt.subplots(nrows=1, ncols=3)
     for dataset in args.dataset:
         if 'Braille' == dataset:
             print('Braille')
@@ -786,6 +796,7 @@ def main(args):
             raise ValueError('dataset not found')
 
         if args.load:
+
             plt_signal(dict_dataset,dataset,
                        folder_fig=folder_fig,
                        # ax=ax1[0,enum[dataset]],
@@ -793,122 +804,140 @@ def main(args):
                        palette=palette[dataset])
 
             # plt_fft(dict_dataset,dataset,folder_fig=folder_fig)
-            pd_datasets = []
-
-            folder_run = folder.joinpath(dataset)
-            folder_data = folder_run.joinpath('data')
-
-            matrixes = retrieve_analysis(analysis,centers,spans,folder_data=str(folder_data),args=args)
-            df1 = pd.DataFrame.from_dict(matrixes[0])
-            for matrix in matrixes:
-                for key in matrix.keys():
-                    if len(matrix[key]) == 1:
-                        matrix[key] = matrix[key][0]
-
-                df2 = pd.DataFrame.from_dict(matrix)
-                df1=pd.concat([df1, df2])
-            pd_datasets.append(df1)
-
-            plot_dict = pd.concat(pd_datasets)
-            plot_dict.head()
-
-            folder_run = folder.joinpath(dataset)
-            folder_fig = folder_run.joinpath('fig')
-            folder_fig.mkdir(parents=True, exist_ok=True)
-            folder_data = folder_run.joinpath('data')
-            opt = {}
-            worse = {}
-            for data_type in analysis:
-                plot_dict_sel = plot_dict[(plot_dict['data_type'] == data_type) & (plot_dict['dataset']==dataset)]
-                mean_accuracy= {'center':[],'span':[],'accuracy':[]}
-                for center in plot_dict_sel['center'].unique():
-                    for span in plot_dict_sel['span'].unique():
-                        mean_accuracy['center'].append(center)
-                        mean_accuracy['span'].append(span)
-                        mean_accuracy['accuracy'].append(plot_dict_sel[(plot_dict_sel['center'] == center) & (plot_dict_sel['span'] == span) & (plot_dict_sel.index>90)]['accuracy'].mean(skipna=True))
-                        ## compute mean of last epochs
-                mean_accuracy = pd.DataFrame.from_dict(mean_accuracy)
-
-                plt.figure()
-                #plot accuracy vs step
-                sns.lineplot(x=plot_dict_sel.index,y='accuracy',data=plot_dict_sel,hue='span',style='center')
-                plt.tight_layout()
-
-                plt.savefig(os.path.join(folder_fig,f'dataset_analys_{data_type}_accuracy_vs_step.pdf'))
-                plt.close()
-
-                which_decimal_c = np.max(
-                    [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))),
-                     len(str(int(0.99 / (centers[data_type][0]))))])
-                which_decimal_s = np.max(
-                    [len(str(int(0.99 / (spans[data_type][1] - spans[data_type][0])))),
-                     len(str(int(0.99 / (spans[data_type][0]))))])
-                # print(folder_fig)
-                # plt.savefig(os.path.join(folder_fig,
-                #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
-                # plt.savefig(os.path.join(folder_fig,
-                #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
-                # # plt.close()
-                plt.figure()
-                chance_level = 1 / dict_dataset['n_classes']
-                # chance_level = 1
-                plot_dict_hm = mean_accuracy.pivot(index="center", columns="span", values="accuracy")
-                plot_dict_hm_np = np.array(plot_dict_hm)
-                # print(plot_dict_hm_np)
-                max_here = np.unravel_index(np.nanargmax(plot_dict_hm_np), plot_dict_hm_np.shape)
-                min_here = np.unravel_index(np.nanargmin(plot_dict_hm_np), plot_dict_hm_np.shape)
-                # print('chance_level',chance_level)
-                norm = MidpointNormalize(midpoint=1, vmin=0, vmax=20)
-                # sns.heatmap(plot_dict_hm,norm=norm,vmin=0,vmax=1,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
-                annot_plot_dict_hm = np.zeros_like(plot_dict_hm_np)
-                annot_plot_dict_hm[max_here[0], max_here[1]] = plot_dict_hm_np[max_here[0], max_here[1]]
-                annot_plot_dict_hm[min_here[0], min_here[1]] = plot_dict_hm_np[min_here[0], min_here[1]]
-                ax = sns.heatmap(plot_dict_hm/chance_level,vmin=0,vmax=1,cmap=sns.diverging_palette(as_cmap=True,h_neg=20,h_pos=220),norm=norm,annot=plot_dict_hm/chance_level,fmt='.2f')
-                # for t in ax.texts:
-                #     if float(t.get_text()) == np.round(plot_dict_hm_np[max_here[0], max_here[1]],2):
-                #         t.set_text(t.get_text())  # if the value is greater than 0.4 then I set the text
-                #     elif float(t.get_text()) == np.round(plot_dict_hm_np[min_here[0], min_here[1]],2):
-                #
-                #         t.set_text(t.get_text())  # if the value is greater than 0.4 then I set the text
-                #     else:
-                #         t.set_text("")  # if not it sets an empty text
-                ax.collections[0].colorbar.set_label("Accuracy/Chance Level")
-                # ax.collections[0].colorbar.set_ticks([0,1])
-                # original_ticks = list(ax.collections[0].colorbar.get_ticks())
-                # ax.collections[0].colorbar.set_ticks(list(np.round(original_ticks,1)) + [1])
-                # ax.collections[0].colorbar.set_ticklabels(list(np.round(original_ticks,1)) + ['CL: '+str(np.round(chance_level,2))])
-                ## add annotation on maximum and minimum
-
-                # print(eee)
-                # splt = plt.scatter(
-                #     np.repeat(x, xlen),
-                #     np.tile(x, xlen),
-                #     c=z, cmap='seismic', s=400,
-                #     norm=norm
-                # )
-                #
-                # plt.colorbar(ee)
-                # sns.heatmap(plot_dict_hm)#,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
-                plt.title(f'dataset {dataset}, feature: {data_type}')
-                plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
-                plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
-                plt.tight_layout()
-                plt.savefig(os.path.join(folder_fig,
-                                         f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
-                plt.savefig(os.path.join(folder_fig,
-                                         f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
-                plt.close()
-                opt[data_type] = {'center': centers[data_type][max_here[0]],
-                                  'span': spans[data_type][max_here[1]],
-                                  'n_steps': 10,
-                                  'acc': np.nanmax(plot_dict_hm_np) * 100}
-                worse[data_type] = {'center': centers[data_type][min_here[0]],
-                                    'span': spans[data_type][min_here[1]],
-                                    'n_steps': 10,
-                                    'acc': np.nanmin(plot_dict_hm_np) * 100}
-                # plt_best(opt,dict_dataset,data_type,args=args,dataset_name = dataset,folder_fig=folder_fig)
-            json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
-            json.dump(worse, open(os.path.join(folder_data, 'worse.json'), 'w'))
+            # pd_datasets = []
+            #
+            # folder_run = folder.joinpath(dataset)
+            # folder_data = folder_run.joinpath('data')
+            #
+            # matrixes = retrieve_analysis(analysis,centers,spans,folder_data=str(folder_data),args=args)
+            # df1 = pd.DataFrame.from_dict(matrixes[0])
+            # for matrix in matrixes:
+            #     for key in matrix.keys():
+            #         if len(matrix[key]) == 1:
+            #             matrix[key] = matrix[key][0]
+            #
+            #     df2 = pd.DataFrame.from_dict(matrix)
+            #     df1=pd.concat([df1, df2])
+            # pd_datasets.append(df1)
+            #
+            # plot_dict = pd.concat(pd_datasets)
+            # plot_dict.head()
+            #
+            # folder_run = folder.joinpath(dataset)
+            # folder_fig = folder_run.joinpath('fig')
+            # folder_fig.mkdir(parents=True, exist_ok=True)
+            # folder_data = folder_run.joinpath('data')
+            # opt = {}
+            # worse = {}
+            # for dt_idx,data_type in enumerate(analysis):
+            #     plot_dict_sel = plot_dict[(plot_dict['data_type'] == data_type) & (plot_dict['dataset']==dataset)]
+            #     mean_accuracy= {'center':[],'span':[],'accuracy':[]}
+            #     for center in plot_dict_sel['center'].unique():
+            #         for span in plot_dict_sel['span'].unique():
+            #             mean_accuracy['center'].append(center)
+            #             mean_accuracy['span'].append(span)
+            #             mean_accuracy['accuracy'].append(plot_dict_sel[(plot_dict_sel['center'] == center) & (plot_dict_sel['span'] == span) & (plot_dict_sel.index>90)]['accuracy'].mean(skipna=True))
+            #             ## compute mean of last epochs
+            #     mean_accuracy = pd.DataFrame.from_dict(mean_accuracy)
+            #
+            #     plt.figure()
+            #     #plot accuracy vs step
+            #     sns.lineplot(x=plot_dict_sel.index,y='accuracy',data=plot_dict_sel,hue='span',style='center')
+            #     plt.tight_layout()
+            #
+            #     plt.savefig(os.path.join(folder_fig,f'dataset_analys_{data_type}_accuracy_vs_step.pdf'))
+            #     # plt.close()
+            #
+            #     which_decimal_c = np.max(
+            #         [len(str(int(0.99 / (centers[data_type][1] - centers[data_type][0])))),
+            #          len(str(int(0.99 / (centers[data_type][0]))))])
+            #     which_decimal_s = np.max(
+            #         [len(str(int(0.99 / (spans[data_type][1] - spans[data_type][0])))),
+            #          len(str(int(0.99 / (spans[data_type][0]))))])
+            #     # print(folder_fig)
+            #     # plt.savefig(os.path.join(folder_fig,
+            #     #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+            #     # plt.savefig(os.path.join(folder_fig,
+            #     #                          f'{data_type}_corr_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
+            #     # # plt.close()
+            #     plt.figure()
+            #     # chance_level = 1 / dict_dataset['n_classes']
+            #     chance_level = 1
+            #     plot_dict_hm = mean_accuracy.pivot(index="center", columns="span", values="accuracy")
+            #     plot_dict_hm_np = np.array(plot_dict_hm)
+            #
+            #
+            #
+            #
+            #     # print(plot_dict_hm_np)
+            #     max_here = np.unravel_index(np.nanargmax(plot_dict_hm_np), plot_dict_hm_np.shape)
+            #     min_here = np.unravel_index(np.nanargmin(plot_dict_hm_np), plot_dict_hm_np.shape)
+            #     # print('chance_level',chance_level)
+            #     norm = MidpointNormalize(midpoint=1, vmin=0, vmax=20)
+            #     # sns.heatmap(plot_dict_hm,norm=norm,vmin=0,vmax=1,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
+            #     annot_plot_dict_hm = np.zeros_like(plot_dict_hm_np)
+            #     annot_plot_dict_hm[max_here[0], max_here[1]] = plot_dict_hm_np[max_here[0], max_here[1]]
+            #     annot_plot_dict_hm[min_here[0], min_here[1]] = plot_dict_hm_np[min_here[0], min_here[1]]
+            #     ax = sns.heatmap(plot_dict_hm/chance_level,vmin=0,vmax=1,cmap=sns.diverging_palette(as_cmap=True,h_neg=20,h_pos=220),norm=norm,annot=plot_dict_hm/chance_level,fmt='.2f')
+            #
+            #     # plt.figure()
+            #     # ax = sns.displot(plot_dict_hm_np.flatten(),kde=True)
+            #     # plt.title(f'dataset {dataset}, feature: {data_type}')
+            #     # plt.savefig(os.path.join(folder_fig,
+            #     #                             f'{data_type}_hist_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+            #     # for t in ax.texts:
+            #     #     if float(t.get_text()) == np.round(plot_dict_hm_np[max_here[0], max_here[1]],2):
+            #     #         t.set_text(t.get_text())  # if the value is greater than 0.4 then I set the text
+            #     #     elif float(t.get_text()) == np.round(plot_dict_hm_np[min_here[0], min_here[1]],2):
+            #     #
+            #     #         t.set_text(t.get_text())  # if the value is greater than 0.4 then I set the text
+            #     #     else:
+            #     #         t.set_text("")  # if not it sets an empty text
+            #     ax.collections[0].colorbar.set_label("Accuracy/Chance Level")
+            #     # ax.collections[0].colorbar.set_ticks([0,1])
+            #     # original_ticks = list(ax.collections[0].colorbar.get_ticks())
+            #     # ax.collections[0].colorbar.set_ticks(list(np.round(original_ticks,1)) + [1])
+            #     # ax.collections[0].colorbar.set_ticklabels(list(np.round(original_ticks,1)) + ['CL: '+str(np.round(chance_level,2))])
+            #     ## add annotation on maximum and minimum
+            #
+            #     # print(eee)
+            #     # splt = plt.scatter(
+            #     #     np.repeat(x, xlen),
+            #     #     np.tile(x, xlen),
+            #     #     c=z, cmap='seismic', s=400,
+            #     #     norm=norm
+            #     # )
+            #     #
+            #     # plt.colorbar(ee)
+            #     # sns.heatmap(plot_dict_hm)#,cmap=sns.diverging_palette(as_cmap=True,h_neg=220,h_pos=20))
+            #     plt.title(f'dataset {dataset}, feature: {data_type}')
+            #     plt.xticks(np.arange(len(spans[data_type])), np.round(spans[data_type], which_decimal_s))
+            #     plt.yticks(np.arange(len(centers[data_type])), np.round(centers[data_type], which_decimal_c))
+            #     plt.tight_layout()
+            #     plt.savefig(os.path.join(folder_fig,
+            #                              f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+            #     plt.savefig(os.path.join(folder_fig,
+            #                              f'{data_type}_hm_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.png'))
+            #     # plt.close()
+            #
+            #     plt.figure()
+            #     CS = ax5[dt_idx].contour(np.arange(len(spans[data_type])), np.arange(len(centers[data_type])), plot_dict_hm_np,cmap=sns.color_palette(palette[dataset],100,as_cmap=True),levels=[0.01*i for i in range(100)])
+            #     ax5[dt_idx].clabel(CS, inline=True, fontsize=10)
+            #
+            #     ax5[dt_idx].set_title(f'dataset {dataset}, feature: {data_type}')
+            #     fig5.savefig(os.path.join(folder_fig,
+            #                                 f'{data_type}_contour_c{centers[data_type][0]}_{centers[data_type][-1]}_{np.round(centers[data_type][1] - centers[data_type][0], which_decimal_c)}_s{spans[data_type][0]}_{spans[data_type][-1]}_{np.round(spans[data_type][1] - spans[data_type][0], which_decimal_s)}.pdf'))
+            #     opt[data_type] = {'center': centers[data_type][max_here[0]],
+            #                       'span': spans[data_type][max_here[1]],
+            #                       'n_steps': 10,
+            #                       'acc': np.nanmax(plot_dict_hm_np) * 100}
+            #     worse[data_type] = {'center': centers[data_type][min_here[0]],
+            #                         'span': spans[data_type][min_here[1]],
+            #                         'n_steps': 10,
+            #                         'acc': np.nanmin(plot_dict_hm_np) * 100}
+            #     # plt_best(opt,dict_dataset,data_type,args=args,dataset_name = dataset,folder_fig=folder_fig)
+            # json.dump(opt, open(os.path.join(folder_data, 'opt.json'), 'w'))
+            # json.dump(worse, open(os.path.join(folder_data, 'worse.json'), 'w'))
 
 
 if __name__ == "__main__":

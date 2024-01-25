@@ -26,9 +26,9 @@ MNclasses = {
     'T': {'a':-80,'A1':0,'A2': 0},
     
 }
-SMALL_SIZE = 8
-MEDIUM_SIZE = 12
-BIGGER_SIZE = 14
+SMALL_SIZE = 12
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 16
 plt.rc('font', family='georgia', size=SMALL_SIZE)
 # plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
@@ -128,16 +128,16 @@ plt.xlabel('Epoch')
 plt.legend(fancybox=True, framealpha=0.5)
 plt.tight_layout()
 plt.savefig('Figures/MI_stimulus_training.pdf')
-fig1 = plt.figure(figsize=(8,8))
-gs = fig1.add_gridspec(4,3)
-ax1 = fig1.add_subplot(gs[:3,:])
+fig1,ax1 = plt.subplots(1,1,figsize=(6,4))
+# gs = fig1.add_gridspec(4,3)
+# ax1 = fig1.add_subplot(gs[:3,:])
 seaborn_pd = seaborn_pd[seaborn_pd['step']>=len(MI)-10]
 # sns.catplot(
 #     data=seaborn_pd, x='type', y='Accuracy', hue='train',
 #     kind='box'
 # )
 
-sns.swarmplot(data=seaborn_pd, x='type', y='Accuracy', hue='Class')
+sns.swarmplot(data=seaborn_pd, x='type', y='Accuracy', hue='Class',size=5)
 # sns.boxplot(x="type", y="Accuracy", hue='Class', data=seaborn_pd,
 #                  showcaps=False,boxprops={'facecolor':'None'},
 #                  showfliers=False,whiskerprops={'linewidth':0})
@@ -184,7 +184,7 @@ ax1.spines['right'].set_visible(False)
 #     a.text(-0.0, 1.1, letters.pop(0), transform=a.transAxes,
 #            size=20, weight='bold')
 # # plt.legend(['Braille Trained','MNIST Trained','Tonic Naive','Adaptive Naive'])
-# plt.tight_layout()
+fig1.tight_layout()
 fig1.savefig('Figures/MI_stimulus_boxplot.pdf')
 # fig1.savefig('Figures/MI_stimulus_types.svg')
 
