@@ -1,0 +1,107 @@
+----- Input signals (Ie/C) as in the original MN paper and output spiking activity produced with the same neuron parameters
+----- Spiking activity classified thropugh the spike_classifier
+
+20230503_153507 original_input_activity_classifier Single-sample inference 1/20 (A) from original MN input for neuronal responses:
+20230503_153507 original_input_activity_classifier Prediction: A (Tonic spiking)
+20230503_153507 original_input_activity_classifier Label probabilities (%): [[100.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.
+    0.   0.   0.   0.   0.   0.]]
+
+20230503_153509 original_input_activity_classifier Single-sample inference 2/20 (B) from original MN input for neuronal responses:
+20230503_153509 original_input_activity_classifier Prediction: A (Tonic spiking)
+20230503_153509 original_input_activity_classifier Label probabilities (%): [[5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5.]]
+
+20230503_154116 original_input_activity_classifier Single-sample inference 3/20 (C) from original MN input for neuronal responses:
+20230503_154116 original_input_activity_classifier Prediction: H (Class 2)
+20230503_154116 original_input_activity_classifier Label probabilities (%): [[21.19  0.   21.19  0.    0.    0.    0.   57.61  0.    0.    0.    0.
+   0.    0.    0.    0.    0.    0.    0.    0.  ]]
+
+20230503_154117 original_input_activity_classifier Single-sample inference 4/20 (D) from original MN input for neuronal responses:
+20230503_154117 original_input_activity_classifier Prediction: D (Phasic spiking)
+20230503_154117 original_input_activity_classifier Label probabilities (%): [[ 0.    0.    0.   99.75  0.    0.    0.    0.    0.    0.    0.    0.
+   0.    0.    0.    0.    0.    0.    0.    0.25]]
+
+20230503_154119 original_input_activity_classifier Single-sample inference 5/20 (E) from original MN input for neuronal responses:
+20230503_154119 original_input_activity_classifier Prediction: E (Accommodation)
+20230503_154119 original_input_activity_classifier Label probabilities (%): [[0.000e+00 0.000e+00 0.000e+00 9.000e-02 9.991e+01 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00]]
+
+20230503_154121 original_input_activity_classifier Single-sample inference 6/20 (F) from original MN input for neuronal responses:
+20230503_154121 original_input_activity_classifier Prediction: I (Integrator)
+20230503_154121 original_input_activity_classifier Label probabilities (%): [[0.00e+00 0.00e+00 0.00e+00 1.00e-02 1.71e+00 2.30e-01 0.00e+00 0.00e+00
+  9.34e+01 0.00e+00 0.00e+00 0.00e+00 0.00e+00 0.00e+00 0.00e+00 0.00e+00
+  4.65e+00 0.00e+00 0.00e+00 0.00e+00]]
+
+20230503_154123 original_input_activity_classifier Single-sample inference 7/20 (G) from original MN input for neuronal responses:
+20230503_154123 original_input_activity_classifier Prediction: G (Rebound spike)
+20230503_154123 original_input_activity_classifier Label probabilities (%): [[0.000e+00 9.000e-02 0.000e+00 0.000e+00 2.300e-01 3.000e-02 9.371e+01
+  0.000e+00 4.670e+00 0.000e+00 6.300e-01 0.000e+00 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 6.300e-01 0.000e+00 1.000e-02 0.000e+00]]
+
+20230503_154124 original_input_activity_classifier Single-sample inference 8/20 (H) from original MN input for neuronal responses:
+20230503_154124 original_input_activity_classifier Prediction: H (Class 2)
+20230503_154124 original_input_activity_classifier Label probabilities (%): [[ 1.32  0.   26.54  0.    0.    0.    0.   72.14  0.    0.    0.    0.
+   0.    0.    0.    0.    0.    0.    0.    0.  ]]
+
+20230503_154125 original_input_activity_classifier Single-sample inference 9/20 (I) from original MN input for neuronal responses:
+20230503_154125 original_input_activity_classifier Prediction: I (Integrator)
+20230503_154125 original_input_activity_classifier Label probabilities (%): [[0.000e+00 0.000e+00 0.000e+00 1.000e-02 1.710e+00 2.300e-01 0.000e+00
+  0.000e+00 9.339e+01 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 4.650e+00 0.000e+00 0.000e+00 0.000e+00]]
+
+20230503_154127 original_input_activity_classifier Single-sample inference 10/20 (J) from original MN input for neuronal responses:
+20230503_154127 original_input_activity_classifier Prediction: J (Input bistability)
+20230503_154127 original_input_activity_classifier Label probabilities (%): [[  0.   0.   0.   0.   0.   0.   0.   0.   0. 100.   0.   0.   0.   0.
+    0.   0.   0.   0.   0.   0.]]
+
+20230503_154402 original_input_activity_classifier Single-sample inference 11/20 (K) from original MN input for neuronal responses:
+20230503_154402 original_input_activity_classifier Prediction: G (Rebound spike)
+20230503_154402 original_input_activity_classifier Label probabilities (%): [[0.000e+00 1.320e+00 0.000e+00 0.000e+00 0.000e+00 1.000e-02 7.213e+01
+  0.000e+00 0.000e+00 0.000e+00 2.654e+01 0.000e+00 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00]]
+
+20230503_163751 original_input_activity_classifier Single-sample inference 12/20 (L) from original MN input for neuronal responses:
+20230503_163751 original_input_activity_classifier Prediction: L (Hyperpolarizing bursting)
+20230503_163751 original_input_activity_classifier Label probabilities (%): [[ 0.    0.    0.    0.    0.    0.    0.22  0.    0.    0.    0.   87.89
+   0.    0.    0.    0.    0.   11.89  0.    0.  ]]
+
+20230503_164029 original_input_activity_classifier Single-sample inference 13/20 (M) from original MN input for neuronal responses:
+20230503_164029 original_input_activity_classifier Prediction: M (Tonic bursting)
+20230503_164029 original_input_activity_classifier Label probabilities (%): [[  0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0. 100.   0.
+    0.   0.   0.   0.   0.   0.]]
+
+20230503_164031 original_input_activity_classifier Single-sample inference 14/20 (N) from original MN input for neuronal responses:
+20230503_164031 original_input_activity_classifier Prediction: N (Phasic bursting)
+20230503_164031 original_input_activity_classifier Label probabilities (%): [[  0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0. 100.
+    0.   0.   0.   0.   0.   0.]]
+
+20230503_164033 original_input_activity_classifier Single-sample inference 15/20 (O) from original MN input for neuronal responses:
+20230503_164033 original_input_activity_classifier Prediction: O (Rebound burst)
+20230503_164033 original_input_activity_classifier Label probabilities (%): [[  0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.
+  100.   0.   0.   0.   0.   0.]]
+
+20230503_164256 original_input_activity_classifier Single-sample inference 16/20 (P) from original MN input for neuronal responses:
+20230503_164256 original_input_activity_classifier Prediction: P (Mixed mode)
+20230503_164256 original_input_activity_classifier Label probabilities (%): [[  0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.   0.
+    0. 100.   0.   0.   0.   0.]]
+
+20230503_164257 original_input_activity_classifier Single-sample inference 17/20 (Q) from original MN input for neuronal responses:
+20230503_164257 original_input_activity_classifier Prediction: G (Rebound spike)
+20230503_164257 original_input_activity_classifier Label probabilities (%): [[0.000e+00 8.000e-02 0.000e+00 0.000e+00 2.200e-01 3.000e-02 8.724e+01
+  0.000e+00 1.181e+01 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 5.900e-01 0.000e+00 3.000e-02 0.000e+00]]
+
+20230503_164538 original_input_activity_classifier Single-sample inference 18/20 (R) from original MN input for neuronal responses:
+20230503_164538 original_input_activity_classifier Prediction: R (Basal bistability)
+20230503_164538 original_input_activity_classifier Label probabilities (%): [[ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+   0.    0.    0.25  0.    0.   99.75  0.    0.  ]]
+
+20230503_164850 original_input_activity_classifier Single-sample inference 19/20 (S) from original MN input for neuronal responses:
+20230503_164850 original_input_activity_classifier Prediction: T (Spike latency)
+20230503_164850 original_input_activity_classifier Label probabilities (%): [[0.000e+00 0.000e+00 0.000e+00 0.000e+00 9.000e-02 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00
+  0.000e+00 0.000e+00 0.000e+00 0.000e+00 3.000e-02 9.988e+01]]
+
+20230503_165143 original_input_activity_classifier Single-sample inference 20/20 (T) from original MN input for neuronal responses:
+20230503_165143 original_input_activity_classifier Prediction: A (Tonic spiking)
+20230503_165143 original_input_activity_classifier Label probabilities (%): [[5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5. 5.]]
