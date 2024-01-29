@@ -7,7 +7,9 @@ and pre-trained weights is used.
 
 SPIKING ACTIVITY COLLECTED FROM MNIST CLASSIFICATION.
 
-CHECK SETTINGS in settings.py
+----------------------------------------------------
+###      CHECK THE SETTINGS in settings.py       ###
+----------------------------------------------------
 
 Fra, Vittorio,
 Politecnico di Torino,
@@ -37,8 +39,8 @@ experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 activity_dir = "./data/Activity"
-dataset_dir = "MN_Output_MNIST_c"
-activity_dataset = "GR_mnist_compressed"
+dataset_dir = "MN_Output_MNIST"
+activity_dataset = "GR_mnist"
 suffix = ["w"]
 subsets = ["train", "eval", "test"]
 
@@ -127,6 +129,7 @@ for sfx in suffix:
 
                 log_path = os.path.join("./logs/activity_classification/MN_activity",dataset_dir,f"{seed_folder}")
                 create_directory(log_path)
+                LOG = logging.getLogger(f"{experiment_name}_{dataset_dir}_{seed_folder}") # experiment_name
                 if settings["debugging"]:
                     logging.basicConfig(filename=log_path+"/{}_{}_debug.log".format(experiment_id,best_test_id),
                                         filemode='a',
@@ -137,7 +140,6 @@ for sfx in suffix:
                                         filemode='a',
                                         format="%(asctime)s %(name)s %(message)s",
                                         datefmt='%Y%m%d_%H%M%S')
-                LOG = logging.getLogger(experiment_name)
                 LOG.setLevel(logging.DEBUG)
                 LOG.debug("Activity classification from: {} ({})\n".format(dataset_dir+"/"+seed_folder, subset))
                 LOG.debug("Experiment started on: {}-{}-{} {}:{}:{}\n".format(
@@ -520,7 +522,6 @@ for sfx in suffix:
                                 behaviour_probs.append(np.round(np.array(probs.detach().cpu().numpy())*100,2))
                                 LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
                                 LOG.debug("Label probabilities (%): {}\n".format(np.round(probs.detach().cpu().numpy()*100,2)))
-                                print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
 
                                 digit_repetitions.extend(digit)
                                 behaviour_repetitions.extend(behaviour)
@@ -530,6 +531,10 @@ for sfx in suffix:
 
                             else:
                                 zero_spikes_digits.append(stimulus_lbl[num])
+                            
+                            perc_progress = (num+1)/len(data)*100
+                            if perc_progress%10 == 0:
+                                print(f"\tprogress: {perc_progress}% done")
 
                         non_zero_channels_repetitions.append(non_zero_channels)
 
@@ -573,10 +578,13 @@ for sfx in suffix:
                             behaviour_probs.append(np.round(probs.detach().cpu().numpy()*100,2))
                             LOG.debug("Behaviour prediction: {} ({})".format(pred, labels_mapping[pred]))
                             LOG.debug("Label probabilities (%): {}\n".format(np.round(np.array(probs.detach().cpu().numpy())*100,2)))
-                            print("\tsingle-sample classification of 'active channel' {}/{} done".format(num+1,len(data)))
 
                         else:
                             zero_spikes_digits.append(stimulus_lbl[num])
+                        
+                        perc_progress = (num+1)/len(data)*100
+                        if perc_progress%10 == 0:
+                            print(f"\tprogress: {perc_progress}% done")
 
                     LOG.debug(f"Number of channels with spiking activity (out of {len(data)}): {non_zero_channels}")
 

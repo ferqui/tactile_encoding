@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 # Experiment name
 parser.add_argument('-experiment_name',
                     type=str,
-                    default="GR_MNIST_c_classifier",
+                    default="GR_MNIST_classifier",
                     help='Name of this experiment.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
