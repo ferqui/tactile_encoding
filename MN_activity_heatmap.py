@@ -7,7 +7,7 @@ import seaborn as sn
 from NNI.utils.utils import create_directory
 
 
-def MN_activity_heatmap(activity_df, lbl_string, save_fig=False, path_to_save=None):
+def MN_activity_heatmap(activity_df, lbl_string, save_fig=False, path_to_save=None, activity=None):
 
     if save_fig and path_to_save==None:
         raise ValueError('The path where to save the heatmap is not given.')
@@ -37,35 +37,67 @@ def MN_activity_heatmap(activity_df, lbl_string, save_fig=False, path_to_save=No
         'S': "Preferred frequency",
         'T': "Spike latency",
     }
-    grouped = activity_df[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
-    classified_activity_df = pd.DataFrame(index=range(len(lbl_string)), columns=range(len(list(labels_mapping.values()))))
-    for ii in range(len(lbl_string)):
-        for jj in range(len(list(labels_mapping.keys()))):
-            classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==lbl_string[ii]]["Probabilities"].item()[-1][jj])
-    classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
-    plt.figure(figsize=(16, 12))
-    sn.heatmap(classified_activity_df.T,
-               annot=True,
-               fmt='.2f',
-               cbar=False,
-               square=False,
-               cmap="YlOrBr"
-               )
-    plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=lbl_string, rotation=0)
-    plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
-    plt.tight_layout()
-    if save_fig:
-        create_directory(path_to_save)
-        plt.savefig(os.path.join(path_to_save,f"MN_heatmap{experiment_datetime}.png"), dpi=300)
-        plt.savefig(os.path.join(path_to_save,f"MN_heatmap{experiment_datetime}.pdf"), dpi=300)
-        plt.close()
-    else:
-        plt.show()
+
+    if activity == "Braille":
+
+        grouped = activity_df[["Letter","Probabilities"]].groupby("Letter", as_index=False).mean()
+        classified_activity_df = pd.DataFrame(index=range(len(lbl_string)), columns=range(len(list(labels_mapping.values()))))
+        for ii in range(len(lbl_string)):
+            for jj in range(len(list(labels_mapping.keys()))):
+                classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Letter"]==lbl_string[ii]]["Probabilities"].item()[-1][jj])
+        classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
+        plt.figure(figsize=(16, 12))
+        sn.heatmap(classified_activity_df.T,
+                   annot=True,
+                   fmt='.2f',
+                   cbar=False,
+                   square=False,
+                   cmap="YlOrBr"
+                   )
+        plt.xticks(ticks=[ii+0.5 for ii in range(27)],labels=lbl_string, rotation=0)
+        plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
+        plt.tight_layout()
+        if save_fig:
+            create_directory(path_to_save)
+            plt.savefig(os.path.join(path_to_save,f"MN_heatmap{experiment_datetime}.png"), dpi=300)
+            plt.savefig(os.path.join(path_to_save,f"MN_heatmap{experiment_datetime}.pdf"), dpi=300)
+            plt.close()
+        else:
+            plt.show()
+    
+    elif activity == "MNIST":
+
+        grouped = activity_df[["Digit","Probabilities"]].groupby("Digit", as_index=False).mean()
+        classified_activity_df = pd.DataFrame(index=range(len(lbl_string)), columns=range(len(list(labels_mapping.values()))))
+        for ii in range(len(lbl_string)):
+            for jj in range(len(list(labels_mapping.keys()))):
+                classified_activity_df.iloc[ii,jj] = float(grouped[grouped["Digit"]==lbl_string[ii]]["Probabilities"].item()[-1][jj])
+        classified_activity_df = classified_activity_df.apply(pd.to_numeric, errors='coerce')
+        plt.figure(figsize=(16, 12))
+        sn.heatmap(classified_activity_df.T,
+                   annot=True,
+                   fmt='.2f',
+                   cbar=False,
+                   square=False,
+                   cmap="YlOrBr"
+                   )
+        plt.xticks(ticks=[ii+0.5 for ii in range(10)],labels=lbl_string, rotation=0)
+        plt.yticks(ticks=[ii+0.5 for ii in range(20)],labels=labels_mapping.values(), rotation=0)
+        plt.tight_layout()
+        if save_fig:
+            create_directory(path_to_save)
+            plt.savefig(os.path.join(path_to_save,f"MN_heatmap{experiment_datetime}.png"), dpi=300)
+            plt.savefig(os.path.join(path_to_save,f"MN_heatmap{experiment_datetime}.pdf"), dpi=300)
+            plt.close()
+        else:
+            plt.show()
 
 
-activity = pd.read_pickle("./results/activity_classification/MN_activity/MN_output_Braille/GR_braille_w_0_eval_20240116_105004.pkl")
+activity = "MNIST" # NOTE that here there is no need to specify if it's the compressed form
+activity_df = pd.read_pickle("./results/activity_classification/MN_activity/MN_Output_MNIST_c/GR_mnist_compressed_w_0_eval_20240126_145344.pkl")
 save_path = "./"
-lbl_string = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+# lbl_string = ['Space', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+#     'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+lbl_string = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-MN_activity_heatmap(activity, lbl_string, save_fig=True, path_to_save=save_path)
+MN_activity_heatmap(activity_df, lbl_string, save_fig=True, path_to_save=save_path, activity=activity)

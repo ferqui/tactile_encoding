@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 # Experiment name
 parser.add_argument('-experiment_name',
                     type=str,
-                    default="GR_Braille_classifier",
+                    default="GR_MNIST_classifier",
                     help='Name of this experiment.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
@@ -31,7 +31,7 @@ parser.add_argument('-auto_gpu',
 # Manual selection of GPU
 parser.add_argument('-manual_gpu_idx',
                     type=int,
-                    default=0,
+                    default=1,
                     help='Set which GPU to use.')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',
