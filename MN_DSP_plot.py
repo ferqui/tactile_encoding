@@ -138,12 +138,17 @@ seaborn_pd = seaborn_pd[seaborn_pd['step']>=len(MI)-10]
 # )
 
 sns.swarmplot(data=seaborn_pd, x='type', y='Accuracy', hue='Class',size=5)
+plt.plot([-0.1,0.1], [100/50, 100/50], 'k')
+plt.plot([0.9,1.1], [100/10, 100/10], 'k')
+# plt.text(0.1, 100/50 + 3, 'Chance Level (2%)', horizontalalignment='center', verticalalignment='center')
 # sns.boxplot(x="type", y="Accuracy", hue='Class', data=seaborn_pd,
 #                  showcaps=False,boxprops={'facecolor':'None'},
 #                  showfliers=False,whiskerprops={'linewidth':0})
 # g = sns.FacetGrid(seaborn_pd, col="train")
 # g.map(sns.boxplot,'type','Accuracy',hue='Class')
 # plt.xticks([0,1,2],['Amplitude','Frequency','Slope'])
+#add a entry to the legend
+
 plt.ylabel('Accuracy (%)')
 plt.xlabel('Stimulus type')
 plt.ylim([0,100])
@@ -152,6 +157,13 @@ plt.ylim([0,100])
 # # plt.text(4, 3.322 - 0.15, 'max MI = 3.322 bits', horizontalalignment='center', verticalalignment='center')
 # # plt.plot([-1,6 + 1], [3.322, 3.322], 'k--')
 ax = plt.gca()
+handles, labels = ax.get_legend_handles_labels()
+print(labels)
+from matplotlib.lines import Line2D
+handles.append(Line2D([0], [0], color='k', linestyle='-'))
+labels = ['MNIST Trained','MNIST compressed Trained','Braille Trained', 'Chance Level']
+# handles.append(mpl.patches.Patch(color='white', label='Chance level'))
+plt.legend(handles=handles,labels=labels,fancybox=True, framealpha=0.5)
 sns.despine(offset=10, trim=True)
 ax1.spines['top'].set_visible(False)
 ax1.spines['right'].set_visible(False)
