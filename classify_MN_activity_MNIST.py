@@ -72,7 +72,7 @@ activity_dir = "./data/Activity"
 
 activity_dataset = "MN_Output_MNIST" # "_c" at the end for the compressed version
 activity_experiment = "GR_mnist_w"
-experiment_number = 1
+experiment_number = 0
 
 activity_path = os.path.join(activity_dir,activity_dataset,f"{activity_experiment}_{experiment_number}")
 

@@ -19,6 +19,7 @@ Torino, Italy.
 
 
 import datetime
+import gc
 import json
 import logging
 import matplotlib.pyplot as plt
@@ -50,7 +51,7 @@ for sfx in suffix:
     seed_folders = [ii for ii in os.listdir(os.path.join(activity_dir,dataset_dir)) if f"{activity_dataset}_{sfx}" in ii]
     max_seed = np.max([int(fld.split("_")[-1]) for fld in seed_folders])
 
-    for seed in range(max_seed+1):
+    for seed in range(0,max_seed+1):
 
         seed_folder = f"{activity_dataset}_{sfx}_{seed}"
 
@@ -649,5 +650,10 @@ for sfx in suffix:
                     conclusion_datetime[-4:-2],
                     conclusion_datetime[-2:])
                     )
+                
+                del activity_df, data, label, stimulus_lbl, activity_classification, digit, behaviour, behaviour_probs, n_spikes, sparsity, non_zero_channels, zero_spikes_digits, grouped, classified_activity_df
+                time.sleep(0.2)
+                gc.collect()
+                time.sleep(0.5)
 
                 ################################################################################
