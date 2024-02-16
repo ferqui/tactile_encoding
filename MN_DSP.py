@@ -878,7 +878,7 @@ if __name__ == "__main__":
         seeds = range(args.seed_n)
     else:
         seeds = [args.seed]
-        exp_id = 'Parallel_oldslopes'
+        exp_id = 'Parallel_240215'
     if ',' in args.noise:
         args.noise = args.noise.split(',')
         args.noise = [float(noise) for noise in args.noise]

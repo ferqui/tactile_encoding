@@ -38,8 +38,10 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 path = 'experiments/results/'
+path = ''
 # folder_high = 'experiments/results/06Jan2024_15-53-06'
-folder_high = ''
+# folder_high = '15Jan2024_22-02-20'
+folder_high = 'MN_DSP_ampli_cnoise_20b_100s'
 if folder_high == '':
 
     list_of_files = glob.glob(path+'*')  # * means all if need specific format then *.csv
@@ -69,6 +71,7 @@ folders = [f for f in os.listdir(folder_high) if os.path.isdir(os.path.join(fold
 # folder_w = sorted([f for f in folders if 'w' in f], key=lambda x: int(re.findall(r'\d+', x)[0]))
 # folder_nw = sorted([f for f in folders if 'nw' in f], key=lambda x: int(re.findall(r'\d+', x)[0]))
 # folders = folder_w + folder_nw
+# print(folders)
 for MNclass in folders:
     MI_coll[MNclass] = {}
     range_type = [mystr.split('_')[0] for mystr in os.listdir(os.path.join(folder_high,MNclass))]
@@ -137,7 +140,7 @@ seaborn_pd = seaborn_pd[seaborn_pd['step']>=len(MI)-10]
 #     kind='box'
 # )
 
-sns.swarmplot(data=seaborn_pd, x='type', y='Accuracy', hue='Class',size=5)
+sns.boxplot(data=seaborn_pd, x='type', y='Accuracy', hue='Class')
 plt.plot([-0.1,0.1], [100/50, 100/50], 'k')
 plt.plot([0.9,1.1], [100/10, 100/10], 'k')
 # plt.text(0.1, 100/50 + 3, 'Chance Level (2%)', horizontalalignment='center', verticalalignment='center')
@@ -160,10 +163,10 @@ ax = plt.gca()
 handles, labels = ax.get_legend_handles_labels()
 print(labels)
 from matplotlib.lines import Line2D
-handles.append(Line2D([0], [0], color='k', linestyle='-'))
-labels = ['MNIST Trained','MNIST compressed Trained','Braille Trained', 'Chance Level']
+# handles.append(Line2D([0], [0], color='k', linestyle='-'))
+# labels = ['MNIST Trained','MNIST compressed Trained','Braille Trained', 'Chance Level']
 # handles.append(mpl.patches.Patch(color='white', label='Chance level'))
-plt.legend(handles=handles,labels=labels,fancybox=True, framealpha=0.5)
+# plt.legend(handles=handles,labels=labels,fancybox=True, framealpha=0.5)
 sns.despine(offset=10, trim=True)
 ax1.spines['top'].set_visible(False)
 ax1.spines['right'].set_visible(False)
@@ -196,6 +199,7 @@ ax1.spines['right'].set_visible(False)
 #     a.text(-0.0, 1.1, letters.pop(0), transform=a.transAxes,
 #            size=20, weight='bold')
 # # plt.legend(['Braille Trained','MNIST Trained','Tonic Naive','Adaptive Naive'])
+ax1.set_title(f'Accuracy (over 10 last epochs), seeds = {np.unique(np.array(seaborn_coll["seed"])).shape[0]}')
 fig1.tight_layout()
 fig1.savefig('Figures/MI_stimulus_boxplot.pdf')
 # fig1.savefig('Figures/MI_stimulus_types.svg')
