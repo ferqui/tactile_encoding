@@ -540,6 +540,8 @@ def classifier_processed(dict_dataset,epochs,data_type,center,span,args,xf=None)
         batches.reset()
         batches.set_description('Training')
         for i, (data, target) in enumerate(dict_dataset['train_loader']):
+            plt.plot(data[0].cpu().numpy())
+            plt.show()
             # data *= dict_dataset['train_loader'].gain
             # print('data_before',data.shape)
             data = extract_feature(data, dict_dataset, data_type, center, span, args.bins, args, i, xf=xf)
@@ -704,7 +706,7 @@ def main(args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
     generator = set_random_seed(args.seed, add_generator=True, device='cpu')
-    folder = Path('dataset_analysis_newslopes_3Gen')
+    folder = Path('dataset_analysis_21Feb')
     if (args.sim_id >= 0) & (args.load == False):
         # folder = folder.joinpath(f'sim_id_{args.sim_id}')
         # folder.mkdir(parents=True, exist_ok=True)
@@ -729,19 +731,20 @@ def main(args):
             folder_data.mkdir(parents=True, exist_ok=True)
             folder_fig = str(folder_fig)
             folder_data = str(folder_data)
-            # dict_dataset = load_dataset('Braille',
-            #                             batch_size=args.batch_size,
-            #                             generator=generator,
-            #                             upsample_fac=1,
-            #                             data_path="data/data_braille_letters_all.pkl",
-            #                             return_fft=False,
-            #                             sampling_freq_hz=100.0,
-            #                             v_max=-1,
-            #                             shuffle=True,
-            #                             gain = args.gain)
+            dict_dataset = load_dataset('Braille',
+                                        batch_size=args.batch_size,
+                                        generator=generator,
+                                        upsample_fac=1,
+                                        data_path="data/data_braille_letters_all.pkl",
+                                        return_fft=False,
+                                        sampling_freq_hz=100.0,
+                                        v_max=-1,
+                                        shuffle=True,
+                                        gain = args.gain)
 
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data=folder_data,args=args,dataset_name='Braille')
+                # pass
         elif 'MNIST' == dataset:
             print('MNIST')
             folder_run = Path(os.path.join(folder,'MNIST'))
@@ -754,20 +757,24 @@ def main(args):
             folder_data = str(folder_data)
             upsample_fac = 1
             dt = (1 / 100.0) / upsample_fac
-            # dataset_tmp = MNISTDataset(num_train=args.num_train, num_test=args.num_test, val_size=args.val_size, batch_size=args.batch_size, stim_len_sec=3, dt_sec=1e-2,
-            #                        v_max=0.2,
-            #                        add_noise=True, gain = args.gain*0.02, compressed=False)
-            # dict_dataset = {}
-            # dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
-            # dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
-            # dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
-            # dict_dataset['dt_sec'] = dataset_tmp.dt_sec
-            # dict_dataset['n_classes'] = dataset_tmp.n_classes
-            # dict_dataset['n_features'] = dataset_tmp.n_features
-            # dict_dataset['n_inputs'] = dataset_tmp.n_inputs
-            # dict_dataset['n_freq_steps'] = dataset_tmp.n_features
+            dataset_tmp = MNISTDataset(num_train=args.num_train, num_test=args.num_test, val_size=args.val_size, batch_size=args.batch_size, stim_len_sec=3, dt_sec=1e-2,
+                                   v_max=0.2,
+                                   add_noise=True, gain = 0.02, compressed=False)
+            # print('max',dataset_tmp.x_train.max())
+
+            dict_dataset = {}
+            dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
+            dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
+            dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
+            dict_dataset['dt_sec'] = dataset_tmp.dt_sec
+            dict_dataset['n_classes'] = dataset_tmp.n_classes
+            dict_dataset['n_features'] = dataset_tmp.n_features
+            dict_dataset['n_inputs'] = dataset_tmp.n_inputs
+            dict_dataset['n_freq_steps'] = dataset_tmp.n_features
+            print('max',dataset_tmp.x_train.max())
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST')
+                # pass
         elif "MNIST_compressed" == dataset:
             print('MNIST_compressed')
             folder_run = Path(os.path.join(folder,'MNIST_compressed'))
@@ -777,21 +784,23 @@ def main(args):
             folder_data.mkdir(parents=True, exist_ok=True)
             folder_fig = str(folder_fig)
             folder_data = str(folder_data)
-            # dataset_tmp = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2,
-            #                        v_max=0.2,
-            #                        add_noise=True, gain = args.gain*0.02, compressed=True,
-            #                        encoder_model='./data/784MNIST_2_6MNIST.pt')
-            # dict_dataset = {}
-            # dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
-            # dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
-            # dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
-            # dict_dataset['dt_sec'] = dataset_tmp.dt_sec
-            # dict_dataset['n_classes'] = dataset_tmp.n_classes
-            # dict_dataset['n_features'] = dataset_tmp.n_features
-            # dict_dataset['n_inputs'] = dataset_tmp.n_inputs
-            # dict_dataset['n_freq_steps'] = dataset_tmp.n_features
+            dataset_tmp = MNISTDataset(args.num_train, args.num_test, args.val_size, args.batch_size, 3, dt_sec=1e-2,
+                                   v_max=0.2,
+                                   add_noise=True, gain = 1/1307, compressed=True,
+                                   encoder_model='./data/784MNIST_2_6MNIST.pt')
+            # print('max',dataset_tmp.x_train.max())
+            dict_dataset = {}
+            dict_dataset['train_loader'] = dataset_tmp.get_train_dataloader(args.device)
+            dict_dataset['test_loader'] = dataset_tmp.get_test_dataloader(args.device)
+            dict_dataset['n_time_steps'] = dataset_tmp.n_time_steps
+            dict_dataset['dt_sec'] = dataset_tmp.dt_sec
+            dict_dataset['n_classes'] = dataset_tmp.n_classes
+            dict_dataset['n_features'] = dataset_tmp.n_features
+            dict_dataset['n_inputs'] = dataset_tmp.n_inputs
+            dict_dataset['n_freq_steps'] = dataset_tmp.n_features
             if args.load == False:
                 do_analysis(dict_dataset,analysis,centers,spans,folder_fig=folder_fig,folder_data= folder_data, args=args,dataset_name='MNIST_compressed')
+                # pass
         else:
             raise ValueError('dataset not found')
 
