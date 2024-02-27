@@ -40,8 +40,8 @@ experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 activity_dir = "./data/Activity"
-dataset_dir = "MN_Output_MNIST"
-activity_dataset = "GR_mnist"
+dataset_dir = "MN_Output_MNIST_c"
+activity_dataset = "GR_mnist_compressed"
 suffix = ["w"]
 subsets = ["train", "eval", "test"]
 
@@ -128,7 +128,7 @@ for sfx in suffix:
 
                 ### 3) log file configuration ##################################################
 
-                log_path = os.path.join("./logs/activity_classification/MN_activity",dataset_dir,f"{seed_folder}")
+                log_path = os.path.join("./logs/activity_classification/MN_activity",dataset_dir,activity_dataset)
                 create_directory(log_path)
                 LOG = logging.getLogger(f"{experiment_name}_{dataset_dir}_{seed_folder}") # experiment_name
                 if settings["debugging"]:
@@ -651,7 +651,7 @@ for sfx in suffix:
                     conclusion_datetime[-2:])
                     )
                 
-                del activity_df, data, label, stimulus_lbl, activity_classification, digit, behaviour, behaviour_probs, n_spikes, sparsity, non_zero_channels, zero_spikes_digits, grouped, classified_activity_df
+                del LOG, activity_df, data, label, stimulus_lbl, activity_classification, digit, behaviour, behaviour_probs, n_spikes, sparsity, non_zero_channels, zero_spikes_digits, grouped, classified_activity_df
                 time.sleep(0.2)
                 gc.collect()
                 time.sleep(0.5)
