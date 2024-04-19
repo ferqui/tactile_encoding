@@ -1,6 +1,6 @@
 import numpy as np
 import pickle as pkl
-import progressbar
+# import progressbar
 
 import matplotlib.pyplot as plt
 import numpy.polynomial.polynomial as poly
