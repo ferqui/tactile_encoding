@@ -18,8 +18,12 @@ Genova, Italy.
 from tqdm import tqdm
 
 from tactile_encoding.utils.functions import fix_time, fix_time_only, original
+from tactile_encoding.utils.utils import create_directory
 
 if __name__ == '__main__':
+    # create output folder
+    create_directory('./data')
+    create_directory('./data/original_mn_output')
     ################
     ### original ###
     ################
