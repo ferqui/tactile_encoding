@@ -429,6 +429,7 @@ def _two_scales(ax1, time, data1, data2, data3, data4, c1, c2, c3, c4, create_xl
     ax1.scatter(np.where(data4 == 1)[0], data1[np.where(
         data4 == 1)-np.ones_like(np.where(data4 == 1))], s=15, color=c4)
 
+    ax2.set_ylim([-4, 9])
     # TODO set tick size
     # ax1.set_xticks(fontsize=8)
     # create labels if needed
