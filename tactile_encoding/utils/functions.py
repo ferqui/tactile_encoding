@@ -505,27 +505,27 @@ def plot_traces_original(path, data, add_offset=False, add_noise=False, temp_jit
         # create left y label
         if num == 0 or num == 4 or num == 8 or num == 12:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
         # create right y label
         elif num == 3 or num == 7 or num == 11 or num == 15:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
         # create left y label and x label
         elif num == 16:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
         # create x label
         elif num > 16 and num < 19:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
         # create right y label and x label
         elif num == 19:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
         # create no label
         else:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
     filepath = f'{path}/traces_original'
     if add_noise:
@@ -711,27 +711,27 @@ def plot_traces_fix_len(path, data, max_trials, add_offset=False, add_noise=Fals
             # create left y label
             if num == 0 or num == 4 or num == 8 or num == 12:
                 ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
             # create right y label
             elif num == 3 or num == 7 or num == 11 or num == 15:
                 ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
             # create left y label and x label
             elif num == 16:
                 ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
             # create x label
             elif num > 16 and num < 19:
                 ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
             # create right y label and x label
             elif num == 19:
                 ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
             # create no label
             else:
                 ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
         filepath = f'{path}/traces_fix_len'
         if add_noise:
@@ -1019,27 +1019,27 @@ def plot_traces_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.
         # create left y label
         if num == 0 or num == 4 or num == 8 or num == 12:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
         # create right y label
         elif num == 3 or num == 7 or num == 11 or num == 15:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
         # create left y label and x label
         elif num == 16:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
         # create x label
         elif num > 16 and num < 19:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
         # create right y label and x label
         elif num == 19:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
         # create no label
         else:
             ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
-                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+                                   data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
     filepath = f'{path}/traces_fix_len'
     if add_noise:

@@ -21,10 +21,10 @@ from tactile_encoding.utils.utils import create_directory
 path = './plots/original'  # set path to store plots
 data_path = './data/original_mn_output'
 create_directory(path)  # create folder if not existent
-# data_types = ['', '_noisy', '_temp_jitter', '_offset', '_noisy_temp_jitter',
-#               '_noisy_offset', '_temp_jitter_offset', '_noisy_temp_jitter_offset']
+data_types = ['', '_noisy', '_temp_jitter', '_offset', '_noisy_temp_jitter',
+              '_noisy_offset', '_temp_jitter_offset', '_noisy_temp_jitter_offset']
 
-data_types = ['_noisy_temp_jitter_offset']
+# data_types = ['_noisy_temp_jitter_offset']
 max_trials = 1
 
 if __name__ == '__main__':
