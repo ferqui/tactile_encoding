@@ -25,7 +25,7 @@ create_directory(path)  # create folder if not existent
 #               '_noisy_offset', '_temp_jitter_offset', '_noisy_temp_jitter_offset']
 
 data_types = ['_noisy_temp_jitter_offset']
-max_trials = 100
+max_trials = 1
 
 if __name__ == '__main__':
     ###################

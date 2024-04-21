@@ -66,37 +66,37 @@ if __name__ == '__main__':
     ###########################
     print('\nCreating 1000ms data.')
     # much faster, 'cause current profile only copied
-    fix_time_only(max_trials=100)
+    fix_time_only(max_trials=1)
 
     # single
     print('\nCreating 1000ms data with offset.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=True, add_noise=False, add_jitter=False)
 
     print('\nCreating noisy 1000ms data.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=False, add_noise=True, add_jitter=False)
 
     print('\nCreating 1000ms data with temporal jitter.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=False, add_noise=False, add_jitter=True)
 
     # combination of two
     print('\nCreating noisy 1000ms data with offset.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=True, add_noise=True, add_jitter=False)
 
     print('\nCreating 1000ms data with temporal jitter and offset.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=True, add_noise=False, add_jitter=True)
 
     print('\nCreating noisy 1000ms data with temporal jitter.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=False, add_noise=True, add_jitter=True)
 
     # combination of three
     print('\nCreating noisy 1000ms data with temporal jitter and offset.')
-    fix_time(max_trials=100, offset=0.1, noise=0.1, jitter=10,
+    fix_time(max_trials=1, offset=0.1, noise=0.1, jitter=10,
              add_offset=True, add_noise=True, add_jitter=True)
 
     print('\nFinished with data creation.')
@@ -112,5 +112,5 @@ if __name__ == '__main__':
     #     for noise_counter, noise in tqdm(enumerate(noise_levels), position=1, leave=False):
     #         print(
     #             f"Working on {len(noise_levels)*offset_counter+noise_counter+1} of {len(noise_levels)*len(offset_levels)}")
-    #         fix_time(max_trials=100, offset=offset, noise=noise,
+    #         fix_time(max_trials=1, offset=offset, noise=noise,
     #                  jitter=10, add_offset=True, add_noise=True, add_jitter=True)

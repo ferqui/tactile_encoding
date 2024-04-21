@@ -94,10 +94,6 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
                 input_current_local = input_currents[class_name]
             input_current = np.ones((sim_time, 1)) * input_current_local
 
-        # set up MN neuron
-        neurons = MN_neuron(
-            1, neuron_parameters[class_name], dt=1E-3, train=False)
-
         if add_noise:
             # add noise
             _noise = np.random.normal(
@@ -105,16 +101,23 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
             input_current = np.array(
                 [input_current[x] + _noise[x] for x in range(len(input_current))])
 
+        # set up MN neuron
+        neurons = MN_neuron(
+            1, neuron_parameters[class_name], dt=1E-3, train=False)
+
         # compute neuron output
         input = torch.as_tensor(input_current)
         output_v = []
-        output_s = []
+        output_spk = []
+        output_thr = []
         for t in range(input.shape[0]):
             out = neurons(input[t])
             # [0] is needed for single neuron
-            output_s.append(out[0].cpu().numpy())
+            output_spk.append(out[0].cpu().numpy())
             output_v.append(neurons.state.V[0].cpu().numpy())
-        encoded_data_original.append([output_s, output_v, input_current])
+            output_thr.append(neurons.state.Thr[0].cpu().numpy())
+        encoded_data_original.append(
+            [output_spk, output_v, output_thr, input_current])
 
     filename = './data/original_mn_output/data_encoding_original'
     if add_noise:
@@ -175,10 +178,6 @@ def fix_time_only(max_trials=100):
             input_current = np.ones((sim_time, 1)) * \
                 input_currents[class_name]
 
-        # set up MN neuron
-        neurons = MN_neuron(
-            1, neuron_parameters[class_name], dt=1E-3, train=False)
-
         # stack input current trace if input length < 1000ms
         # round down, with first list initialized
         factor = round((max_time/sim_time)+0.5)
@@ -197,19 +196,26 @@ def fix_time_only(max_trials=100):
 
         input = torch.as_tensor(input_current)
 
+        # set up MN neuron
+        neurons = MN_neuron(
+            1, neuron_parameters[class_name], dt=1E-3, train=False)
+
         # compute new neuron output
         output_v = []
-        output_s = []
+        output_spk = []
+        output_thr = []
         for t in range(input.shape[0]):
             out = neurons(input[t])
             # [0] is needed for single neuron
-            output_s.append(out[0].cpu().numpy())
+            output_spk.append(out[0].cpu().numpy())
             output_v.append(neurons.state.V[0].cpu().numpy())
+            output_thr.append(neurons.state.Thr[0].cpu().numpy())
 
         # create max_trials trials per class
         for _ in range(max_trials):
             # store neuron output
-            encoded_data.append([output_s, output_v, input_current])
+            encoded_data.append(
+                [output_spk, output_v, output_thr, input_current])
             encoded_label.append(class_name)
 
     encoded_data = np.array(encoded_data)
@@ -222,7 +228,7 @@ def fix_time_only(max_trials=100):
         pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def fix_time(max_trials=100, offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=False, add_jitter=False):
+def fix_time(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=False, add_jitter=False):
     """
     Preferable over fix_time_only.
     Creates data for behavior classes regarding neuron 
@@ -354,15 +360,18 @@ def fix_time(max_trials=100, offset=1E-1, noise=1E-1, jitter=10, add_offset=Fals
 
             # compute new neuron output
             output_v = []
-            output_s = []
+            output_spk = []
+            output_thr = []
             for t in range(input.shape[0]):
                 out = neurons(input[t])
                 # [0] is needed for single neuron
-                output_s.append(out[0].cpu().numpy())
+                output_spk.append(out[0].cpu().numpy())
                 output_v.append(neurons.state.V[0].cpu().numpy())
+                output_thr.append(neurons.state.Thr[0].cpu().numpy())
 
             # store neuron output
-            encoded_data.append([output_s, output_v, input_current])
+            encoded_data.append(
+                [output_spk, output_v, output_thr, input_current])
             encoded_label.append(class_name)
 
     filename_data = './data/original_mn_output/data_encoding_fix_len'
@@ -400,22 +409,25 @@ def indices_of_sign_change(data):
     return idc
 
 
-def _two_scales(ax1, time, data1, data2, data3, c1, c2, c3, create_xlabel=False, create_ylabel1=False, create_ylabel2=False):
+def _two_scales(ax1, time, data1, data2, data3, data4, c1, c2, c3, c4, create_xlabel=False, create_ylabel1=False, create_ylabel2=False):
     """
     Creates subplot with shared x axis and 2 y axis.
     """
     ax2 = ax1.twinx()
 
+    # plot threshold trace
+    ax1.plot(time, data3, color=c3, linestyle='-.', alpha=0.7)
+
     # plot voltage trace
     ax1.plot(time, data1, color=c1)
 
     # input current trace
-    ax2.plot(time, data2, color=c2, alpha=0.7)
+    ax2.plot(time, data2, color=c2, alpha=0.7, linewidth=1)
 
     # spike times at peak of voltage trace
     # TODO check spike times! Now the v at t-1 is selected
-    ax1.scatter(np.where(data3 == 1)[0], data1[np.where(
-        data3 == 1)-np.ones_like(np.where(data3 == 1))], s=15, color=c3)
+    ax1.scatter(np.where(data4 == 1)[0], data1[np.where(
+        data4 == 1)-np.ones_like(np.where(data4 == 1))], s=15, color=c4)
 
     # TODO set tick size
     # ax1.set_xticks(fontsize=8)
@@ -480,35 +492,39 @@ def plot_traces_original(path, data, add_offset=False, add_noise=False, temp_jit
         voltage = np.reshape(np.array(data[num][1]), (np.array(
             data[num][1]).shape[0]))
 
-        # input current trace
-        input_current = np.reshape(np.array(data[num][2]), (np.array(
+        # threshold trace
+        threshold = np.reshape(np.array(data[num][2]), (np.array(
             data[num][2]).shape[0]))
+
+        # input current trace
+        input_current = np.reshape(np.array(data[num][3]), (np.array(
+            data[num][3]).shape[0]))
 
         # only add labels on most outer subplot
         # create left y label
         if num == 0 or num == 4 or num == 8 or num == 12:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
         # create right y label
         elif num == 3 or num == 7 or num == 11 or num == 15:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
         # create left y label and x label
         elif num == 16:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
         # create x label
         elif num > 16 and num < 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
         # create right y label and x label
         elif num == 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
         # create no label
         else:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
     filepath = f'{path}/traces_original'
     if add_noise:
@@ -682,35 +698,39 @@ def plot_traces_fix_len(path, data, max_trials, add_offset=False, add_noise=Fals
             voltage = np.reshape(np.array(data[pos][1]), (np.array(
                 data[pos][1]).shape[0]))
 
-            # input current trace
-            input_current = np.reshape(np.array(data[pos][2]), (np.array(
+            # threshold trace
+            threshold = np.reshape(np.array(data[pos][2]), (np.array(
                 data[pos][2]).shape[0]))
+
+            # input current trace
+            input_current = np.reshape(np.array(data[pos][3]), (np.array(
+                data[pos][3]).shape[0]))
 
             # only add labels on most outer subplot
             # create left y label
             if num == 0 or num == 4 or num == 8 or num == 12:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                       c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
             # create right y label
             elif num == 3 or num == 7 or num == 11 or num == 15:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                       c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
             # create left y label and x label
             elif num == 16:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                       c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
             # create x label
             elif num > 16 and num < 19:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                       c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
             # create right y label and x label
             elif num == 19:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                       c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
             # create no label
             else:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                       c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                       data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
         filepath = f'{path}/traces_fix_len'
         if add_noise:
@@ -997,28 +1017,28 @@ def plot_traces_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.
         # only add labels on most outer subplot
         # create left y label
         if num == 0 or num == 4 or num == 8 or num == 12:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
         # create right y label
         elif num == 3 or num == 7 or num == 11 or num == 15:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
         # create left y label and x label
         elif num == 16:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
         # create x label
         elif num > 16 and num < 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
         # create right y label and x label
         elif num == 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
         # create no label
         else:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=spikes,
-                                   c1='b', c2='orange', c3='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                                   data4=spikes, c1='b', c2='orange', c3='gray', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
     filepath = f'{path}/traces_fix_len'
     if add_noise:
