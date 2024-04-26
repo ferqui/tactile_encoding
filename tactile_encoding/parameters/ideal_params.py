@@ -4,13 +4,13 @@ Sets up neuron parameters and input currents
 
 input_currents = {
     "Tonic spiking": [1.5],
-    "Class 1": [1.000001],  # 1 + 1E-6
+    "Class 1": [1+1E-6],  # 1 + 1E-6
     "Spike frequency adaptation": [2],
     "Phasic spiking": [1.5],
     "Accommodation": [1.5, 0, 0.5, 1, 1.5, 0],
-    "Threshold variability": [1.5, 0, -1.5, 0, 1.5, 0],
+    "Threshold variability": [1.29, 0, -1.5, 0, 1.5, 0],  # changed 67
     "Rebound spike": [0, -3.5, 0],
-    "Class 2": [2.000002],  # 2(1 + 1E-6)
+    "Class 2": [2*(1+1E-6)],  # 2(1 + 1E-6)
     "Integrator": [1.5, 0, 1.5, 0, 1.5, 0, 1.5, 0],
     "Input bistability": [1.5, 1.7, 1.5, 1.7],
     "Hyperpolarizing spiking": [-1],
@@ -28,7 +28,7 @@ input_currents = {
 
 time_points = {
     "Accommodation": [0, 100, 600, 700, 800, 900],  # 1000 ms
-    "Threshold variability": [0, 40, 200, 220, 260, 280],  # 400 ms
+    "Threshold variability": [0, 40, 200, 228, 255, 280],  # 400 ms
     "Rebound spike": [0, 50, 800],  # 1000 ms
     "Integrator": [0, 20, 30, 50, 300, 320, 350, 370],  # 400 ms
     "Input bistability": [0, 100, 500, 600],  # 1000 ms
@@ -36,7 +36,7 @@ time_points = {
     "Afterpotentials": [0, 15],  # 200 ms
     "Basal bistability": [0, 10, 100, 110],  # 200 ms
     "Preferred frequency": [0, 10, 20, 30, 400, 410, 450, 460],  # 800 ms
-    "Spike latency": [0, 2],  # 50 ms
+    "Spike latency": [0, 2],  # 50 ms original
 }
 
 runtime = {  # ms
@@ -68,12 +68,16 @@ neuron_parameters["Tonic spiking"] = {
     "a": 0,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Class 1"] = {
     "a": 0,
     "A1": 0,
     "A2": 0,
+    "ELinit": -0.05,
+    "Tinf": -0.050000200048089030874232109, # -0.050000200048089030874232108 too high (no add spike), -0.050000200048089030874232109 too low (spike too early)
+    "dt": 1E-3,
 }
 
 
@@ -81,48 +85,58 @@ neuron_parameters["Spike frequency adaptation"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Phasic spiking"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Accommodation"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Threshold variability"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Rebound spike"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Class 2"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "ELinit": -0.030,
+    "Tinit": -0.030,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Integrator"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Input bistability"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 
@@ -130,6 +144,7 @@ neuron_parameters["Hyperpolarizing spiking"] = {
     "a": 30,
     "A1": 0,
     "A2": 0,
+    "dt": 1E-3,
 }
 
 
@@ -137,38 +152,44 @@ neuron_parameters["Hyperpolarizing bursting"] = {
     "a": 30,
     "A1": 10,
     "A2": -0.6,
+    "dt": 1E-3,
 }
 
 
 neuron_parameters["Tonic bursting"] = {
-    "a": 5,
-    "A1": 10,
+    "a": 5.1,  #5.35
+    "A1": 12,
     "A2": -0.6,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Phasic bursting"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Rebound burst"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
+    "dt": 1E-3,
 }
 
 
 neuron_parameters["Mixed mode"] = {
     "a": 5,
-    "A1": 5,
+    "A1": 5.5,
     "A2": -0.3,
+    "dt": 1E-3,
 }
 
 neuron_parameters["Afterpotentials"] = {
     "a": 5,
     "A1": 5,
     "A2": -0.3,
+    "dt": 1E-3,
 }
 
 
@@ -176,18 +197,21 @@ neuron_parameters["Basal bistability"] = {
     "a": 0,
     "A1": 8,
     "A2": -0.1,
+    "dt": 1E-3,
 }
 
-
+# TODO does not act as low-pass
 neuron_parameters["Preferred frequency"] = {
     "a": 5,
     "A1": -3,
     "A2": 0.5,
+    "dt": 0.1E-3,
 }
 
 
 neuron_parameters["Spike latency"] = {
-    "a": 5,
-    "A1": -3,
-    "A2": 0.5,
+    "a": -80,
+    "A1": 0,
+    "A2": 0,
+    "dt": 0.1*1E-3,
 }

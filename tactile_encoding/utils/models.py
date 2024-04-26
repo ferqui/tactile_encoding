@@ -43,6 +43,45 @@ class SurrGradSpike(torch.autograd.Function):
 
 activation = SurrGradSpike.apply
 
+class SurrGradSpike2(torch.autograd.Function):
+    """
+    Here we implement our spiking nonlinearity which also implements 
+    the surrogate gradient. By subclassing torch.autograd.Function, 
+    we will be able to use all of PyTorch's autograd functionality.
+    Here we use the normalized negative part of a fast sigmoid 
+    as this was done in Zenke & Ganguli (2018).
+    """
+
+    scale = 100
+
+    @staticmethod
+    def forward(ctx, input):
+        """
+        In the forward pass we compute a step function of the input Tensor
+        and return it. ctx is a context object that we use to stash information which 
+        we need to later backpropagate our error signals. To achieve this we use the 
+        ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input)
+        out = torch.zeros_like(input)
+        out[input >= 0] = 1.0
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor we need to compute the 
+        surrogate gradient of the loss with respect to the input. 
+        Here we use the normalized negative part of a fast sigmoid 
+        as this was done in Zenke & Ganguli (2018).
+        """
+        input, = ctx.saved_tensors
+        grad_input = grad_output.clone()
+        grad = grad_input / (SurrGradSpike.scale * torch.abs(input) + 1.0) ** 2
+        return grad
+
+activation2 = SurrGradSpike2.apply
+
 
 ## Encoder
 class Encoder(nn.Module):
@@ -181,7 +220,12 @@ class MN_neuron(nn.Module):
 
         self.dt = dt # get dt from sample rate!
 
-        parameters_list = ["a", "A1", "A2", "b", "G", "k1", "k2", "R1", "R2"]
+        # here we can set inital conditions
+        self.ELinit = self.EL  # init mem pot
+        self.Tinit = self.Tinf  # set thr pot
+
+        # do we need to be able to set a spk as init?
+        parameters_list = ["a", "A1", "A2", "b", "G", "k1", "k2", "R1", "R2", "Tinf", "ELinit", "Tinit"]
         for ii in parameters_list:
             if ii in list(parameters_combination.keys()):
                 eval_string = "self.{}".format(ii) + " = " + str(parameters_combination[ii])
@@ -197,10 +241,10 @@ class MN_neuron(nn.Module):
 
     def forward(self, x):
         if self.state is None:
-            self.state = self.NeuronState(V=torch.ones(x.shape[0], self.N, device=x.device) * self.EL,
+            self.state = self.NeuronState(V=torch.ones(x.shape[0], self.N, device=x.device) * self.ELinit,
                                           i1=torch.zeros(x.shape[0], self.N, device=x.device),
                                           i2=torch.zeros(x.shape[0], self.N, device=x.device),
-                                          Thr=torch.ones(x.shape[0], self.N, device=x.device) * self.Tinf,
+                                          Thr=torch.ones(x.shape[0], self.N, device=x.device) * self.Tinit,
                                           spk=torch.zeros(x.shape[0], self.N, device=x.device))
 
         V = self.state.V
@@ -213,7 +257,7 @@ class MN_neuron(nn.Module):
         V += self.dt * (self.linear.to(x.device, non_blocking=True) * x + i1 + i2 - self.G * (V - self.EL)) / self.C
         Thr += self.dt * (self.a.to(x.device, non_blocking=True) * (V - self.EL) - self.b * (Thr - self.Tinf))
 
-        spk = activation(V - Thr)
+        spk = activation2(V - Thr)
 
         i1 = (1 - spk) * i1 + (spk) * (self.R1 * i1 + self.A1.to(x.device, non_blocking=True))
         i2 = (1 - spk) * i2 + (spk) * (self.R2 * i2 + self.A2.to(x.device, non_blocking=True))

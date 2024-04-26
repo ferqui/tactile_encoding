@@ -5,6 +5,9 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from tactile_encoding.parameters.ideal_params import (input_currents,
+                                                      neuron_parameters,
+                                                      runtime, time_points)
 from tactile_encoding.utils.models import MN_neuron
 from tactile_encoding.utils.utils import value2key
 
@@ -34,10 +37,6 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
     The add_jitter flag will add temporal jitter to
     the step input profiles.
     """
-    # import neuron params
-    from tactile_encoding.parameters.ideal_params import (input_currents,
-                                                          neuron_parameters,
-                                                          runtime, time_points)
 
     classes = neuron_parameters.keys()
 
@@ -53,7 +52,13 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
             print('No input current given.')
 
         # iterate over changes
-        sim_time = runtime[class_name]
+        sim_time = int(runtime[class_name] *
+                       (1/neuron_parameters[class_name]["dt"])*1E-3)
+        try:
+            time_points_local = [int(
+                i*(1/neuron_parameters[class_name]["dt"])*1E-3) for i in time_points[class_name]]
+        except:
+            KeyError
         # variable input currents over time
         if len(input_currents[class_name]) > 1:
             if time_points[class_name] is None:
@@ -75,11 +80,11 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
                     _jitter = np.random.choice(_jitter)
                 # new current from t on
                 if add_jitter:
-                    t = time_points[class_name][counter]+_jitter
+                    t = time_points_local[counter]+_jitter
                     if t < 0:
                         t = 0
                 else:
-                    t = time_points[class_name][counter]
+                    t = time_points_local[counter]
                 input_current[t:] = actual_current
         else:
             # const current
@@ -103,8 +108,9 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
 
         # set up MN neuron
         neurons = MN_neuron(
-            1, neuron_parameters[class_name], dt=1E-3, train=False)
-
+            1, neuron_parameters[class_name], dt=neuron_parameters[class_name]["dt"], train=False)
+        if class_name == "Spike latency":
+            pass
         # compute neuron output
         input = torch.as_tensor(input_current)
         output_v = []
@@ -426,15 +432,15 @@ def _two_scales(ax1, time, data1, data2, data3, data4, c1, c2, c3, c4, create_xl
 
     # spike times at peak of voltage trace
     # TODO check spike times! Now the v at t-1 is selected
-    ax1.scatter(np.where(data4 == 1)[0], data1[np.where(
+    ax1.scatter(time[np.where(data4 == 1)[0]], data1[np.where(
         data4 == 1)-np.ones_like(np.where(data4 == 1))], s=15, color=c4)
 
     ax2.set_ylim([-4, 9])
     # TODO set tick size
-    # ax1.set_xticks(fontsize=8)
+    # ax1.set_xticks(time, minor=False)  # fontsize=8
     # create labels if needed
     if create_xlabel:
-        ax1.set_xlabel('time [ms]', fontsize=AXIS_LABEL_FONTSIZE)
+        ax1.set_xlabel('time [s]', fontsize=AXIS_LABEL_FONTSIZE)
     if create_ylabel1:
         ax1.set_ylabel('voltage [V]', fontsize=AXIS_LABEL_FONTSIZE)
     if create_ylabel2:
@@ -478,7 +484,7 @@ def plot_traces_original(path, data, add_offset=False, add_noise=False, temp_jit
         figname = figname + ' - temp jitter'
     if add_offset:
         figname = figname + ' - offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         ax = plt.subplot(5, 4, num+1)
@@ -501,30 +507,33 @@ def plot_traces_original(path, data, add_offset=False, add_noise=False, temp_jit
         input_current = np.reshape(np.array(data[num][3]), (np.array(
             data[num][3]).shape[0]))
 
+        # lets create the correct time axis
+        time = np.linspace(0.0, len(voltage)*neuron_parameters[el]["dt"], len(voltage))
+
         # only add labels on most outer subplot
         # create left y label
         if num == 0 or num == 4 or num == 8 or num == 12:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
         # create right y label
         elif num == 3 or num == 7 or num == 11 or num == 15:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
         # create left y label and x label
         elif num == 16:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
         # create x label
         elif num > 16 and num < 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
         # create right y label and x label
         elif num == 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
         # create no label
         else:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
     filepath = f'{path}/traces_original'
@@ -575,7 +584,7 @@ def plot_isi_original(path, data, add_offset=False, add_noise=False, temp_jitter
         figname = figname + ' - temp jitter'
     if add_offset:
         figname = figname + ' - offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         ax = plt.subplot(5, 4, num+1)
@@ -678,7 +687,7 @@ def plot_traces_fix_len(path, data, max_trials, add_offset=False, add_noise=Fals
     if add_offset:
         figname = figname + ' - offset'
     for i in range(max_trials):
-        fig = plt.figure(figsize=(12, 12))
+        fig = plt.figure(figsize=(16, 12))
         fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
         for num, el in enumerate(list(classes_list.values())):
             # lets visualize all trials
@@ -707,30 +716,33 @@ def plot_traces_fix_len(path, data, max_trials, add_offset=False, add_noise=Fals
             input_current = np.reshape(np.array(data[pos][3]), (np.array(
                 data[pos][3]).shape[0]))
 
+            # lets create the correct time axis
+            time = np.linspace(0.0, len(voltage)*neuron_parameters[el]["dt"], len(voltage))
+
             # only add labels on most outer subplot
             # create left y label
             if num == 0 or num == 4 or num == 8 or num == 12:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                        data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
             # create right y label
             elif num == 3 or num == 7 or num == 11 or num == 15:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                        data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
             # create left y label and x label
             elif num == 16:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                        data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
             # create x label
             elif num > 16 and num < 19:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                        data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
             # create right y label and x label
             elif num == 19:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                        data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
             # create no label
             else:
-                ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                        data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
         filepath = f'{path}/traces_fix_len'
@@ -781,7 +793,7 @@ def plot_single_isi_fix_len(path, data, max_trials, add_offset=False, add_noise=
         figname = figname + ' - temp jitter'
     if add_offset:
         figname = figname + ' - offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         # select a sample trial out of max_trials
@@ -891,7 +903,7 @@ def plot_isi_fix_len(path, data, max_trials, add_offset=False, add_noise=False, 
         figname = figname + ' - temp jitter'
     if add_offset:
         figname = figname + ' - offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         # concatenate all ISIs
@@ -992,7 +1004,7 @@ def plot_traces_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.
     }
 
     figname = f'{noise} noise, {jitter} jitter, {offset} offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         # select a sample trial out of max_trials
@@ -1011,34 +1023,41 @@ def plot_traces_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.
         voltage = np.reshape(np.array(data[pos][1]), (np.array(
             data[pos][1]).shape[0]))
 
-        # input current trace
-        input_current = np.reshape(np.array(data[pos][2]), (np.array(
+        # threshold trace
+        threshold = np.reshape(np.array(data[pos][2]), (np.array(
             data[pos][2]).shape[0]))
+
+        # input current trace
+        input_current = np.reshape(np.array(data[pos][3]), (np.array(
+            data[pos][3]).shape[0]))
+
+        # lets create the correct time axis
+        time = np.linspace(0.0, len(voltage)*neuron_parameters[el]["dt"], len(voltage))
 
         # only add labels on most outer subplot
         # create left y label
         if num == 0 or num == 4 or num == 8 or num == 12:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
         # create right y label
         elif num == 3 or num == 7 or num == 11 or num == 15:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
         # create left y label and x label
         elif num == 16:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
         # create x label
         elif num > 16 and num < 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
         # create right y label and x label
         elif num == 19:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
         # create no label
         else:
-            ax1, ax2 = _two_scales(ax1=ax, time=range(1, len(voltage)+1), data1=voltage, data2=input_current, data3=threshold,
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
     filepath = f'{path}/traces_fix_len'
@@ -1083,7 +1102,7 @@ def plot_single_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, nois
     }
 
     figname = f'{noise} noise, {jitter} jitter, {offset} offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         # select a sample trial out of max_trials
@@ -1184,7 +1203,7 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
     }
 
     figname = f'{noise} noise, {jitter} jitter, {offset} offset'
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
         # concatenate all ISIs
