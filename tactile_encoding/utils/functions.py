@@ -45,85 +45,87 @@ def original(offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=Fal
 
     # create training dataset by iterating over neuron params and input currents
     for _, class_name in enumerate(classes):
-        # do some sanity checks
-        if runtime[class_name] is None:
-            print('No runtime given.')
-        if input_currents[class_name] is None:
-            print('No input current given.')
-
-        # iterate over changes
-        sim_time = int(runtime[class_name] *
-                       (1/neuron_parameters[class_name]["dt"])*1E-3)
-        try:
-            time_points_local = [int(
-                i*(1/neuron_parameters[class_name]["dt"])*1E-3) for i in time_points[class_name]]
-        except:
-            KeyError
-        # variable input currents over time
-        if len(input_currents[class_name]) > 1:
-            if time_points[class_name] is None:
-                print('Missing time points.')
-            # current with step function
-            input_current = np.zeros((sim_time, 1))
-            for counter, actual_current in enumerate(input_currents[class_name]):
+        # mkae sure we have at least one spike in the trial
+        go_next = False
+        while not go_next:
+            # iterate over changes
+            sim_time = int(runtime[class_name] *
+                        (1/neuron_parameters[class_name]["dt"])*1E-3)
+            try:
+                time_points_local = [int(
+                    i*(1/neuron_parameters[class_name]["dt"])*1E-3) for i in time_points[class_name]]
+            except:
+                KeyError
+            # variable input currents over time
+            if len(input_currents[class_name]) > 1:
+                if time_points[class_name] is None:
+                    print('Missing time points.')
+                # current with step function
+                input_current = np.zeros((sim_time, 1))
+                for counter, actual_current in enumerate(input_currents[class_name]):
+                    if add_offset:
+                        # np.random.random_sample(): Return random floats in the half-open interval [0.0, 1.0).
+                        input_current_local = actual_current + \
+                            (np.random.random_sample() - 0.5)*offset
+                        # if current_tmp < 0.0:
+                        #     actual_current = 0.0
+                        # else:
+                        #     actual_current = current_tmp
+                    if add_jitter:
+                        # temporal jitter in ms
+                        _jitter = np.arange(-int((jitter/2)), int((jitter/2)))
+                        _jitter = np.random.choice(_jitter)
+                    # new current from t on
+                    if add_jitter:
+                        t = time_points_local[counter]+_jitter
+                        if t < 0:
+                            t = 0
+                    else:
+                        t = time_points_local[counter]
+                    input_current[t:] = actual_current
+            else:
+                # const current
                 if add_offset:
-                    # np.random.random_sample(): Return random floats in the half-open interval [0.0, 1.0).
-                    input_current_local = actual_current + \
+                    input_current_local = input_currents[class_name][0] + \
                         (np.random.random_sample() - 0.5)*offset
                     # if current_tmp < 0.0:
-                    #     actual_current = 0.0
+                    #     input_current_local = 0.0
                     # else:
-                    #     actual_current = current_tmp
-                if add_jitter:
-                    # temporal jitter in ms
-                    _jitter = np.arange(-int((jitter/2)), int((jitter/2)))
-                    _jitter = np.random.choice(_jitter)
-                # new current from t on
-                if add_jitter:
-                    t = time_points_local[counter]+_jitter
-                    if t < 0:
-                        t = 0
+                    #     input_current_local = current_tmp
                 else:
-                    t = time_points_local[counter]
-                input_current[t:] = actual_current
-        else:
-            # const current
-            if add_offset:
-                input_current_local = input_currents[class_name][0] + \
-                    (np.random.random_sample() - 0.5)*offset
-                # if current_tmp < 0.0:
-                #     input_current_local = 0.0
-                # else:
-                #     input_current_local = current_tmp
+                    input_current_local = input_currents[class_name]
+                input_current = np.ones((sim_time, 1)) * input_current_local
+
+            if add_noise:
+                # add noise
+                _noise = np.random.normal(
+                    loc=0.0, scale=noise, size=input_current.size)
+                input_current = np.array(
+                    [input_current[x] + _noise[x] for x in range(len(input_current))])
+
+            # set up MN neuron
+            neurons = MN_neuron(
+                1, neuron_parameters[class_name], dt=neuron_parameters[class_name]["dt"], train=False)
+            if class_name == "Spike latency":
+                pass
+            # compute neuron output
+            input = torch.as_tensor(input_current)
+            output_v = []
+            output_spk = []
+            output_thr = []
+            for t in range(input.shape[0]):
+                out = neurons(input[t])
+                # [0] is needed for single neuron
+                output_spk.append(out[0].cpu().numpy())
+                output_v.append(neurons.state.V[0].cpu().numpy())
+                output_thr.append(neurons.state.Thr[0].cpu().numpy())
+            if np.sum(output_spk) > 0:
+                encoded_data_original.append(
+                    [output_spk, output_v, output_thr, input_current])
+                go_next = True
             else:
-                input_current_local = input_currents[class_name]
-            input_current = np.ones((sim_time, 1)) * input_current_local
-
-        if add_noise:
-            # add noise
-            _noise = np.random.normal(
-                loc=0.0, scale=noise, size=input_current.size)
-            input_current = np.array(
-                [input_current[x] + _noise[x] for x in range(len(input_current))])
-
-        # set up MN neuron
-        neurons = MN_neuron(
-            1, neuron_parameters[class_name], dt=neuron_parameters[class_name]["dt"], train=False)
-        if class_name == "Spike latency":
-            pass
-        # compute neuron output
-        input = torch.as_tensor(input_current)
-        output_v = []
-        output_spk = []
-        output_thr = []
-        for t in range(input.shape[0]):
-            out = neurons(input[t])
-            # [0] is needed for single neuron
-            output_spk.append(out[0].cpu().numpy())
-            output_v.append(neurons.state.V[0].cpu().numpy())
-            output_thr.append(neurons.state.Thr[0].cpu().numpy())
-        encoded_data_original.append(
-            [output_spk, output_v, output_thr, input_current])
+                print(f"No spike at {class_name}. Repeating.")
+                go_next = False
 
     filename = './data/original_mn_output/data_encoding_original'
     if add_noise:
@@ -253,7 +255,7 @@ def fix_time(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False,
     from tactile_encoding.parameters.ideal_params import (input_currents,
                                                           neuron_parameters,
                                                           runtime, time_points)
-    from tactile_encoding.utils.utils import check_cuda
+    # from tactile_encoding.utils.utils import check_cuda
 
     # device = check_cuda(share_GPU=False, gpu_sel=0, gpu_mem_frac=None)
     max_time = max(runtime.values())  # get max run time (1000ms)
@@ -264,6 +266,7 @@ def fix_time(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False,
 
     # create training dataset by iterating over neuron params and input currents
     for _, class_name in tqdm(enumerate(classes)):
+
         # print(f'Working on {class_name}')
         # do some sanity checks
         if runtime[class_name] is None:
@@ -271,115 +274,121 @@ def fix_time(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False,
         if input_currents[class_name] is None:
             print('No input current given.')
 
+
         # create max_trials trials per class
         for _ in range(max_trials):
-            # iterate over changes
-            sim_time = runtime[class_name]
+            go_next = False
+            while not go_next:
+                # iterate over changes
+                sim_time = runtime[class_name]
 
-            # calc if input length < max_time and duplicate if needed
-            if sim_time < max_time:
-                factor = round((max_time/sim_time)+0.5)
-            else:
-                factor = 1
+                # calc if input length < max_time and duplicate if needed
+                if sim_time < max_time:
+                    factor = round((max_time/sim_time)+0.5)
+                else:
+                    factor = 1
 
-            # dynamic input current
-            if len(input_currents[class_name]) > 1:
-                if time_points[class_name] is None:
-                    print('Missing time points.')
+                # dynamic input current
+                if len(input_currents[class_name]) > 1:
+                    if time_points[class_name] is None:
+                        print('Missing time points.')
 
-                input_current = np.zeros((sim_time*factor, 1))
+                    input_current = np.zeros((sim_time*factor, 1))
 
-                # create local copies
-                input_currents_copy = input_currents[class_name].copy()
-                time_points_copy = time_points[class_name].copy()
+                    # create local copies
+                    input_currents_copy = input_currents[class_name].copy()
+                    time_points_copy = time_points[class_name].copy()
 
-                for counter in range(factor-1):
-                    input_currents_copy.extend(
-                        input_currents[class_name].copy())
-                    tmp = [time_points[class_name][x] +
-                           (counter+1) * sim_time for x in range(len(time_points[class_name]))]
-                    time_points_copy.extend(tmp)
+                    for counter in range(factor-1):
+                        input_currents_copy.extend(
+                            input_currents[class_name].copy())
+                        tmp = [time_points[class_name][x] +
+                            (counter+1) * sim_time for x in range(len(time_points[class_name]))]
+                        time_points_copy.extend(tmp)
 
-                if add_jitter:
-                    # create temp jitter
-                    _jitter = [int(np.random.random()*jitter)
-                               for _ in range(len(time_points_copy)-1)]
-                    # always start at t=0, initial current
-                    for x in range(len(time_points_copy)-1):
-                        time_points_copy[x +
-                                         1] = time_points_copy[x+1]+_jitter[x]
-                    # make sure time_points_copy is const increasing
-                    dt_time_points = np.diff(time_points_copy)
-                    if np.min(dt_time_points[1:]) <= 0.0:
-                        for pos, value in enumerate(dt_time_points):
-                            # skip first value
-                            if pos != 0 and value <= 0.0:
-                                # found dt <= 0
-                                time_points_copy[pos +
-                                                 1] = time_points_copy[pos]+1
-                                # update dt_time_points
-                                dt_time_points = np.diff(time_points_copy)
-                # calc input current trace
-                for counter, actual_current in enumerate(input_currents_copy):
+                    if add_jitter:
+                        # create temp jitter
+                        _jitter = [int(np.random.random()*jitter)
+                                for _ in range(len(time_points_copy)-1)]
+                        # always start at t=0, initial current
+                        for x in range(len(time_points_copy)-1):
+                            time_points_copy[x +
+                                            1] = time_points_copy[x+1]+_jitter[x]
+                        # make sure time_points_copy is const increasing
+                        dt_time_points = np.diff(time_points_copy)
+                        if np.min(dt_time_points[1:]) <= 0.0:
+                            for pos, value in enumerate(dt_time_points):
+                                # skip first value
+                                if pos != 0 and value <= 0.0:
+                                    # found dt <= 0
+                                    time_points_copy[pos +
+                                                    1] = time_points_copy[pos]+1
+                                    # update dt_time_points
+                                    dt_time_points = np.diff(time_points_copy)
+                    # calc input current trace
+                    for counter, actual_current in enumerate(input_currents_copy):
+                        if add_offset:
+                            input_current_local = actual_current + \
+                                (np.random.random_sample() - 0.5)*offset
+                            # if current_tmp < 0.0:
+                            #     actual_current = 0.0
+                            # else:
+                            #     actual_current = current_tmp
+                        input_current[time_points_copy[counter]:] = actual_current
+                # const input current
+                else:
+                    # const current
                     if add_offset:
-                        input_current_local = actual_current + \
+                        input_current_local = input_currents[class_name][0] + \
                             (np.random.random_sample() - 0.5)*offset
                         # if current_tmp < 0.0:
-                        #     actual_current = 0.0
+                        #     input_current_local = 0.0
                         # else:
-                        #     actual_current = current_tmp
-                    input_current[time_points_copy[counter]:] = actual_current
-            # const input current
-            else:
-                # const current
-                if add_offset:
-                    input_current_local = input_currents[class_name][0] + \
-                        (np.random.random_sample() - 0.5)*offset
-                    # if current_tmp < 0.0:
-                    #     input_current_local = 0.0
-                    # else:
-                    #     input_current_local = current_tmp
+                        #     input_current_local = current_tmp
+                    else:
+                        input_current_local = input_currents[class_name]
+
+                    input_current = np.ones((max_time, 1)) * input_current_local
+
+                # set fix input length
+                if len(input_current) < max_time:
+                    print("ERROR-> Trial too short! <-ERROR")
+                elif len(input_current) > max_time:
+                    input_current = input_current[:max_time]
+
+                if add_noise:
+                    # add noise on input current
+                    _noise = np.random.normal(
+                        loc=0.0, scale=noise, size=input_current.size)
+                    input_current = np.array(
+                        [input_current[x] + _noise[x] for x in range(len(input_current))])
+
+                # convert input current to tensor
+                input = torch.as_tensor(input_current)  # .to(device)
+
+                # set up MN neuron
+                neurons = MN_neuron(
+                    1, neuron_parameters[class_name], dt=1E-3, train=False)
+
+                # compute new neuron output
+                output_v = []
+                output_spk = []
+                output_thr = []
+                for t in range(input.shape[0]):
+                    out = neurons(input[t])
+                    # [0] is needed for single neuron
+                    output_spk.append(out[0].cpu().numpy())
+                    output_v.append(neurons.state.V[0].cpu().numpy())
+                    output_thr.append(neurons.state.Thr[0].cpu().numpy())
+                if np.sum(output_spk) > 0:
+                    # store neuron output
+                    encoded_data.append(
+                        [output_spk, output_v, output_thr, input_current])
+                    encoded_label.append(class_name)
+                    go_next = True
                 else:
-                    input_current_local = input_currents[class_name]
-
-                input_current = np.ones((max_time, 1)) * input_current_local
-
-            # set fix input length
-            if len(input_current) < max_time:
-                print("ERROR-> Trial too short! <-ERROR")
-            elif len(input_current) > max_time:
-                input_current = input_current[:max_time]
-
-            if add_noise:
-                # add noise on input current
-                _noise = np.random.normal(
-                    loc=0.0, scale=noise, size=input_current.size)
-                input_current = np.array(
-                    [input_current[x] + _noise[x] for x in range(len(input_current))])
-
-            # convert input current to tensor
-            input = torch.as_tensor(input_current)  # .to(device)
-
-            # set up MN neuron
-            neurons = MN_neuron(
-                1, neuron_parameters[class_name], dt=1E-3, train=False)
-
-            # compute new neuron output
-            output_v = []
-            output_spk = []
-            output_thr = []
-            for t in range(input.shape[0]):
-                out = neurons(input[t])
-                # [0] is needed for single neuron
-                output_spk.append(out[0].cpu().numpy())
-                output_v.append(neurons.state.V[0].cpu().numpy())
-                output_thr.append(neurons.state.Thr[0].cpu().numpy())
-
-            # store neuron output
-            encoded_data.append(
-                [output_spk, output_v, output_thr, input_current])
-            encoded_label.append(class_name)
-
+                    # print(f'Missing spikes in {class_name}')
+                    go_next = False
     filename_data = './data/original_mn_output/data_encoding_fix_len'
     filename_label = './data/original_mn_output/label_encoding_fix_len'
     if add_noise:
@@ -421,30 +430,51 @@ def _two_scales(ax1, time, data1, data2, data3, data4, c1, c2, c3, c4, create_xl
     """
     ax2 = ax1.twinx()
 
-    # plot threshold trace
-    ax1.plot(time, data3, color=c3, linestyle='-.', alpha=0.7)
+    # convert V to mV
+    data1 = data1*1E3
+    data3 = data3*1E3
 
-    # plot voltage trace
-    ax1.plot(time, data1, color=c1)
+    # get spike times
+    spk_idc = np.where(data4 == 1)[0]
+    spk_time = time[spk_idc]
+    v_spk = data1[spk_idc-1]
 
+    # if we have spikes we want to reset the voltage and threshold trace
+    if np.sum(spk_idc) > 0:
+        spk_idc_list = []
+        spk_idc_list.append(0)
+        spk_idc_list.extend(spk_idc)
+        spk_idc_list.append(len(data1))
+
+        for i in range(len(spk_idc_list)-1):
+            # plot threshold trace
+            ax1.plot(time[spk_idc_list[i]: spk_idc_list[i+1]], data3[spk_idc_list[i]: spk_idc_list[i+1]], color=c3, linestyle='-.', alpha=0.7)
+
+            # plot voltage trace
+            ax1.plot(time[spk_idc_list[i]: spk_idc_list[i+1]], data1[spk_idc_list[i]: spk_idc_list[i+1]], color=c1)
+    else:
+        # plot threshold trace
+        ax1.plot(time, data3, color=c3, linestyle='-.', alpha=0.7)
+
+        # plot voltage trace
+        ax1.plot(time, data1, color=c1)
+
+    # TODO to seperate this at step we would need to save step times...
     # input current trace
     ax2.plot(time, data2, color=c2, alpha=0.7, linewidth=1)
 
     # spike times at peak of voltage trace
-    # TODO check spike times! Now the v at t-1 is selected
-    ax1.scatter(time[np.where(data4 == 1)[0]], data1[np.where(
-        data4 == 1)-np.ones_like(np.where(data4 == 1))], s=15, color=c4)
+    ax1.scatter(spk_time, v_spk, s=15, color=c4)
 
     ax2.set_ylim([-4, 9])
-    # TODO set tick size
     # ax1.set_xticks(time, minor=False)  # fontsize=8
     # create labels if needed
     if create_xlabel:
         ax1.set_xlabel('time [s]', fontsize=AXIS_LABEL_FONTSIZE)
     if create_ylabel1:
-        ax1.set_ylabel('voltage [V]', fontsize=AXIS_LABEL_FONTSIZE)
+        ax1.set_ylabel('voltage [mV]', fontsize=AXIS_LABEL_FONTSIZE)
     if create_ylabel2:
-        ax2.set_ylabel('current [I]', fontsize=AXIS_LABEL_FONTSIZE)
+        ax2.set_ylabel('current/C [V/s]', fontsize=AXIS_LABEL_FONTSIZE)
 
     return ax1, ax2
 
@@ -686,76 +716,74 @@ def plot_traces_fix_len(path, data, max_trials, add_offset=False, add_noise=Fals
         figname = figname + ' - temp jitter'
     if add_offset:
         figname = figname + ' - offset'
-    for i in range(max_trials):
-        fig = plt.figure(figsize=(16, 12))
-        fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
-        for num, el in enumerate(list(classes_list.values())):
-            # lets visualize all trials
-            # select a sample trial out of max_trials
-            # pos = range(num*max_trials, num*max_trials+max_trials)
-            # pos = np.random.choice(pos)
-            pos = num*max_trials+i
+    fig = plt.figure(figsize=(16, 12))
+    fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
+    for num, el in enumerate(list(classes_list.values())):
+        # lets visualize all trials
+        # select a sample trial out of max_trials
+        pos = range(num*max_trials, num*max_trials+max_trials)
+        pos = np.random.choice(pos)
 
-            ax = plt.subplot(5, 4, num+1)
-            ax.set_title("{}: {}".format(value2key(
-                el, classes_list)[0], el), fontsize=TITLE_FONTSIZE)
+        ax = plt.subplot(5, 4, num+1)
+        ax.set_title("{}: {}".format(value2key(
+            el, classes_list)[0], el), fontsize=TITLE_FONTSIZE)
 
-            # get spike times
-            spikes = np.reshape(np.array(data[pos][0]), (np.array(
-                data[pos][0]).shape[0]))
+        # get spike times
+        spikes = np.reshape(np.array(data[pos][0]), (np.array(
+            data[pos][0]).shape[0]))
 
-            # voltage trace
-            voltage = np.reshape(np.array(data[pos][1]), (np.array(
-                data[pos][1]).shape[0]))
+        # voltage trace
+        voltage = np.reshape(np.array(data[pos][1]), (np.array(
+            data[pos][1]).shape[0]))
 
-            # threshold trace
-            threshold = np.reshape(np.array(data[pos][2]), (np.array(
-                data[pos][2]).shape[0]))
+        # threshold trace
+        threshold = np.reshape(np.array(data[pos][2]), (np.array(
+            data[pos][2]).shape[0]))
 
-            # input current trace
-            input_current = np.reshape(np.array(data[pos][3]), (np.array(
-                data[pos][3]).shape[0]))
+        # input current trace
+        input_current = np.reshape(np.array(data[pos][3]), (np.array(
+            data[pos][3]).shape[0]))
 
-            # lets create the correct time axis
-            time = np.linspace(0.0, len(voltage)*neuron_parameters[el]["dt"], len(voltage))
+        # lets create the correct time axis
+        time = np.linspace(0.0, len(voltage)*neuron_parameters[el]["dt"], len(voltage))
 
-            # only add labels on most outer subplot
-            # create left y label
-            if num == 0 or num == 4 or num == 8 or num == 12:
-                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
-            # create right y label
-            elif num == 3 or num == 7 or num == 11 or num == 15:
-                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
-            # create left y label and x label
-            elif num == 16:
-                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
-            # create x label
-            elif num > 16 and num < 19:
-                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
-            # create right y label and x label
-            elif num == 19:
-                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
-            # create no label
-            else:
-                ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
-                                       data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
+        # only add labels on most outer subplot
+        # create left y label
+        if num == 0 or num == 4 or num == 8 or num == 12:
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
+                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=True, create_ylabel2=False)
+        # create right y label
+        elif num == 3 or num == 7 or num == 11 or num == 15:
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
+                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=True)
+        # create left y label and x label
+        elif num == 16:
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
+                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=True, create_ylabel2=False)
+        # create x label
+        elif num > 16 and num < 19:
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
+                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=False)
+        # create right y label and x label
+        elif num == 19:
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
+                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=True, create_ylabel1=False, create_ylabel2=True)
+        # create no label
+        else:
+            ax1, ax2 = _two_scales(ax1=ax, time=time, data1=voltage, data2=input_current, data3=threshold,
+                                    data4=spikes, c1='b', c2='orange', c3='k', c4='r', create_xlabel=False, create_ylabel1=False, create_ylabel2=False)
 
-        filepath = f'{path}/traces_fix_len'
-        if add_noise:
-            filepath = filepath + '_noisy'
-        if temp_jitter:
-            filepath = filepath + '_temp_jitter'
-        if add_offset:
-            filepath = filepath + '_offset'
+    filepath = f'{path}/traces_fix_len'
+    if add_noise:
+        filepath = filepath + '_noisy'
+    if temp_jitter:
+        filepath = filepath + '_temp_jitter'
+    if add_offset:
+        filepath = filepath + '_offset'
 
-        fig.tight_layout()
-        fig.savefig(f'{filepath}_{i}.pdf')
-        plt.close(fig)
+    fig.tight_layout()
+    fig.savefig(f'{filepath}.pdf')
+    plt.close(fig)
 
 
 def plot_single_isi_fix_len(path, data, max_trials, add_offset=False, add_noise=False, temp_jitter=False, norm_time=False, norm_count=False):

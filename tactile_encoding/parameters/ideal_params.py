@@ -192,9 +192,9 @@ neuron_parameters["Afterpotentials"] = {
     "dt": 1E-3,
 }
 
-
+# TODO tonic spiking doesn't happen
 neuron_parameters["Basal bistability"] = {
-    "a": 1,
+    "a": -3.8,
     "A1": 8,
     "A2": -0.1,
     "dt": 1E-3,
@@ -213,5 +213,5 @@ neuron_parameters["Spike latency"] = {
     "a": -80,
     "A1": 0,
     "A2": 0,
-    "dt": 0.1*1E-3,
+    "dt": 1E-3,
 }
