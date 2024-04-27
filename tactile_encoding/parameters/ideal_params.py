@@ -194,7 +194,7 @@ neuron_parameters["Afterpotentials"] = {
 
 
 neuron_parameters["Basal bistability"] = {
-    "a": 0,
+    "a": 1,
     "A1": 8,
     "A2": -0.1,
     "dt": 1E-3,
@@ -205,7 +205,7 @@ neuron_parameters["Preferred frequency"] = {
     "a": 5,
     "A1": -3,
     "A2": 0.5,
-    "dt": 0.1E-3,
+    "dt": 1E-3,
 }
 
 
