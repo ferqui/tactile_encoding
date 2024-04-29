@@ -4,13 +4,13 @@ Sets up neuron parameters and input currents
 
 input_currents = {
     "Tonic spiking": [1.5],
-    "Class 1": [1+1E-6],  # 1 + 1E-6
+    "Class 1": [1+1E-6],
     "Spike frequency adaptation": [2],
     "Phasic spiking": [1.5],
     "Accommodation": [1.5, 0, 0.5, 1, 1.5, 0],
     "Threshold variability": [1.29, 0, -1.5, 0, 1.5, 0],  # changed 67
     "Rebound spike": [0, -3.5, 0],
-    "Class 2": [2*(1+1E-6)],  # 2(1 + 1E-6)
+    "Class 2": [2*(1+1E-6)],
     "Integrator": [1.5, 0, 1.5, 0, 1.5, 0, 1.5, 0],
     "Input bistability": [1.5, 1.7, 1.5, 1.7],
     "Hyperpolarizing spiking": [-1],
@@ -120,8 +120,8 @@ neuron_parameters["Class 2"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
-    "ELinit": -0.030,
-    "Tinit": -0.030,
+    "ELinit": -0.03,
+    "Tinit": -0.03,
     "dt": 1E-3,
 }
 
@@ -157,8 +157,8 @@ neuron_parameters["Hyperpolarizing bursting"] = {
 
 
 neuron_parameters["Tonic bursting"] = {
-    "a": 5.1,  #5.35
-    "A1": 12,
+    "a": 5.1,  # 5
+    "A1": 12,  # 10
     "A2": -0.6,
     "dt": 1E-3,
 }
@@ -180,7 +180,7 @@ neuron_parameters["Rebound burst"] = {
 
 neuron_parameters["Mixed mode"] = {
     "a": 5,
-    "A1": 5.5,
+    "A1": 5.5,  # 5
     "A2": -0.3,
     "dt": 1E-3,
 }
@@ -192,9 +192,8 @@ neuron_parameters["Afterpotentials"] = {
     "dt": 1E-3,
 }
 
-# TODO tonic spiking doesn't happen
 neuron_parameters["Basal bistability"] = {
-    "a": -3.8,
+    "a": -3.8,  # 0
     "A1": 8,
     "A2": -0.1,
     "dt": 1E-3,
