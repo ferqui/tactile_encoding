@@ -1031,7 +1031,7 @@ def plot_traces_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.
         'T': "Spike latency",
     }
 
-    figname = f'{noise} noise, {jitter} jitter, {offset} offset'
+    figname = f'noise: {noise} ,jitter: {jitter}, offset: {offset}'
     fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
@@ -1128,8 +1128,8 @@ def plot_single_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, nois
         'S': "Preferred frequency",
         'T': "Spike latency",
     }
-
-    figname = f'{noise} noise, {jitter} jitter, {offset} offset'
+    isis_list = []
+    figname = f'noise: {noise} ,jitter: {jitter}, offset: {offset}'
     fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
@@ -1164,6 +1164,8 @@ def plot_single_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, nois
                 ax.bar(isi_fix_len, isi_fix_len_count)
         else:
             ax.text(0.3, 0.5, f'nbr. spikes = {len(np.where(spikes == 1))}')
+            isi_fix_len, isi_fix_len_count = 0, 1
+        isis_list.append([num, isi_fix_len, isi_fix_len_count])
         plt.tick_params(axis='x', labelsize=6)
         plt.tick_params(axis='y', labelsize=6)
 
@@ -1201,6 +1203,8 @@ def plot_single_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, nois
     fig.savefig(f'{filepath}.pdf')
     plt.close(fig)
 
+    return isis_list
+
 
 def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, jitter=10, add_offset=False, add_noise=False, temp_jitter=False, norm_count=False, norm_time=False):
     """
@@ -1229,8 +1233,8 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
         'S': "Preferred frequency",
         'T': "Spike latency",
     }
-
-    figname = f'{noise} noise, {jitter} jitter, {offset} offset'
+    out_list = []
+    figname = f'noise: {noise} ,jitter: {jitter}, offset: {offset}'
     fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
     for num, el in enumerate(list(classes_list.values())):
@@ -1241,7 +1245,19 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
             spikes = np.reshape(np.array(data[trial + num*max_trials][0]), (np.array(
                 data[trial + num*max_trials][0]).shape[0]))
             # calc ISI
-            isi_fix_len.extend(np.diff(np.where(spikes == 1)[0]))
+            isi = np.diff(np.where(spikes == 1)[0])
+            isi_fix_len.extend(isi)
+            if len(isi) > 0:
+                tmp = np.unique(isi, return_counts=True)
+                isi = tmp[0]
+                if norm_time:
+                    isi = isi/max(isi)
+                isi_count = tmp[1]
+                if norm_count:
+                    isi_count = isi_count/max(isi_count)
+            else:
+                isi, isi_count = 0, 1
+            out_list.append([num, isi, isi_count])  # id, isi, count
 
         ax = plt.subplot(5, 4, num+1)
         ax.set_title("{}: {}".format(value2key(
@@ -1265,7 +1281,8 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
                 ax.bar(isi_fix_len, isi_fix_len_count)
         else:
             ax.text(0.3, 0.5, f'nbr. spikes = {len(np.where(spikes == 1))}')
-
+        #     isi_fix_len, isi_fix_len_count = 0, 1
+        # out_list.append([num, isi_fix_len, isi_fix_len_count])  # id, isi, count
         plt.tick_params(axis='x', labelsize=6)
         plt.tick_params(axis='y', labelsize=6)
 
@@ -1301,6 +1318,8 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
     fig.tight_layout()
     fig.savefig(f'{filepath}.pdf')
     plt.close(fig)
+
+    return out_list
 
 
 def return_isi_fix_len(data, max_trials, norm_count=False, norm_time=False):
