@@ -317,7 +317,7 @@ def retrieve_nni_results(
     Klepatsch, Daniel; Silicon Austria Labs; Graz, Austria.
     """
 
-    if nni_default_path:
+    if nni_default_path==True:
         db_path = os.path.expanduser("~/nni-experiments/{}/{}/db".format(exp_name,exp_id))
     else:
         db_path = nni_default_path
@@ -338,7 +338,7 @@ def retrieve_nni_results(
     top = df_trial.sort_values(by=[metrics,"timestamp"], ascending=False)#.head(10)
     
     if export_csv:
-        export_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        export_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
         fileNamecsv = 'OptimizationResults_{}_{}_{}.csv'.format(
             exp_name,
             exp_id,

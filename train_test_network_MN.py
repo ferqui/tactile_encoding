@@ -19,6 +19,7 @@ Settings to be accounted for:
     store_weights
     trained_layers_path
     gpu_mem_frac
+    visible_gpus
     use_seed
 
 Fra, Vittorio,
@@ -27,29 +28,27 @@ EDA Group,
 Torino, Italy.
 """
 
-
-import logging
+#%%
 import argparse
-import numpy as np
-import pandas as pd
-import json
-import random
-
-import os
 import datetime
-
+import json
+import logging
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
+import pickle
+import random
 import seaborn as sn
-
 from sklearn.metrics import confusion_matrix
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from NNI.utils.utils import set_device, gpu_usage_df, check_gpu_memory_constraint, create_directory, retrieve_nni_results, load_layers
+from NNI.utils.utils import *
 
 
+#%%
 ### 1) various experiment settings #############################################
 
 parser = argparse.ArgumentParser()
@@ -77,7 +76,7 @@ parser.add_argument('-repetitions',
 # Number or tests for statistics
 parser.add_argument('-n_test',
                     type=int,
-                    default=50,
+                    default=10,
                     help='Number of tests to be performed for statistical evaluation.')
 # Number of epochs
 parser.add_argument('-nb_epochs',
@@ -119,6 +118,11 @@ parser.add_argument('-gpu_mem_frac',
                     type=float,
                     default=0.3,
                     help='The maximum GPU memory fraction to be used by this experiment.')
+# Which GPU is actually "visible"
+parser.add_argument('-visible_gpus',
+                    type=int,
+                    default=[0],
+                    help='GPU index to be used for the experiment.')
 # Set seed usage
 parser.add_argument('-use_seed',
                     type=bool,
@@ -168,9 +172,10 @@ n_test = settings["n_test"]
 ################################################################################
 
 
-experiment_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+#%%
 ### 2) data "configuration" specific for spike classification from MN paper ####
 """
 Data created following the paper "A Generalized
@@ -224,6 +229,7 @@ labels_mapping = {
 ################################################################################
 
 
+#%%
 ### 3) log file configuration ##################################################
 
 log_path = "./logs/optimized/{}/{}".format(experiment_name,name)
@@ -249,24 +255,62 @@ if use_seed:
 ################################################################################
 
 
-### 4) CUDA device set-up ######################################################
+#%%
+### 4) Devices set-up ##########################################################
 
-gpu_mem_frac = settings["gpu_mem_frac"]
-flag_allocate_memory = False
-flag_print = True
-while not flag_allocate_memory:
-    if check_gpu_memory_constraint(gpu_usage_df(),gpu_mem_frac):
-        flag_allocate_memory = True
-        print("The available memory is enough.")
+# gpu_mem_frac = settings["gpu_mem_frac"]
+# flag_allocate_memory = False
+# flag_print = True
+# while not flag_allocate_memory:
+#     if check_gpu_memory_constraint(gpu_usage_df(),gpu_mem_frac):
+#         flag_allocate_memory = True
+#         print("The available memory is enough.")
+#     else:
+#         if flag_print:
+#             print("Waiting for more memory available.")
+#             flag_print = False
+# device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
+
+### GPU
+use_gpu = True
+auto_gpu = True
+print("------------------------------------------------------------------------------------")
+if use_gpu:
+    gpu_mem_frac = settings["gpu_mem_frac"]
+    visible_gpus = settings["visible_gpus"]
+    visible_devices = ", ".join(map(str, visible_gpus))
+    os.environ["CUDA_VISIBLE_DEVICES"] = visible_devices
+    if auto_gpu:
+        flag_allocate_memory = False
+        flag_print = True
+        while not flag_allocate_memory:
+            if check_gpu_memory_constraint(gpu_usage_df(visible_gpus),visible_gpus,gpu_mem_frac):
+                flag_allocate_memory = True
+                print("The available memory is enough.")
+            else:
+                if flag_print:
+                    print("Waiting for more memory available.")
+                    flag_print = False
+        device = set_device(auto_sel=True, visible=visible_gpus, gpu_mem_frac=gpu_mem_frac)
     else:
-        if flag_print:
-            print("Waiting for more memory available.")
-            flag_print = False
-device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
+        gpu_sel = 1 # NOTE that this is the index for elements in visible_gpus, CHECK IT'S OK!
+        device = set_device(gpu_sel=gpu_sel, visible=visible_gpus, gpu_mem_frac=gpu_mem_frac)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":4096:8"
+else:
+    device = torch.device("cpu")
+
+settings["device"] = device
+
+### CPU
+min_use = get_least_active_cores(num_cores=3)
+print("Selected CPU cores: {}".format(min_use))
+limit_cpu_cores(min_use)
 
 ################################################################################
 
 
+#%%
 ### 5) data and parameters paths to be used ####################################
 
 # Load the test subset (always the same)
@@ -303,6 +347,7 @@ else:
 ################################################################################
 
 
+#%%
 ### 6)  temporal dynamics quantities for the SNN ###############################
 
 tau_mem = params["tau_mem"]
@@ -314,7 +359,7 @@ beta = torch.as_tensor(float(np.exp(-dt/tau_mem)))
 ################################################################################
 
 
-
+#%%
 ### Various definitions ########################################################
 
 class feedforward_layer:
@@ -650,12 +695,14 @@ def train_net(
             optimizer.zero_grad()
             loss_val.backward()
             optimizer.step()
+
             local_loss.append(loss_val.item())
 
             # compare to labels
             _, am = torch.max(m, 1)  # argmax over output units
-            tmp = np.mean((y_local == am).detach().cpu().numpy())
-            accs.append(tmp)
+            # tmp = np.mean((y_local == am).detach().cpu().numpy())
+            # accs.append(tmp)
+            accs.extend((y_local == am).detach().cpu().numpy())
 
         mean_loss = np.mean(local_loss)
         loss_hist[0].append(mean_loss)
@@ -671,9 +718,9 @@ def train_net(
                 dataset_val,
                 layers=layers_update
             )
-            # only safe best validation (test)
+            # only save best validation (test)
             accs_hist[1].append(val_acc)
-            # only safe loss of best validation (test)
+            # only save loss of best validation (test)
             loss_hist[1].append(val_loss)
 
         if dataset_val is None:
@@ -693,7 +740,7 @@ def train_net(
             e + 1, nb_epochs, accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
         
         if (e+1)%10 == 0:
-            print("\tepoch {}/{} done ({}) \t --> \ttraining accuracy (loss): {:.2f}% ({:.5f}), \tvalidation accuracy (loss): {:.2f}% ({:.5f})".format(e+1,nb_epochs,datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
+            print("\tepoch {}/{} done ({}) \t --> \ttraining accuracy (loss): {:.2f}% ({:.5f}), \tvalidation accuracy (loss): {:.2f}% ({:.5f})".format(e+1,nb_epochs,datetime.now().strftime("%Y%m%d_%H%M%S"),accs_hist[0][-1]*100, loss_hist[0][-1], accs_hist[1][-1]*100, loss_hist[1][-1]))
 
     return loss_hist, accs_hist, best_acc_layers
 
@@ -798,8 +845,9 @@ def compute_classification_accuracy(params, dataset, layers=None, label_probabil
         loss_val = loss_fn(log_p_y, y_local).detach().cpu().numpy()
         losss.append(loss_val)
         # compute acc
-        tmp = np.mean((y_local == am).detach().cpu().numpy())
-        accs.append(tmp)
+        # tmp = np.mean((y_local == am).detach().cpu().numpy())
+        # accs.append(tmp)
+        accs.extend((y_local == am).detach().cpu().numpy())
 
     if label_probabilities:
         return np.mean(accs), np.mean(losss), torch.exp(log_p_y)
@@ -832,10 +880,19 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
         m = torch.sum(spks_out, 1)  # sum over time
         _, am = torch.max(m, 1)     # argmax over output units
         # compare to labels
-        tmp = np.mean((y_local == am).detach().cpu().numpy())
-        accs.append(tmp)
+        # tmp = np.mean((y_local == am).detach().cpu().numpy())
+        # accs.append(tmp)
+        accs.extend((y_local == am).detach().cpu().numpy())
         trues.extend(y_local.detach().cpu().numpy())
         preds.extend(am.detach().cpu().numpy())
+    
+    training_history_path = "./results/training/history/{}/{}".format(experiment_name,name)
+    create_directory(training_history_path)
+    file_path = os.path.join(training_history_path,f"{experiment_datetime}_cm.pkl")
+    with open(file_path, 'wb') as file:
+        pickle.dump(trues, file)
+        pickle.dump(preds, file)
+        pickle.dump(accs, file)
 
     cm = confusion_matrix(trues, preds, normalize='true')
     cm_df = pd.DataFrame(cm, index=[ii for ii in labels], columns=[
@@ -848,7 +905,7 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
                square=False,
                cmap="YlGnBu")
     if title:
-        plt.title("Accuracy from confusion matrix: {:.2f}% +- {:.2f}%\n".format(np.median(accs) * 100, np.std(accs)*100))
+        plt.title("Test accuracy: {:.2f}%\n".format(np.mean(accs) * 100))
     plt.xlabel('\nPredicted')
     plt.ylabel('True\n')
     plt.xticks(rotation=0)
@@ -869,6 +926,7 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
 
 
 
+#%%
 ### WHERE THINGS ACTUALLY HAPPEN ###############################################
 
 print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
@@ -881,6 +939,9 @@ print("EXPERIMENT STARTED --- {}-{}-{} {}:{}:{}".format(
     )
 
 if do_training:
+
+    training_history_path = "./results/training/history/{}/{}".format(experiment_name,name)
+    create_directory(training_history_path)
 
     # Path for plots from training and validation
     if save_fig:
@@ -901,14 +962,14 @@ if do_training:
         acc_val_list = []
         acc_test_list = []
 
-        print("*** training (with validation) statistics started ***".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
-        LOG.debug("### Training statistics with {} repetitions started ({}). ###\n".format(repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        print("*** training (with validation) statistics started ***".format(datetime.now().strftime("%Y%m%d_%H%M%S")))
+        LOG.debug("### Training statistics with {} repetitions started ({}). ###\n".format(repetitions,datetime.now().strftime("%Y%m%d_%H%M%S")))
         
         for rpt in range(repetitions):
             # Reload data for each repetition
             # Select random training and validation set
             rnd_idx = np.random.randint(0, 10) # 3
-            LOG.debug("Repetition {}/{}: started ({}) with split number {}.\n".format(rpt+1,repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),rnd_idx))
+            LOG.debug("Repetition {}/{}: started ({}) with split number {}.\n".format(rpt+1,repetitions,datetime.now().strftime("%Y%m%d_%H%M%S"),rnd_idx))
             ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
             ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
@@ -930,13 +991,18 @@ if do_training:
             acc_val_list.append(acc_hist[1])
             acc_test_list.append(test_acc)
 
-            print("\trepetition {}/{} done ({}) --> test accuracy: {}%".format(rpt+1,repetitions,datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),np.round(test_acc*100,4)))
+            print("\trepetition {}/{} done ({}) --> test accuracy: {}%".format(rpt+1,repetitions,datetime.now().strftime("%Y%m%d_%H%M%S"),np.round(test_acc*100,4)))
         
         best_layers = very_best_layer
 
         LOG.debug("Overall best training accuracy: {}%".format(np.round(np.nanmax(acc_train_list)*100,4)))
         LOG.debug("Overall best validation accuracy: {}%".format(np.round(np.nanmax(acc_val_list)*100,4)))
         LOG.debug("Overall best test accuracy: {}%\n".format(np.round(best_acc*100,4)))
+
+        file_path = os.path.join(training_history_path,f"{experiment_datetime}.pkl")
+        with open(file_path, 'wb') as file:
+            pickle.dump(acc_train_list, file)
+            pickle.dump(acc_val_list, file)
 
         # Make plots for loss and accuracy from training and validation
         # Accuracy:
@@ -996,7 +1062,7 @@ if do_training:
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
 
-        LOG.debug("### Training statistics done ({}). ###\n".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+        LOG.debug("### Training statistics done ({}). ###\n".format(datetime.now().strftime("%Y%m%d_%H%M%S")))
         print("*** training (with validation) statistics done ***")
 
     else:
@@ -1071,7 +1137,7 @@ else:
     print("*** test statistics done ***")
 
 
-conclusion_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+conclusion_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
     conclusion_datetime[:4],
     conclusion_datetime[4:6],
