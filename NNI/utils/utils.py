@@ -1,15 +1,16 @@
+from datetime import datetime
+from io import StringIO
 import os
-import torch
 import numpy as np
 import pandas as pd
-import random
-import sqlite3
-from datetime import datetime
-from sklearn.model_selection import train_test_split
-from subprocess import check_output
-from io import StringIO
 import psutil
+import random
+import signal
+from sklearn.model_selection import train_test_split
+import sqlite3
+from subprocess import check_output
 import time
+import torch
 
 
 def create_directory(
@@ -26,7 +27,7 @@ def create_directory(
         return directory_path
 
 
-def gpu_usage_df():
+def gpu_usage_df(visible=None):
     """
     Create a pandas dataframe with index, occupied memory and occupied percentage of the available GPUs from the nvidia-smi command.
     Columns: [gpu_index, gpu_mem, gpu_perc]
@@ -56,9 +57,16 @@ def gpu_usage_df():
     
     gpu_usage_df_sum = gpu_usage_df.groupby("gpu_index").sum().reset_index()
 
+    if visible != None:
+        gpu_usage_df_sum = gpu_usage_df_sum.loc[gpu_usage_df_sum.gpu_index.isin(visible)].reset_index()
+    
     gpu_perc = []
     for num,el in enumerate(gpu_usage_df_sum["gpu_index"]):
-        gpu_perc.append(gpu_usage_df_sum["gpu_mem"].iloc[num]/int(np.round(torch.cuda.get_device_properties(device="cuda:{}".format(el)).total_memory/1e6,0))*100)
+        if visible != None:
+            gpu_perc.append(gpu_usage_df_sum["gpu_mem"].iloc[num]/int(np.round(torch.cuda.get_device_properties(device=visible.index(el)).total_memory/1e6,0))*100)
+        else:
+            gpu_perc.append(gpu_usage_df_sum["gpu_mem"].iloc[num]/int(np.round(torch.cuda.get_device_properties(device=el).total_memory/1e6,0))*100)
+        #gpu_perc.append(gpu_usage_df_sum["gpu_mem"].iloc[num]/int(np.round(get_gpu_memory(el),0))*100)
     gpu_usage_df_sum["gpu_perc"] = gpu_perc
 
     return gpu_usage_df_sum
@@ -66,6 +74,7 @@ def gpu_usage_df():
 
 def check_gpu_memory_constraint(
     gpu_usage_df,
+    visible,
     gpu_mem_frac
     ):
     """
@@ -73,6 +82,9 @@ def check_gpu_memory_constraint(
 
     Fra, Vittorio; Politecnico di Torino; EDA Group; Torino, Italy.
     """
+
+    if visible != None:
+        gpu_usage_df = gpu_usage_df.loc[gpu_usage_df.gpu_index.isin(visible)].copy()
     
     flag_available = False
     for num,el in enumerate(gpu_usage_df["gpu_perc"]):
@@ -87,6 +99,7 @@ def set_device(
     gpu_sel=None,
     random_sel=False,
     auto_sel=False,
+    visible=None,
     gpu_mem_frac=0.3
     ):
     """
@@ -105,8 +118,8 @@ def set_device(
         if torch.cuda.is_available():
 
             if torch.cuda.device_count() > 1:
-
-                gpu_df = gpu_usage_df()
+                
+                gpu_df = gpu_usage_df(visible)
                 
                 if random_sel:
                     gpu_query_index = str(check_output(["nvidia-smi", "--format=csv", "--query-gpu=index"]), 'utf-8').splitlines()
@@ -124,12 +137,15 @@ def set_device(
                     else:
                         gpu_sel = random.choice(less_occupied)
                 
-                print("Multiple GPUs detected but single GPU (automatically) selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
-                device = torch.device("cuda:"+str(gpu_sel))
+                print("Multiple GPUs detected but single GPU selected. Setting up the simulation on {}".format("cuda:"+str(gpu_sel)))
+                if visible != None:
+                    device = torch.device("cuda:"+str(visible.index(gpu_sel)))
+                else:
+                    device = torch.device("cuda:"+str(gpu_sel))
             
             elif torch.cuda.device_count() == 1:
                 print("Single GPU detected. Setting up the simulation there.")
-                device = torch.device("cuda")
+                device = torch.device("cuda:0")
             
             torch.cuda.set_per_process_memory_fraction(gpu_mem_frac, device=device) # decrese or comment out memory fraction if more is available (the smaller the better)
         
@@ -393,3 +409,20 @@ def get_least_active_cores(num_cores, num_readings=10):
 
     return least_active_cores
 
+
+def kill_ipykernel_launcher(user):
+    pids = []
+    for line in os.popen("ps -ef | grep -v 'awk' | awk '/ipykernel_launcher/'"):
+        if line.split()[0] == user:
+            pids.append(line.split()[1])
+    answer = ""
+    while answer not in ["yes", "y", "no", "n"]:
+        answer = input(f"Do you want to kill the pid(s) {pids}? ('yes' or 'no')")
+        if (answer == "yes") | (answer == "y"):
+            for pid in pids:
+                os.kill(int(pid), signal.SIGKILL)
+            print("Done.")
+        elif (answer == "no") | (answer == "n"):
+            pass
+        else:
+            print("Unexpected input. Note that 'Enter' and 'Escape' are ignored.")

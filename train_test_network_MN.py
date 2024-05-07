@@ -1,26 +1,15 @@
 """
 This script allows to train and test a network for
 spiking activity classification (with the parameters 
-found from NNI optimization) according to the MN paper.
+found from NNI optimization) according to the classes
+described in the MN paper.
 The NNI parameters are also saved to be re-used
-independently of the NNI results database.
+independently of the NNI results database if it is
+not available. Of course, at leat one among the
+optimization database and the stored parameters is
+always needed.
 
-Settings to be accounted for:
-    experiment_name
-    do_training
-    training_statistics
-    repetitions
-    n_test
-    nb_epochs
-    experiment_id
-    best_test_id
-    save_weights
-    save_fig
-    store_weights
-    trained_layers_path
-    gpu_mem_frac
-    visible_gpus
-    use_seed
+CHECK SETTINGS in settings_posthpo_train.py
 
 Fra, Vittorio,
 Politecnico di Torino,
@@ -29,7 +18,6 @@ Torino, Italy.
 """
 
 #%%
-import argparse
 import datetime
 import json
 import logging
@@ -46,125 +34,53 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from NNI.utils.utils import *
+from settings_posthpo_train import settings
+
+
+# The following is used to enable or disable stopping of ipykernel_launcher process(es) at the end of the script
+# NOTE that it is not needed if the script is not run cell-wise
+stop_process = True
+user = "fra" # specify the user to avoid killing others' processes
 
 
 #%%
-### 1) various experiment settings #############################################
-
-parser = argparse.ArgumentParser()
-
-# Experiment name
-parser.add_argument('-experiment_name',
-                    type=str,
-                    default="spike_classifier",
-                    help='Name of this experiment.')
-# Training needed or not
-parser.add_argument('-do_training',
-                    type=bool,
-                    default=True,
-                    help='If set to False, test only will be performed.')
-# Make some statistics for training
-parser.add_argument('-training_statistics',
-                    type=bool,
-                    default=True,
-                    help='If set to True, multiple trainings will be performed (with use_seed consequently set to False).')
-# Number or repetitions for training statistics
-parser.add_argument('-repetitions',
-                    type=int,
-                    default=10,
-                    help='Number of trainings to be performed for statistical evaluation.')
-# Number or tests for statistics
-parser.add_argument('-n_test',
-                    type=int,
-                    default=10,
-                    help='Number of tests to be performed for statistical evaluation.')
-# Number of epochs
-parser.add_argument('-nb_epochs',
-                    type=int,
-                    default=100,
-                    help='Number of training epochs.')
-# ID of the NNI experiment to refer to
-parser.add_argument('-experiment_id',
-                    type=str,
-                    default="vpeqjlkr",
-                    help='ID of the NNI experiment whose results are to be used.')
-# ID of the NNI trial providing the best test accuracy
-parser.add_argument('-best_test_id',
-                    type=str,
-                    default="euX7c",
-                    help='ID of the NNI trial that gave the highest test accuracy.')
-# Save the weights (to be re-used right after the training to test) or not
-parser.add_argument('-save_weights',
-                    type=bool,
-                    default=True,
-                    help='Weights can be saved to be loaded after training and used for test.')
-# Save figures
-parser.add_argument('-save_fig',
-                    type=bool,
-                    default=True,
-                    help='Save or not the plots produced during training and test.')
-# Store the weights 
-parser.add_argument('-store_weights',
-                    type=bool,
-                    default=True,
-                    help='Weights can be stored with specific, unique name.')
-# Path of weights to perform test only (if do_training is False)
-parser.add_argument('-trained_layers_path',
-                    type=str,
-                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt", #"./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr.pt",
-                    help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
-# (maximum) GPU memory fraction to be allocated
-parser.add_argument('-gpu_mem_frac',
-                    type=float,
-                    default=0.3,
-                    help='The maximum GPU memory fraction to be used by this experiment.')
-# Which GPU is actually "visible"
-parser.add_argument('-visible_gpus',
-                    type=int,
-                    default=[0],
-                    help='GPU index to be used for the experiment.')
-# Set seed usage
-parser.add_argument('-use_seed',
-                    type=bool,
-                    default=False,
-                    help='Set if a seed is to be used or not.')
-
-args = parser.parse_args()
-
-settings = vars(args)
+### 1) Various experiment settings #############################################
 
 experiment_name = settings["experiment_name"]
 
 do_training = settings["do_training"]
 training_statistics = settings["training_statistics"]
 
+nni_db_available = settings["nni_db_available"]
+
 experiment_id = settings["experiment_id"]
-if do_training:
-    best_test_id, _ = retrieve_nni_results(experiment_name, experiment_id, "test")
+
+if nni_db_available:
+    best_test_id, _ = retrieve_nni_results(experiment_name, experiment_id, "test", nni_default_path=f"./NNI/results/optimization_db/{settings['experiment_id']}")
 else:
-    trained_layers_path = settings["trained_layers_path"]
     best_test_id = settings["best_test_id"]
 
-save_weights = settings["save_weights"]
-save_fig = settings["save_fig"]
-store_weights = settings["store_weights"]
+if do_training:
+    nb_epochs = settings["nb_epochs"]
+    save_weights = settings["save_weights"]
+    store_weights = settings["store_weights"]
+else:
+    trained_layers_path = settings["trained_layers_path"]
 
-nb_epochs = settings["nb_epochs"]
+save_fig = settings["save_fig"]
 
 use_seed = settings["use_seed"] # it will be in any case "re-set" to False for test statistics
 
-if not training_statistics:
-    if use_seed:
-        seed = 42
-        os.environ['PYTHONHASHSEED'] = str(seed)
-        np.random.seed(seed)
-        random.seed(seed)
-        torch.manual_seed(seed)
-    else:
-        seed = None
+if use_seed:
+    seed = 42
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
 else:
-    use_seed = False
     seed = None
+
+if training_statistics:
     repetitions = settings["repetitions"]
 
 n_test = settings["n_test"]
@@ -176,7 +92,7 @@ experiment_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 #%%
-### 2) data "configuration" specific for spike classification from MN paper ####
+### 2) Data "configuration" specific for spike classification from MN paper ####
 """
 Data created following the paper "A Generalized
 Linear Integrate-and-Fire Neural Model Produces Diverse Spiking 
@@ -230,7 +146,7 @@ labels_mapping = {
 
 
 #%%
-### 3) log file configuration ##################################################
+### 3) Log file configuration ##################################################
 
 log_path = "./logs/optimized/{}/{}".format(experiment_name,name)
 create_directory(log_path)
@@ -257,19 +173,6 @@ if use_seed:
 
 #%%
 ### 4) Devices set-up ##########################################################
-
-# gpu_mem_frac = settings["gpu_mem_frac"]
-# flag_allocate_memory = False
-# flag_print = True
-# while not flag_allocate_memory:
-#     if check_gpu_memory_constraint(gpu_usage_df(),gpu_mem_frac):
-#         flag_allocate_memory = True
-#         print("The available memory is enough.")
-#     else:
-#         if flag_print:
-#             print("Waiting for more memory available.")
-#             flag_print = False
-# device = set_device(auto_sel=True, gpu_mem_frac=gpu_mem_frac)
 
 ### GPU
 use_gpu = True
@@ -311,44 +214,43 @@ limit_cpu_cores(min_use)
 
 
 #%%
-### 5) data and parameters paths to be used ####################################
+### 5) Data and parameters paths to be used ####################################
 
 # Load the test subset (always the same)
 ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
 
 nb_steps = len(next(iter(ds_test))[0])
 
-if do_training:
+if (do_training == True) & (training_statistics == False):
 
-    if not training_statistics:
-        # Select random training and validation set
-        rnd_idx = np.random.randint(0, 10) # 3
-        LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
-        ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-        ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+    # Select random training and validation set
+    rnd_idx = np.random.randint(0, 10) # 3
+    LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
+    ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+    ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
-    # Get the optimized parameters
+if nni_db_available:
+    # Get the optimized parameters from db
     parameters_path = './NNI/results/parameters/best_test/{}/{}/{}.json'.format(experiment_name,name,experiment_id)
     with open(parameters_path, 'r') as fp:
         params = json.load(fp)
-
-    # Store the optimized parameters
+    # Store the optimized parameters from db
     parameters_path = './parameters/optimized/{}/{}'.format(experiment_name,name)
     create_directory(parameters_path)
     with open(parameters_path+"/parameters.json", 'w') as fp:
         json.dump(params, fp)
-
 else:
-
+    # Get the already saved optimized parameters 
     parameters_path = './parameters/optimized/{}/{}/parameters.json'.format(experiment_name,name)
     with open(parameters_path, 'r') as fp:
         params = json.load(fp)
+
 
 ################################################################################
 
 
 #%%
-### 6)  temporal dynamics quantities for the SNN ###############################
+### 6) Temporal dynamics quantities for the SNN ################################
 
 tau_mem = params["tau_mem"]
 tau_syn = params["tau_syn"]
@@ -890,9 +792,7 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
     create_directory(training_history_path)
     file_path = os.path.join(training_history_path,f"{experiment_datetime}_cm.pkl")
     with open(file_path, 'wb') as file:
-        pickle.dump(trues, file)
-        pickle.dump(preds, file)
-        pickle.dump(accs, file)
+        pickle.dump([trues, preds, accs], file)
 
     cm = confusion_matrix(trues, preds, normalize='true')
     cm_df = pd.DataFrame(cm, index=[ii for ii in labels], columns=[
@@ -909,6 +809,7 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
     plt.xlabel('\nPredicted')
     plt.ylabel('True\n')
     plt.xticks(rotation=0)
+    plt.tight_layout()
     if save:
         path_for_plots = "./results/plots/optimized/{}/{}".format(experiment_name,name)
         create_directory(path_for_plots)
@@ -919,8 +820,7 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
         plt.savefig(path_to_save_fig+".png", dpi=300)
         plt.savefig(path_to_save_fig+".pdf", dpi=300)
         plt.close()
-    else:
-        plt.show()
+    plt.show()
 
 ################################################################################
 
@@ -1001,8 +901,12 @@ if do_training:
 
         file_path = os.path.join(training_history_path,f"{experiment_datetime}.pkl")
         with open(file_path, 'wb') as file:
-            pickle.dump(acc_train_list, file)
-            pickle.dump(acc_val_list, file)
+            pickle.dump([ # transposing make them easier to plot when they will be loaded from the file
+                np.array(loss_train_list).T,
+                np.array(acc_train_list).T,
+                np.array(loss_val_list).T,
+                np.array(acc_val_list).T
+                ], file)
 
         # Make plots for loss and accuracy from training and validation
         # Accuracy:
@@ -1035,10 +939,11 @@ if do_training:
         plt.ylabel("Accuracy (%)")
         plt.ylim((0, 105))
         plt.legend(["Training", "Validation"], loc='lower right')
-        plt.show()
+        plt.tight_layout()
         if save_fig:
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        plt.show()
         # Loss:
         # Compute mean, median and std. dev.
         loss_mean_train = np.mean(loss_train_list, axis=0)
@@ -1057,10 +962,11 @@ if do_training:
         plt.ylabel("Loss")
         plt.ylim(bottom=0)
         plt.legend(["Training", "Validation"], loc='upper right')
-        plt.show()
+        plt.tight_layout()
         if save_fig:
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
+        plt.show()
 
         LOG.debug("### Training statistics done ({}). ###\n".format(datetime.now().strftime("%Y%m%d_%H%M%S")))
         print("*** training (with validation) statistics done ***")
@@ -1084,12 +990,12 @@ if do_training:
         plt.ylim((0, 105))
         #plt.title("{} ({} epochs)".format(name,nb_epochs))
         plt.legend(["Training", "Validation"], loc='lower right')
+        plt.tight_layout()
         if save_fig:
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-        plt.show()
-        if save_fig:
             print("*** accuracy plot saved ***")
+        plt.show()            
         # Loss:
         plt.figure()
         plt.plot(range(1, len(loss_hist[0])+1),
@@ -1101,12 +1007,12 @@ if do_training:
         plt.ylim(bottom=0)
         #plt.title("{} ({} epochs)".format(name,nb_epochs))
         plt.legend(["Training", "Validation"], loc='upper right')
+        plt.tight_layout()
         if save_fig:
             plt.savefig(path_for_plots + "/loss_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/loss_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-        plt.show()
-        if save_fig:
             print("*** loss plot saved ***")
+        plt.show()            
         
     # Save (to re-load) trained weights 
     path = './results/layers/optimized/{}/{}'.format(experiment_name,name)
@@ -1148,3 +1054,9 @@ print("EXPERIMENT DONE --- {}-{}-{} {}:{}:{}".format(
     )
 
 ################################################################################
+
+
+#%%
+##### USEFUL ONLY IF YOU RAN THE CODE CELL-WISE #####
+if stop_process:
+    kill_ipykernel_launcher(user) 
