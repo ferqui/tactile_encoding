@@ -3,7 +3,6 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from tqdm import tqdm
 
 from tactile_encoding.parameters.ideal_params import (input_currents,
                                                       neuron_parameters,
@@ -265,7 +264,7 @@ def fix_time(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False,
     encoded_label = []
 
     # create training dataset by iterating over neuron params and input currents
-    for _, class_name in tqdm(enumerate(classes)):
+    for _, class_name in enumerate(classes):
 
         # print(f'Working on {class_name}')
         # do some sanity checks
@@ -389,26 +388,146 @@ def fix_time(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False,
                 else:
                     # print(f'Missing spikes in {class_name}')
                     go_next = False
-    filename_data = './data/original_mn_output/data_encoding_fix_len'
-    filename_label = './data/original_mn_output/label_encoding_fix_len'
-    if add_noise:
-        filename_data = filename_data + f'_{noise}_noise'
-        filename_label = filename_label + '_noisy'
-    if add_jitter:
-        filename_data = filename_data + f'_{jitter}_jitter'
-        filename_label = filename_label + '_jitter'
-    if add_offset:
-        filename_data = filename_data + f'_{offset}_offset'
-        filename_label = filename_label + '_offset'
 
-    encoded_data = np.array(encoded_data)
-    encoded_label = np.array(encoded_label)
+    return np.array(encoded_data), np.array(encoded_label)
 
-    # dump neuron output to file
-    with open(f"{filename_data}.pkl", 'wb') as handle:
-        pkl.dump(encoded_data, handle, protocol=pkl.HIGHEST_PROTOCOL)
-    with open(f"{filename_label}.pkl", 'wb') as handle:
-        pkl.dump(encoded_label, handle, protocol=pkl.HIGHEST_PROTOCOL)
+import concurrent.futures
+
+def _generate_trial(neuron_parameters, max_time, input_currents, time_points, factor, add_jitter, jitter, add_offset, offset, add_noise, noise):
+    # TODO check if the params handed over fit...
+#     Traceback (most recent call last):
+#   File "/home/smullercleve/code/tactile_encoding/tactile_encoding/scripts/create_original_dataset.py", line 121, in <module>
+#     encoded_data, encoded_label = fix_time_multithreading(max_trials=NB_TRIALS, offset=offset, noise=noise,
+#   File "/home/smullercleve/code/tactile_encoding/tactile_encoding/utils/functions.py", line 522, in fix_time_multithreading
+    
+# ValueError: setting an array element with a sequence. The requested array has an inhomogeneous shape after 2 dimensions. The detected shape was (2000, 4) + inhomogeneous part.
+    keep_going = True
+    while keep_going:
+        # iterate over changes
+        # calc if input length < max_time and duplicate if needed
+        # if sim_time < max_time:
+        #     factor = round((max_time/sim_time)+0.5)
+        # else:
+        #     factor = 1
+
+        # dynamic input current
+        if len(input_currents) > 1:
+            input_current = np.zeros((max_time*factor, 1))
+            input_currents_copy = input_currents.copy()
+            time_points_copy = time_points.copy()
+            for counter in range(factor-1):
+                input_currents_copy.extend(input_currents)
+                tmp = [time_points[x] + (counter+1) * max_time for x in range(len(time_points))]
+                time_points_copy.extend(tmp)
+
+            if add_jitter:
+                _jitter = [int(np.random.random()*jitter) for _ in range(len(time_points_copy)-1)]
+                for x in range(len(time_points_copy)-1):
+                    time_points_copy[x + 1] = time_points_copy[x+1] + _jitter[x]
+                # TODO check if needed!
+                # make sure time_points_copy is const increasing
+                dt_time_points = np.diff(time_points_copy)
+                if len(dt_time_points) > 1 and np.min(dt_time_points[1:]) <= 0.0:
+                    for pos in range(1, len(dt_time_points)):
+                        # skip first value
+                        if dt_time_points[pos] <= 0.0:
+                            # found dt <= 0
+                            time_points_copy[pos +
+                                            1] = time_points_copy[pos]+1
+                            # update dt_time_points
+                            dt_time_points = np.diff(time_points_copy)
+
+            for counter, actual_current in enumerate(input_currents_copy):
+                if add_offset:
+                    input_current_local = actual_current + (np.random.random_sample() - 0.5) * offset
+                input_current[time_points_copy[counter]:] = actual_current
+        # constant input current
+        else:
+            if add_offset:
+                input_current_local = input_currents[0] + (np.random.random_sample() - 0.5) * offset
+            else:
+                input_current_local = input_currents
+            input_current = np.ones((max_time, 1)) * input_current_local
+
+        if len(input_current) < max_time:
+            print("ERROR-> Trial too short! <-ERROR")
+        elif len(input_current) > max_time:
+            input_current = input_current[:max_time]
+
+        if add_noise:
+            _noise = np.random.normal(loc=0.0, scale=noise, size=input_current.size)
+            input_current = np.array([input_current[x] + _noise[x] for x in range(len(input_current))])
+
+        input = torch.as_tensor(input_current)
+
+        # set up MN neuron
+        neurons = MN_neuron(
+            1, neuron_parameters, dt=1E-3, train=False)
+
+        output_v = []
+        output_spk = []
+        output_thr = []
+        for t in range(input.shape[0]):
+            out = neurons(input[t])
+            # [0] is needed for single neuron
+            output_spk.append(out[0].cpu().numpy())
+            output_v.append(neurons.state.V[0].cpu().numpy())
+            output_thr.append(neurons.state.Thr[0].cpu().numpy())
+
+        if np.sum(output_spk) > 0:
+            keep_going = False  # TODO check if needed
+            return [output_spk, output_v, output_thr, input_current]
+
+
+def fix_time_multithreading(max_trials=2, offset=1E-1, noise=1E-1, jitter=10, add_offset=False, add_noise=False, add_jitter=False):
+    '''
+    Adjusting the Number of Threads: Experiment with the max_workers parameter of ThreadPoolExecutor() to find the optimal number of worker threads. 
+    Increasing the number of worker threads can improve performance up to a certain point, after which adding more threads may not provide significant 
+    benefits and may even degrade performance due to resource contention.
+
+    Batch Processing: Instead of submitting each trial individually, you can batch multiple trials together and submit them as a group to the executor. 
+    This can reduce the overhead associated with task submission and result in better utilization of resources.
+
+    Asynchronous Processing: If there are any independent tasks within each trial generation process, you can identify them and parallelize their 
+    execution using asynchronous programming techniques such as asyncio or concurrent.futures' as_completed() function.
+
+    Optimizing Trial Generation: Look for opportunities to optimize the trial generation process itself. This could involve optimizing algorithms, 
+    reducing unnecessary computations, or utilizing specialized libraries or techniques for performance-critical sections of the code.
+
+    Profiling and Tuning: Profile your code to identify performance bottlenecks and areas for improvement. Focus on optimizing the most time-consuming 
+    parts of the code to achieve the greatest performance gains.
+    '''
+
+    # import neuron params
+    from tactile_encoding.parameters.ideal_params import (input_currents,
+                                                          neuron_parameters,
+                                                          runtime, time_points)
+
+    max_time = 1000 # set fix runtime of 1000ms
+    classes = neuron_parameters.keys()
+    encoded_data = []
+    encoded_label = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+        futures = []
+        for class_name in classes:
+            for _ in range(max_trials):
+                params = neuron_parameters[class_name]
+                input = input_currents[class_name]
+                try: 
+                    time = time_points[class_name]
+                except:
+                    KeyError
+                    time = None
+                factor = round((max_time/runtime[class_name])+0.5)
+
+                futures.append(executor.submit(_generate_trial, params, max_time, input, time, factor, add_jitter, jitter, add_offset, offset, add_noise, noise))
+        
+        for future in concurrent.futures.as_completed(futures):
+            encoded_data.append(future.result())
+            encoded_label.append(class_name)
+
+    return np.array(encoded_data), np.array(encoded_label)
 
 
 def indices_of_sign_change(data):
@@ -1233,7 +1352,6 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
         'S': "Preferred frequency",
         'T': "Spike latency",
     }
-    out_list = []
     figname = f'noise: {noise} ,jitter: {jitter}, offset: {offset}'
     fig = plt.figure(figsize=(16, 12))
     fig.suptitle(figname, fontsize=SUPTITLE_FONT_SIZE)
@@ -1247,24 +1365,13 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
             # calc ISI
             isi = np.diff(np.where(spikes == 1)[0])
             isi_fix_len.extend(isi)
-            if len(isi) > 0:
-                tmp = np.unique(isi, return_counts=True)
-                isi = tmp[0]
-                if norm_time:
-                    isi = isi/max(isi)
-                isi_count = tmp[1]
-                if norm_count:
-                    isi_count = isi_count/max(isi_count)
-            else:
-                isi, isi_count = 0, 1
-            out_list.append([num, isi, isi_count])  # id, isi, count
 
         ax = plt.subplot(5, 4, num+1)
         ax.set_title("{}: {}".format(value2key(
             el, classes_list)[0], el), fontsize=TITLE_FONTSIZE)
 
         # TODO inlcude grid to all plots
-        # plt.grid()
+        plt.grid()
 
         if len(isi_fix_len) > 0:
             tmp_fix_len = np.unique(isi_fix_len, return_counts=True)
@@ -1281,8 +1388,7 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
                 ax.bar(isi_fix_len, isi_fix_len_count)
         else:
             ax.text(0.3, 0.5, f'nbr. spikes = {len(np.where(spikes == 1))}')
-        #     isi_fix_len, isi_fix_len_count = 0, 1
-        # out_list.append([num, isi_fix_len, isi_fix_len_count])  # id, isi, count
+
         plt.tick_params(axis='x', labelsize=6)
         plt.tick_params(axis='y', labelsize=6)
 
@@ -1318,6 +1424,53 @@ def plot_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, 
     fig.tight_layout()
     fig.savefig(f'{filepath}.pdf')
     plt.close(fig)
+
+
+def return_isi_fix_len_param_sweep(path, data, max_trials, offset=0.1, noise=0.1, jitter=10, add_offset=False, add_noise=False, temp_jitter=False, norm_count=False, norm_time=False):
+    """
+    Calculates and plots the ISI for all repetitions of fix length data.
+    """
+
+    classes_list = {
+        'A': "Tonic spiking",
+        'B': "Class 1",
+        'C': "Spike frequency adaptation",
+        'D': "Phasic spiking",
+        'E': "Accommodation",
+        'F': "Threshold variability",
+        'G': "Rebound spike",
+        'H': "Class 2",
+        'I': "Integrator",
+        'J': "Input bistability",
+        'K': "Hyperpolarizing spiking",
+        'L': "Hyperpolarizing bursting",
+        'M': "Tonic bursting",
+        'N': "Phasic bursting",
+        'O': "Rebound burst",
+        'P': "Mixed mode",
+        'Q': "Afterpotentials",
+        'R': "Basal bistability",
+        'S': "Preferred frequency",
+        'T': "Spike latency",
+    }
+    out_list = []
+    for num, el in enumerate(list(classes_list.values())):
+        # concatenate all ISIs
+        isi_fix_len = []
+        for trial in range(max_trials):
+            # calc spikes per trial
+            spikes = np.reshape(np.array(data[trial + num*max_trials][0]), (np.array(
+                data[trial + num*max_trials][0]).shape[0]))
+            # calc ISI
+            isi = np.diff(np.where(spikes == 1)[0])
+            isi_fix_len.extend(isi)
+            if len(isi) > 0:
+                tmp = np.unique(isi, return_counts=True)
+                isi = tmp[0]
+                isi_count = tmp[1]
+            else:
+                isi, isi_count = np.array([0]), np.array([1])
+            out_list.append([num, isi, isi_count])  # id, isi, count
 
     return out_list
 

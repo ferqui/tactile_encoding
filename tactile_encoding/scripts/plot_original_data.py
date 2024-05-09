@@ -19,7 +19,8 @@ from tqdm import tqdm
 from tactile_encoding.utils.functions import (
     plot_isi_fix_len, plot_isi_fix_len_param_sweep, plot_isi_original,
     plot_single_isi_fix_len, plot_single_isi_fix_len_param_sweep,
-    plot_traces_fix_len, plot_traces_fix_len_param_sweep, plot_traces_original)
+    plot_traces_fix_len, plot_traces_fix_len_param_sweep, plot_traces_original,
+    return_isi_fix_len_param_sweep)
 from tactile_encoding.utils.utils import create_directory
 
 path = './plots/original'  # set path to store plots
@@ -32,7 +33,8 @@ data_types = ['', '_noisy', '_temp_jitter', '_offset', '_noisy_temp_jitter',
 OFFSET = 0.1
 NOISE = 0.2
 JITTER = 10
-NB_TRIALS = 3
+NB_TRIALS = 100
+
 
 def create_interactive_3d_plot(fig_path, title, x, y, z, objectives):
     # Create an interactive 3d surface plot
@@ -50,6 +52,7 @@ def create_interactive_3d_plot(fig_path, title, x, y, z, objectives):
 
     # Save the plot as an interactive HTML file
     plotly_fig.write_html(f"{fig_path}.html")
+
 
 if __name__ == '__main__':
     ###################
@@ -177,60 +180,70 @@ if __name__ == '__main__':
     ##################
     # parameter weep #
     ##################
-    step_size = 0.05
-    noise_levels = np.round(np.arange(0, 1+step_size, step_size), 5)
+
+    step_size = 0.01
+    noise_levels = np.round(np.arange(0, 0.2+step_size, step_size), 5)
     offset_levels = noise_levels
+    step_size_list = [1, 2, 5, 10, 20, 50]
 
     add_noise = True
     temp_jitter = True
     add_offset = True
 
-    silhouette_sc_list = []
+    step_size_list = [1, 2, 5, 10, 20, 50]
+    for step_size_isi in tqdm(step_size_list, position=0, leave=False, total=len(step_size_list)):
+        # let's create a common representation of the ISIs
+        possible_isis = np.arange(0, 1000+step_size_isi, step_size_isi)
+        silhouette_sc_list = []
 
-    for offset_counter, offset in tqdm(enumerate(offset_levels), position=0, leave=False, total=len(offset_levels)):
-        silhouette_sc_list_offset = []
-        for noise_counter, noise in tqdm(enumerate(noise_levels), position=1, leave=False, total=len(noise_levels)):
-            # load data
-            data_type = f'{noise}_noise_{JITTER}_jitter_{offset}_offset'
-            filename = 'data_encoding_fix_len_' + data_type
-            with open(f"{data_path}/{filename}.pkl", 'rb') as infile:
-                data = pickle.load(infile)
+        for offset_counter, offset in tqdm(enumerate(offset_levels), position=1, leave=False, total=len(offset_levels)):
+            silhouette_sc_list_offset = []
+            for noise_counter, noise in tqdm(enumerate(noise_levels), position=2, leave=False, total=len(noise_levels)):
+                # load data
+                data_type = f'{noise}_noise_{JITTER}_jitter_{offset}_offset'
+                filename = 'data_encoding_fix_len_' + data_type
+                with open(f"{data_path}/{filename}.pkl", 'rb') as infile:
+                    data = pickle.load(infile)
 
-            # create plots
-            # plot_traces_fix_len_param_sweep(path, data, max_trials=NB_TRIALS, offset=offset, noise=noise, jitter=JITTER,
-            #                                 add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter)
+                # create plots
+                plot_traces_fix_len_param_sweep(path, data, max_trials=NB_TRIALS, offset=offset, noise=noise, jitter=JITTER,
+                                                add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter)
 
-            # plot_single_isi_fix_len_param_sweep(path, data, max_trials=NB_TRIALS, offset=offset, noise=noise, jitter=JITTER,
-            #                                     add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
+                plot_single_isi_fix_len_param_sweep(path, data, max_trials=NB_TRIALS, offset=offset, noise=noise, jitter=JITTER,
+                                                    add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
 
-            isis_list = plot_isi_fix_len_param_sweep(path, data, max_trials=NB_TRIALS, offset=offset, noise=noise, jitter=JITTER,
-                                         add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
-            # isis_list: (id, isi, count)*classes
-            
-            # each entry can have different length so we want to turn the data into one-hot encoding
-            precision = 2  # in digits
-            id = []
-            unique_isis = []
-            for entry in isis_list:
-                id.append(entry[0])
-                unique_isis.extend(np.unique(np.round(entry[1], precision)))
-            unique_isis = np.unique(unique_isis)  
-            
-            # with that we found all ISIs in the dataset and now create a datastructure of size trials*unique_isis
-            data = np.zeros((len(id), len(unique_isis)))
-            for i, entry in enumerate(isis_list):
-                if isinstance(entry[1], (int, float)):  # Check if entry[1] is a single element
-                    data[i, np.where(unique_isis == entry[1])] = entry[2]  # Assign count directly
-                else:
-                    for j, isi in enumerate(entry[1]):
-                        data[i, np.where(unique_isis == isi)] = entry[2][j]
-            # get the silouhette score to qunatify how seperable the groups are
-            silhouette_sc = silhouette_score(data, np.array(id))
-            silhouette_sc_list_offset.append(silhouette_sc)
-        silhouette_sc_list.append(silhouette_sc_list_offset)
+                isis_list = return_isi_fix_len_param_sweep(path, data, max_trials=NB_TRIALS, offset=offset, noise=noise, jitter=JITTER,
+                                                           add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
+                # isis_list: (id, isi, count)*classes
 
-    # create 3d plot
-    fig_path = f'{path}/siouhette_score_parameter_sweep'
-    title = 'Silhouette score depending on noise'
-    objectives=['offset', 'noise']  # TODO double check order! (just reduce on in len or change numbers)
-    create_interactive_3d_plot(fig_path=fig_path, title=title, x=offset_levels, y=noise_levels, z=silhouette_sc_list, objectives=objectives)
+                # each entry can have different length so we want to turn the data into one-hot encoding
+                # precision = 2  # in digits
+                id = []
+                unique_isis = []
+                for entry in isis_list:
+                    id.append(entry[0])
+                    unique_isis.extend(np.unique(entry[1]))
+                unique_isis = np.unique(unique_isis)
+
+                # with that we found all ISIs in the dataset and now create a datastructure of size trials*unique_isis
+                data = np.zeros((len(id), len(possible_isis)))
+                for i, entry in enumerate(isis_list):
+                    closest_values = [possible_isis[np.abs(
+                        possible_isis - val).argmin()] for val in entry[1]]
+                    for closest_value_local in np.unique(closest_values):
+                        try:
+                            data[i, possible_isis == closest_value_local] = np.sum(
+                                entry[2][closest_values == closest_value_local])
+                        except:
+                            pass
+                # get the silouhette score to qunatify how seperable the groups are
+                silhouette_sc = silhouette_score(data, np.array(id))
+                silhouette_sc_list_offset.append(silhouette_sc)
+            silhouette_sc_list.append(silhouette_sc_list_offset)
+
+        # create 3d plot
+        fig_path = f'{path}/siouhette_score_parameter_sweep_isi_bin_size_{step_size_isi}'
+        title = 'Silhouette score depending on noise'
+        objectives = ['offset', 'noise']
+        create_interactive_3d_plot(fig_path=fig_path, title=title, x=offset_levels,
+                                   y=noise_levels, z=silhouette_sc_list, objectives=objectives)
