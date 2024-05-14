@@ -24,8 +24,11 @@ data/Activity/MN_Output_MNIST_c/*
 data/Activity/MN_Output_MNIST_c_ERROR/*
 data/Activity/MN_Output_MNIST_c_ERROR_2/*
 dataset_splits/fix_len_noisy_temp_jitter/*
+!dataset_splits/fix_len_noisy_temp_jitter/fix_len_noisy_temp_jitter_ds_test.pt
 dataset_splits/mn_classes/*
+!dataset_splits/mn_classes/mn_classes_500_ds_test.pt
 dataset_splits/original_extended/*
+!dataset_splits/original_extended/original_extended_ds_test*
 logs/*
 NNI/dataset_splits/*
 NNI/logs/*
