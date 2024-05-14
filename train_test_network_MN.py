@@ -39,7 +39,7 @@ from settings_posthpo_train import settings
 
 # The following is used to enable or disable stopping of ipykernel_launcher process(es) at the end of the script
 # NOTE that it is not needed if the script is not run cell-wise
-stop_process = True
+stop_process = False
 user = "fra" # specify the user to avoid killing others' processes
 
 
@@ -69,7 +69,7 @@ else:
 
 save_fig = settings["save_fig"]
 
-use_seed = settings["use_seed"] # it will be in any case "re-set" to False for test statistics
+use_seed = settings["use_seed"]
 
 if use_seed:
     seed = 42
@@ -77,6 +77,7 @@ if use_seed:
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
 else:
     seed = None
 
@@ -104,20 +105,26 @@ Event-driven perception in robotics - EDPR,
 Genova, Italy.
 """
  
-# Specify what kind of data to use
-original = False
-fixed_length = not original
-noise = True
-jitter = True
+### Specify what kind of data to use
 
-# Prepare data selection
-name = ""
-data_features = [original, fixed_length, noise, jitter]
-data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
-for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
-    name += "{} ".format(data_attributes[el])
-name = name[:-1]
-name = name.replace(" ","_")
+# ## The old one
+# original = False
+# fixed_length = not original
+# noise = True
+# jitter = True
+# 
+# # Prepare data selection
+# name = ""
+# data_features = [original, fixed_length, noise, jitter]
+# data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
+# for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
+#     name += "{} ".format(data_attributes[el])
+# name = name[:-1]
+# name = name.replace(" ","_")
+
+## The new one
+name = "mn_classes"
+n_reps = 500
 
 labels_mapping = {
     'A': "Tonic spiking",
@@ -206,7 +213,7 @@ else:
 settings["device"] = device
 
 ### CPU
-min_use = get_least_active_cores(num_cores=3)
+min_use = get_least_active_cores(num_cores=5)
 print("Selected CPU cores: {}".format(min_use))
 limit_cpu_cores(min_use)
 
@@ -217,7 +224,7 @@ limit_cpu_cores(min_use)
 ### 5) Data and parameters paths to be used ####################################
 
 # Load the test subset (always the same)
-ds_test = torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
+ds_test = torch.load("./dataset_splits/{}/{}_{}_ds_test.pt".format(name,name,n_reps), map_location=device) # torch.load("./dataset_splits/{}/{}_ds_test.pt".format(name,name), map_location=device)
 
 nb_steps = len(next(iter(ds_test))[0])
 
@@ -226,8 +233,8 @@ if (do_training == True) & (training_statistics == False):
     # Select random training and validation set
     rnd_idx = np.random.randint(0, 10) # 3
     LOG.debug("Split number {} used for this experiment.\n".format(rnd_idx))
-    ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-    ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+    ds_train = torch.load("./dataset_splits/{}/{}_{}_ds_train_{}.pt".format(name,name,n_reps,rnd_idx), map_location=device) # torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+    ds_val = torch.load("./dataset_splits/{}/{}_{}_ds_val_{}.pt".format(name,name,n_reps,rnd_idx), map_location=device) # torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
 if nni_db_available:
     # Get the optimized parameters from db
@@ -683,6 +690,7 @@ def build_and_test(
     trained_path,
     device=device,
     N=10,
+    use_seed=use_seed,
     ):
     
     # Load the pre-trained weights
@@ -692,7 +700,7 @@ def build_and_test(
 
     for ii in range(N):
 
-        test_acc, _ = compute_classification_accuracy(params, ds_test, layers=layers, shuffle=True, use_seed=False)
+        test_acc, _ = compute_classification_accuracy(params, ds_test, layers=layers, shuffle=True, use_seed=use_seed)
         
         test_N.append(test_acc)
         LOG.debug("Test {}/{}: {}%".format(ii+1,N,np.round(test_acc*100,4)))
@@ -713,10 +721,10 @@ def build_and_test(
 
     LOG.debug("---------------------------------------------------------------------------------------------------\n\n")
     
-    ConfusionMatrix(params, ds_test, save_fig, layers=layers, labels=list(labels_mapping.keys()), use_seed=False)
+    ConfusionMatrix(params, ds_test, save_fig, layers=layers, labels=list(labels_mapping.keys()), use_seed=use_seed)
 
 
-def compute_classification_accuracy(params, dataset, layers=None, label_probabilities=False, shuffle=False, use_seed=use_seed):
+def compute_classification_accuracy(params, dataset, layers=None, label_probabilities=False, shuffle=True, use_seed=use_seed):
     """ Computes classification accuracy on supplied data in batches. """
 
     if use_seed:
@@ -820,7 +828,8 @@ def ConfusionMatrix(params, dataset, save, title=False, layers=None, labels=None
         plt.savefig(path_to_save_fig+".png", dpi=300)
         plt.savefig(path_to_save_fig+".pdf", dpi=300)
         plt.close()
-    plt.show()
+    else:
+        plt.show()
 
 ################################################################################
 
@@ -870,8 +879,8 @@ if do_training:
             # Select random training and validation set
             rnd_idx = np.random.randint(0, 10) # 3
             LOG.debug("Repetition {}/{}: started ({}) with split number {}.\n".format(rpt+1,repetitions,datetime.now().strftime("%Y%m%d_%H%M%S"),rnd_idx))
-            ds_train = torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
-            ds_val = torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
+            ds_train = torch.load("./dataset_splits/{}/{}_{}_ds_train_{}.pt".format(name,name,n_reps,rnd_idx), map_location=device) # torch.load("./dataset_splits/{}/{}_ds_train_{}.pt".format(name,name,rnd_idx), map_location=device)
+            ds_val = torch.load("./dataset_splits/{}/{}_{}_ds_val_{}.pt".format(name,name,n_reps,rnd_idx), map_location=device) # torch.load("./dataset_splits/{}/{}_ds_val_{}.pt".format(name,name,rnd_idx), map_location=device)
 
             # Train the network with validation and test
             loss_hist, acc_hist, test_acc, best_layers = train_validate_test(params, name, ds_train, ds_val, ds_test)
@@ -943,7 +952,8 @@ if do_training:
         if save_fig:
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-        plt.show()
+        else:
+            plt.show()
         # Loss:
         # Compute mean, median and std. dev.
         loss_mean_train = np.mean(loss_train_list, axis=0)
@@ -966,7 +976,8 @@ if do_training:
         if save_fig:
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/loss_{}_{}_{}_stats.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
-        plt.show()
+        else:
+            plt.show()
 
         LOG.debug("### Training statistics done ({}). ###\n".format(datetime.now().strftime("%Y%m%d_%H%M%S")))
         print("*** training (with validation) statistics done ***")
@@ -995,7 +1006,8 @@ if do_training:
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/accuracy_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             print("*** accuracy plot saved ***")
-        plt.show()            
+        else:
+            plt.show()            
         # Loss:
         plt.figure()
         plt.plot(range(1, len(loss_hist[0])+1),
@@ -1012,7 +1024,8 @@ if do_training:
             plt.savefig(path_for_plots + "/loss_{}_{}_{}.pdf".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             plt.savefig(path_for_plots + "/loss_{}_{}_{}.png".format(experiment_id,best_test_id,experiment_datetime), dpi=300)
             print("*** loss plot saved ***")
-        plt.show()            
+        else:
+            plt.show()            
         
     # Save (to re-load) trained weights 
     path = './results/layers/optimized/{}/{}'.format(experiment_name,name)

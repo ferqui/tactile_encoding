@@ -210,60 +210,6 @@ def value2index(entry, dictionary):
     return idx
 
 
-
-# Specify what kind of data to take into account
-original = True
-fixed_length = not original
-noise = False
-jitter = False
-
-# prepare data selection
-data_filepath = "../data/data_encoding"
-label_filepath = "../data/label_encoding"
-name = ""
-data_features = [original, fixed_length, noise, jitter]
-data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
-for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
-    data_filepath += "_{}".format(data_attributes[el])
-    label_filepath += "_{}".format(data_attributes[el])
-    name += "{} ".format(data_attributes[el])
-data_filepath += ".pkl"
-label_filepath += ".pkl"
-name = name[:-1]
-
-infile = open(data_filepath, "rb")
-encoded_data = pkl.load(infile)
-infile.close()
-
-if original:
-    n_copies = 100
-    original_panels = []
-    for num_panel,el_panel in enumerate(encoded_data):
-        original_variables = []
-        for num_variable,el_variable in enumerate(el_panel):
-            original_signal = []
-            if num_variable < 2:
-                for num_signal,el_signal in enumerate(el_variable):
-                    original_signal.append([el_signal.item()])
-            else:
-                for num_signal,el_signal in enumerate(el_variable):
-                    original_signal.append(el_signal)
-            original_variables.append(original_signal)
-        original_panels.append(np.array(original_variables))
-    original_labels = list(input_currents.keys())
-    original_data_extended = []
-    original_labels_extended = []
-    for num,el in enumerate(original_panels):
-        for ii in range(n_copies):
-            original_data_extended.append(el)
-            original_labels_extended.append(original_labels[num])
-    encoded_data = original_data_extended
-    encoded_label = original_labels_extended
-else:
-    infile = open(label_filepath, "rb")
-    encoded_label = pkl.load(infile)
-    infile.close()
-
 labels_MNpaper = {
         'A': "Tonic spiking",
         'B': "Class 1",
@@ -287,71 +233,144 @@ labels_MNpaper = {
         'T': "Spike latency",
     }
 
-if original:
-    ### Save the extended version (with n_copies replicas) of the original data
-    filename_data_extended = "../data/data_encoding_{}".format(name.replace(" ","_")) + "_extended"
-    filename_label_extended = "../data/label_encoding_{}".format(name.replace(" ","_")) + "_extended"
-    # xs
-    with open(f"{filename_data_extended}.pkl", 'wb') as handle:
-        pkl.dump(encoded_data, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    # ys
-    with open(f"{filename_label_extended}.pkl", 'wb') as handle:
-        pkl.dump(value2index(encoded_label, labels_MNpaper), handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    ### Save the splits
-    save_path = "../dataset_splits/{}_extended/".format(name.replace(" ","_"))
-    create_directory(save_path)
-    filename_prefix = save_path + name.replace(" ","_") + "_extended"
-    filename_train = filename_prefix + "_ds_train"
-    filename_val = filename_prefix + "_ds_val"
-    filename_test = filename_prefix + "_ds_test"
-    # xs training
-    xs_training = []
-    for ii in range(len(original_panels)):
-        xs_training.extend(encoded_data[ii*n_copies:70+ii*n_copies])
-    with open(f"{filename_train}.pkl", 'wb') as handle:
-        pkl.dump(xs_training, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    # ys training
-    ys_training = []
-    for ii in range(len(original_panels)):
-        ys_training.extend(value2index(encoded_label[ii*n_copies:70+ii*n_copies], labels_MNpaper))
-    with open(f"{filename_train}_label.pkl", 'wb') as handle:
-        pkl.dump(ys_training, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    # xs validation
-    xs_validation = []
-    for ii in range(len(original_panels)):
-        xs_validation.extend(encoded_data[70+ii*n_copies:90+ii*n_copies])
-    with open(f"{filename_val}.pkl", 'wb') as handle:
-        pkl.dump(xs_validation, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    # ys validation
-    ys_validation = []
-    for ii in range(len(original_panels)):
-        ys_validation.extend(value2index(encoded_label[70+ii*n_copies:90+ii*n_copies], labels_MNpaper))
-    with open(f"{filename_val}_label.pkl", 'wb') as handle:
-        pkl.dump(ys_validation, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    # xs test
-    xs_test = []
-    for ii in range(len(original_panels)):
-        xs_test.extend(encoded_data[90+ii*n_copies:(ii+1)*n_copies])
-    with open(f"{filename_test}.pkl", 'wb') as handle:
-        pkl.dump(xs_test, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-    # ys test
-    ys_test = []
-    for ii in range(len(original_panels)):
-        ys_test.extend(value2index(encoded_label[90+ii*n_copies:(ii+1)*n_copies], labels_MNpaper))
-    with open(f"{filename_test}_label.pkl", 'wb') as handle:
-        pkl.dump(ys_test, handle,
-                    protocol=pkl.HIGHEST_PROTOCOL)
-else:
-    train_validation_test_split(np.array(encoded_data)[:, 0], encoded_label, 
-                                multiple=True, 
-                                save_tensor=True,
-                                labels_mapping=labels_MNpaper, 
-                                save_name=name.replace(" ","_"),
-                                save_path="../dataset_splits/{}/".format(name.replace(" ","_")))
+### Data selection
+# ## The old one
+# # Specify what kind of data to take into account
+# original = True
+# fixed_length = not original
+# noise = False
+# jitter = False
+# data_filepath = "../data/data_encoding"
+# label_filepath = "../data/label_encoding"
+# name = ""
+# data_features = [original, fixed_length, noise, jitter]
+# data_attributes = ["original", "fix_len", "noisy", "temp_jitter"]
+# for num,el in enumerate(list(np.where(np.array(data_features)==True)[0])):
+#     data_filepath += "_{}".format(data_attributes[el])
+#     label_filepath += "_{}".format(data_attributes[el])
+#     name += "{} ".format(data_attributes[el])
+# data_filepath += ".pkl"
+# label_filepath += ".pkl"
+# name = name[:-1]
+# 
+# infile = open(data_filepath, "rb")
+# encoded_data = pkl.load(infile)
+# infile.close()
+# 
+# if original:
+#     n_copies = 100
+#     original_panels = []
+#     for num_panel,el_panel in enumerate(encoded_data):
+#         original_variables = []
+#         for num_variable,el_variable in enumerate(el_panel):
+#             original_signal = []
+#             if num_variable < 2:
+#                 for num_signal,el_signal in enumerate(el_variable):
+#                     original_signal.append([el_signal.item()])
+#             else:
+#                 for num_signal,el_signal in enumerate(el_variable):
+#                     original_signal.append(el_signal)
+#             original_variables.append(original_signal)
+#         original_panels.append(np.array(original_variables))
+#     original_labels = list(input_currents.keys())
+#     original_data_extended = []
+#     original_labels_extended = []
+#     for num,el in enumerate(original_panels):
+#         for ii in range(n_copies):
+#             original_data_extended.append(el)
+#             original_labels_extended.append(original_labels[num])
+#     encoded_data = original_data_extended
+#     encoded_label = original_labels_extended
+# else:
+#     infile = open(label_filepath, "rb")
+#     encoded_label = pkl.load(infile)
+#     infile.close()
+# 
+# if original:
+#     ### Save the extended version (with n_copies replicas) of the original data
+#     filename_data_extended = "../data/data_encoding_{}".format(name.replace(" ","_")) + "_extended"
+#     filename_label_extended = "../data/label_encoding_{}".format(name.replace(" ","_")) + "_extended"
+#     # xs
+#     with open(f"{filename_data_extended}.pkl", 'wb') as handle:
+#         pkl.dump(encoded_data, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     # ys
+#     with open(f"{filename_label_extended}.pkl", 'wb') as handle:
+#         pkl.dump(value2index(encoded_label, labels_MNpaper), handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     ### Save the splits
+#     save_path = "../dataset_splits/{}_extended/".format(name.replace(" ","_"))
+#     create_directory(save_path)
+#     filename_prefix = save_path + name.replace(" ","_") + "_extended"
+#     filename_train = filename_prefix + "_ds_train"
+#     filename_val = filename_prefix + "_ds_val"
+#     filename_test = filename_prefix + "_ds_test"
+#     # xs training
+#     xs_training = []
+#     for ii in range(len(original_panels)):
+#         xs_training.extend(encoded_data[ii*n_copies:70+ii*n_copies])
+#     with open(f"{filename_train}.pkl", 'wb') as handle:
+#         pkl.dump(xs_training, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     # ys training
+#     ys_training = []
+#     for ii in range(len(original_panels)):
+#         ys_training.extend(value2index(encoded_label[ii*n_copies:70+ii*n_copies], labels_MNpaper))
+#     with open(f"{filename_train}_label.pkl", 'wb') as handle:
+#         pkl.dump(ys_training, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     # xs validation
+#     xs_validation = []
+#     for ii in range(len(original_panels)):
+#         xs_validation.extend(encoded_data[70+ii*n_copies:90+ii*n_copies])
+#     with open(f"{filename_val}.pkl", 'wb') as handle:
+#         pkl.dump(xs_validation, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     # ys validation
+#     ys_validation = []
+#     for ii in range(len(original_panels)):
+#         ys_validation.extend(value2index(encoded_label[70+ii*n_copies:90+ii*n_copies], labels_MNpaper))
+#     with open(f"{filename_val}_label.pkl", 'wb') as handle:
+#         pkl.dump(ys_validation, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     # xs test
+#     xs_test = []
+#     for ii in range(len(original_panels)):
+#         xs_test.extend(encoded_data[90+ii*n_copies:(ii+1)*n_copies])
+#     with open(f"{filename_test}.pkl", 'wb') as handle:
+#         pkl.dump(xs_test, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+#     # ys test
+#     ys_test = []
+#     for ii in range(len(original_panels)):
+#         ys_test.extend(value2index(encoded_label[90+ii*n_copies:(ii+1)*n_copies], labels_MNpaper))
+#     with open(f"{filename_test}_label.pkl", 'wb') as handle:
+#         pkl.dump(ys_test, handle,
+#                     protocol=pkl.HIGHEST_PROTOCOL)
+# else:
+#     train_validation_test_split(np.array(encoded_data)[:, 0], encoded_label, 
+#                                 multiple=True, 
+#                                 save_tensor=True,
+#                                 labels_mapping=labels_MNpaper, 
+#                                 save_name=name.replace(" ","_"),
+#                                 save_path="../dataset_splits/{}/".format(name.replace(" ","_")))
+
+# The new one
+n_reps = 500
+data_filepath = f"../data/mn_classes_dataset_{n_reps}_trials.pkl"
+label_filepath = f"../data/mn_classes_labels_{n_reps}_trials.pkl"
+
+infile = open(data_filepath, "rb")
+encoded_data = pkl.load(infile)
+infile.close()
+
+infile = open(label_filepath, "rb")
+encoded_label = pkl.load(infile)
+infile.close()
+
+train_validation_test_split(np.array(encoded_data)[:, 0], encoded_label,
+                            multiple=True, 
+                            save_tensor=True,
+                            labels_mapping=labels_MNpaper, 
+                            save_name=f"mn_classes_{n_reps}",
+                            save_path=f"../dataset_splits/mn_classes/")

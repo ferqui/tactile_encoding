@@ -24,7 +24,7 @@ parser.add_argument('-training_statistics',
 # Number or repetitions for training statistics
 parser.add_argument('-repetitions',
                     type=int,
-                    default=3,
+                    default=10,
                     help='Number of trainings to be performed for statistical evaluation.')
 # Number or tests for statistics
 parser.add_argument('-n_test',
@@ -34,7 +34,7 @@ parser.add_argument('-n_test',
 # Number of epochs
 parser.add_argument('-nb_epochs',
                     type=int,
-                    default=5,
+                    default=30,
                     help='Number of training epochs.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
