@@ -213,7 +213,7 @@ else:
 settings["device"] = device
 
 ### CPU
-min_use = get_least_active_cores(num_cores=5)
+min_use = get_least_active_cores(num_cores=settings["n_cores"])
 print("Selected CPU cores: {}".format(min_use))
 limit_cpu_cores(min_use)
 

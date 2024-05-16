@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 # Experiment name
 parser.add_argument('-experiment_name',
                     type=str,
-                    default="GR_MNIST_classifier",
+                    default="original_patterns",
                     help='Name of this experiment.')
 # ID of the NNI experiment to refer to
 parser.add_argument('-experiment_id',
@@ -21,8 +21,13 @@ parser.add_argument('-best_test_id',
 # Path of weights to perform test only (if do_training is False)
 parser.add_argument('-trained_layers_path',
                     type=str,
-                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt",
+                    default="./results/layers/optimized/spike_classifier/mn_classes/vpeqjlkr_ref.pt",
                     help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
+# Set if to use GPU
+parser.add_argument('-use_gpu',
+                    type=bool,
+                    default=False,
+                    help='Specify if GPU is needed.')
 # Auto-selection of GPU
 parser.add_argument('-auto_gpu',
                     type=bool,
@@ -31,7 +36,7 @@ parser.add_argument('-auto_gpu',
 # Manual selection of GPU
 parser.add_argument('-manual_gpu_idx',
                     type=int,
-                    default=1,
+                    default=0,
                     help='Set which GPU to use.')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',

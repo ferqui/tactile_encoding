@@ -14,7 +14,7 @@ parser.add_argument('-experiment_name',
 # Training needed or not
 parser.add_argument('-do_training',
                     type=bool,
-                    default=True,
+                    default=False,
                     help='If set to False, test only will be performed.')
 # Make some statistics for training
 parser.add_argument('-training_statistics',
@@ -69,7 +69,7 @@ parser.add_argument('-store_weights',
 # Path of weights to perform test only (if do_training is False)
 parser.add_argument('-trained_layers_path',
                     type=str,
-                    default="./results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr_ref.pt", #"./NNI/results/layers/fix_len_noisy_temp_jitter/vpeqjlkr.pt",
+                    default="./results/layers/optimized/spike_classifier/mn_classes/vpeqjlkr_ref.pt",
                     help='Path of the weights to be loaded to perform test only (given do_training is set to False).')
 # (maximum) GPU memory fraction to be allocated
 parser.add_argument('-gpu_mem_frac',
@@ -81,6 +81,11 @@ parser.add_argument('-visible_gpus',
                     type=int,
                     default=[0],
                     help='GPU index to be used for the experiment.')
+# Limit CPU usage
+parser.add_argument('-n_cores',
+                    type=int,
+                    default=5,
+                    help='Maximum number of CPU cores to use.')
 # Set seed usage
 parser.add_argument('-use_seed',
                     type=bool,
