@@ -38,6 +38,7 @@ results/activity_classification/MN_activity/BrailleTrained_activity_classificati
 results/activity_classification/MN_activity/MN_Output_MNIST_c_ERROR/*
 results/activity_classification/MN_activity/MN_Output_MNIST_c_ERROR_2/*
 !results/activity_classification/MN_activity/BrailleTrained_activity_classification/activity_classification_Braille_20230927_092051
+results/activity_classification/MN_activity/original_patterns_OldModel/*
 results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/vpeqjlkr.pt
 results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/experiments_history/*
 results/layers/optimized/spike_classifier/fix_len_noisy_temp_jitter/initial_attempts/*
@@ -47,6 +48,7 @@ results/plots/activity_classification/MN_activity/BrailleTrained_activity_MN/bra
 results/plots/activity_classification/MN_activity/MN_Output_MNIST_c_ERROR/*
 results/plots/activity_classification/MN_activity/MN_Output_MNIST_c_ERROR_2/*
 results/plots/activity_classification/MN_activity/original_patterns/*
+results/plots/activity_classification/MN_activity/original_patterns_OldModel/*
 results/plots/classification/Braille/*
 results/plots/classification/original_input_activity_MN/with_Braille-optimized_parameters_v0/*
 results/plots/optimized/*
