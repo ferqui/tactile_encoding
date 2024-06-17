@@ -58,124 +58,124 @@ if __name__ == '__main__':
     ###################
     # original length #
     ###################
-    # for counter, data_type in tqdm(enumerate(data_types)):
-    #     # original
-    #     if data_type == '':
-    #         add_noise = False
-    #         temp_jitter = False
-    #         add_offset = False
-    #     # single
-    #     elif data_type == '_noisy':
-    #         data_type = f'_{NOISE}_noise'
-    #         add_noise = True
-    #         temp_jitter = False
-    #         add_offset = False
-    #     elif data_type == '_temp_jitter':
-    #         data_type = f'_{JITTER}_jitter'
-    #         add_noise = False
-    #         temp_jitter = True
-    #         add_offset = False
-    #     elif data_type == '_offset':
-    #         data_type = f'_{OFFSET}_offset'
-    #         add_noise = False
-    #         temp_jitter = False
-    #         add_offset = True
-    #     # combination of two
-    #     elif data_type == '_noisy_temp_jitter':
-    #         data_type = f'_{NOISE}_noise_{JITTER}_jitter'
-    #         add_noise = True
-    #         temp_jitter = True
-    #         add_offset = False
-    #     elif data_type == '_noisy_offset':
-    #         data_type = f'_{NOISE}_noise_{OFFSET}_offset'
-    #         add_noise = True
-    #         temp_jitter = False
-    #         add_offset = True
-    #     elif data_type == '_temp_jitter_offset':
-    #         data_type = f'_{JITTER}_jitter_{OFFSET}_offset'
-    #         add_noise = False
-    #         temp_jitter = True
-    #         add_offset = True
-    #     # combination of three
-    #     elif data_type == '_noisy_temp_jitter_offset':
-    #         data_type = f'_{NOISE}_noise_{JITTER}_jitter_{OFFSET}_offset'
-    #         add_noise = True
-    #         temp_jitter = True
-    #         add_offset = True
+    for counter, data_type in tqdm(enumerate(data_types)):
+        # original
+        if data_type == '':
+            add_noise = False
+            temp_jitter = False
+            add_offset = False
+        # single
+        elif data_type == '_noisy':
+            data_type = f'_{NOISE}_noise'
+            add_noise = True
+            temp_jitter = False
+            add_offset = False
+        elif data_type == '_temp_jitter':
+            data_type = f'_{JITTER}_jitter'
+            add_noise = False
+            temp_jitter = True
+            add_offset = False
+        elif data_type == '_offset':
+            data_type = f'_{OFFSET}_offset'
+            add_noise = False
+            temp_jitter = False
+            add_offset = True
+        # combination of two
+        elif data_type == '_noisy_temp_jitter':
+            data_type = f'_{NOISE}_noise_{JITTER}_jitter'
+            add_noise = True
+            temp_jitter = True
+            add_offset = False
+        elif data_type == '_noisy_offset':
+            data_type = f'_{NOISE}_noise_{OFFSET}_offset'
+            add_noise = True
+            temp_jitter = False
+            add_offset = True
+        elif data_type == '_temp_jitter_offset':
+            data_type = f'_{JITTER}_jitter_{OFFSET}_offset'
+            add_noise = False
+            temp_jitter = True
+            add_offset = True
+        # combination of three
+        elif data_type == '_noisy_temp_jitter_offset':
+            data_type = f'_{NOISE}_noise_{JITTER}_jitter_{OFFSET}_offset'
+            add_noise = True
+            temp_jitter = True
+            add_offset = True
 
-    #     # load data
-    #     filename = 'data_encoding_original' + data_type
-    #     with open(f"{data_path}/{filename}.pkl", 'rb') as infile:
-    #         data = pickle.load(infile)
+        # load data
+        filename = 'data_encoding_original' + data_type
+        with open(f"{data_path}/{filename}.pkl", 'rb') as infile:
+            data = pickle.load(infile)
 
-    #     # create plots
-    #     plot_traces_original(path, data, add_offset=add_offset, add_noise=add_noise,
-    #                          temp_jitter=temp_jitter)
+        # create plots
+        plot_traces_original(path, data, add_offset=add_offset, add_noise=add_noise,
+                             temp_jitter=temp_jitter)
 
-    #     plot_isi_original(path, data, add_offset=add_offset, add_noise=add_noise,
-    #                       temp_jitter=temp_jitter, norm_count=True, norm_time=True)
+        plot_isi_original(path, data, add_offset=add_offset, add_noise=add_noise,
+                          temp_jitter=temp_jitter, norm_count=True, norm_time=True)
 
     # # ##############
     # # # fix length #
     # # ##############
-    # for _, data_type in tqdm(enumerate(data_types)):
-    #     # original
-    #     if data_type == '':
-    #         add_noise = False
-    #         temp_jitter = False
-    #         add_offset = False
-    #     # single
-    #     elif data_type == '_noisy':
-    #         data_type = f'_{NOISE}_noise'
-    #         add_noise = True
-    #         temp_jitter = False
-    #         add_offset = False
-    #     elif data_type == '_temp_jitter':
-    #         data_type = f'_{JITTER}_jitter'
-    #         add_noise = False
-    #         temp_jitter = True
-    #         add_offset = False
-    #     elif data_type == '_offset':
-    #         data_type = f'_{OFFSET}_offset'
-    #         add_noise = False
-    #         temp_jitter = False
-    #         add_offset = True
-    #     # combination of two
-    #     elif data_type == '_noisy_temp_jitter':
-    #         data_type = f'_{NOISE}_noise_{JITTER}_jitter'
-    #         add_noise = True
-    #         temp_jitter = True
-    #         add_offset = False
-    #     elif data_type == '_noisy_offset':
-    #         data_type = f'_{NOISE}_noise_{OFFSET}_offset'
-    #         add_noise = True
-    #         temp_jitter = False
-    #         add_offset = True
-    #     elif data_type == '_temp_jitter_offset':
-    #         data_type = f'_{JITTER}_jitter_{OFFSET}_offset'
-    #         add_noise = False
-    #         temp_jitter = True
-    #         add_offset = True
-    #     # combination of three
-    #     elif data_type == '_noisy_temp_jitter_offset':
-    #         data_type = f'_{NOISE}_noise_{JITTER}_jitter_{OFFSET}_offset'
-    #         add_noise = True
-    #         temp_jitter = True
-    #         add_offset = True
+    for _, data_type in tqdm(enumerate(data_types)):
+        # original
+        if data_type == '':
+            add_noise = False
+            temp_jitter = False
+            add_offset = False
+        # single
+        elif data_type == '_noisy':
+            data_type = f'_{NOISE}_noise'
+            add_noise = True
+            temp_jitter = False
+            add_offset = False
+        elif data_type == '_temp_jitter':
+            data_type = f'_{JITTER}_jitter'
+            add_noise = False
+            temp_jitter = True
+            add_offset = False
+        elif data_type == '_offset':
+            data_type = f'_{OFFSET}_offset'
+            add_noise = False
+            temp_jitter = False
+            add_offset = True
+        # combination of two
+        elif data_type == '_noisy_temp_jitter':
+            data_type = f'_{NOISE}_noise_{JITTER}_jitter'
+            add_noise = True
+            temp_jitter = True
+            add_offset = False
+        elif data_type == '_noisy_offset':
+            data_type = f'_{NOISE}_noise_{OFFSET}_offset'
+            add_noise = True
+            temp_jitter = False
+            add_offset = True
+        elif data_type == '_temp_jitter_offset':
+            data_type = f'_{JITTER}_jitter_{OFFSET}_offset'
+            add_noise = False
+            temp_jitter = True
+            add_offset = True
+        # combination of three
+        elif data_type == '_noisy_temp_jitter_offset':
+            data_type = f'_{NOISE}_noise_{JITTER}_jitter_{OFFSET}_offset'
+            add_noise = True
+            temp_jitter = True
+            add_offset = True
 
-    #     filename = 'data_encoding_fix_len' + data_type
-    #     with open(f"{data_path}/{filename}.pkl", 'rb') as infile:
-    #         data = pickle.load(infile)
+        filename = 'data_encoding_fix_len' + data_type
+        with open(f"{data_path}/{filename}.pkl", 'rb') as infile:
+            data = pickle.load(infile)
 
-    #     # create plots
-    #     plot_traces_fix_len(path, data, max_trials=NB_TRIALS,
-    #                         add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter)
+        # create plots
+        plot_traces_fix_len(path, data, max_trials=NB_TRIALS,
+                            add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter)
 
-    #     plot_single_isi_fix_len(path, data, max_trials=NB_TRIALS,
-    #                             add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
+        plot_single_isi_fix_len(path, data, max_trials=NB_TRIALS,
+                                add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
 
-    #     plot_isi_fix_len(path, data, max_trials=NB_TRIALS,
-    #                      add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
+        plot_isi_fix_len(path, data, max_trials=NB_TRIALS,
+                         add_offset=add_offset, add_noise=add_noise, temp_jitter=temp_jitter, norm_count=True, norm_time=True)
 
     ##################
     # parameter weep #
