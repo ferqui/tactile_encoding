@@ -68,15 +68,28 @@ neuron_parameters["Tonic spiking"] = {
     "a": 0,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
+# adopted
+# neuron_parameters["Class 1"] = {
+#     "a": 0,
+#     "A1": 0,
+#     "A2": 0,
+#     "ELinit": -0.05,
+#     "Tinf": -0.050000200048089030874232109, # -0.050000200048089030874232108 too high (just single spike), -0.050000200048089030874232109 too low (spike too early)
+#     "dt": 1E-3,
+# }
 neuron_parameters["Class 1"] = {
     "a": 0,
     "A1": 0,
     "A2": 0,
     "ELinit": -0.05,
-    "Tinf": -0.050000200048089030874232109, # -0.050000200048089030874232108 too high (no add spike), -0.050000200048089030874232109 too low (spike too early)
+    "Tinf": -0.050000200048089030874232109, # -0.050000200048089030874232108 too high (just single spike), -0.050000200048089030874232109 too low (spike too early)
+    "v0": -0.05,
+    "t0": -0.05,
     "dt": 1E-3,
 }
 
@@ -85,6 +98,8 @@ neuron_parameters["Spike frequency adaptation"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -92,6 +107,8 @@ neuron_parameters["Phasic spiking"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -99,6 +116,8 @@ neuron_parameters["Accommodation"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -106,6 +125,8 @@ neuron_parameters["Threshold variability"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -113,6 +134,8 @@ neuron_parameters["Rebound spike"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -122,6 +145,8 @@ neuron_parameters["Class 2"] = {
     "A2": 0,
     "ELinit": -0.03,
     "Tinit": -0.03,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -129,6 +154,8 @@ neuron_parameters["Integrator"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -136,6 +163,8 @@ neuron_parameters["Input bistability"] = {
     "a": 5,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -144,6 +173,8 @@ neuron_parameters["Hyperpolarizing spiking"] = {
     "a": 30,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -155,11 +186,23 @@ neuron_parameters["Hyperpolarizing bursting"] = {
     "dt": 1E-3,
 }
 
+# adopted
+# neuron_parameters["Tonic bursting"] = {
+#     "a": 5.1,  # 5
+#     "A1": 12,  # 10
+#     "A2": -0.6,
+    # "v0": None,
+    # "t0": None,
+#     "dt": 1E-3,
+# }
 
+# original
 neuron_parameters["Tonic bursting"] = {
-    "a": 5.1,  # 5
-    "A1": 12,  # 10
+    "a": 5,
+    "A1": 10,
     "A2": -0.6,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -167,6 +210,8 @@ neuron_parameters["Phasic bursting"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -174,6 +219,8 @@ neuron_parameters["Rebound burst"] = {
     "a": 5,
     "A1": 10,
     "A2": -0.6,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -182,6 +229,8 @@ neuron_parameters["Mixed mode"] = {
     "a": 5,
     "A1": 5.5,  # 5
     "A2": -0.3,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -189,21 +238,35 @@ neuron_parameters["Afterpotentials"] = {
     "a": 5,
     "A1": 5,
     "A2": -0.3,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
+# adopted
+# neuron_parameters["Basal bistability"] = {
+#     "a": -3.8,  # 0
+#     "A1": 8,
+#     "A2": -0.1,
+#     "dt": 1E-3,
+# }
+
+# original
 neuron_parameters["Basal bistability"] = {
-    "a": -3.8,  # 0
+    "a": 0,  # 0
     "A1": 8,
     "A2": -0.1,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
-
 # TODO does not act as low-pass
 neuron_parameters["Preferred frequency"] = {
     "a": 5,
     "A1": -3,
     "A2": 0.5,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
 
@@ -212,5 +275,7 @@ neuron_parameters["Spike latency"] = {
     "a": -80,
     "A1": 0,
     "A2": 0,
+    "v0": None,
+    "t0": None,
     "dt": 1E-3,
 }
